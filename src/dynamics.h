@@ -16,4 +16,7 @@ int diff_eval(struct Diff *, double, double *, double *,double*);
 ////////////////////////////////////////////////
 
 int dyn_eval(struct Dyn *,double,double *,double *,double *, double *);
+
+int std_dyn_eval(struct StdDyn *, double *, double *, double *,
+                 double *, double *);
 #endif

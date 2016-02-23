@@ -173,6 +173,7 @@ int main(int argc, char * argv[])
     state_free(state);
     control_free(control);
     trajectory_free(traj);
+    policy_free(pol);
     
     return 0;
 }

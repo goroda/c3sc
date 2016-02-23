@@ -65,4 +65,15 @@ struct Dyn
     struct Diff  * diff;
 };
 
+
+// for normalizing states
+struct StdDyn
+{
+    size_t d;
+    double * slope; //slope
+    double * off; //offset
+    double * space;
+    struct Dyn * dyn;
+}
+
 #endif

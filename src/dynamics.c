@@ -74,5 +74,23 @@ int dyn_eval(struct Dyn * dyn, double time, double * x, double * u,
     return res;
 }
 
-
-
+int std_dyn_eval(struct StdDyn * sd, double * time, double * x, double *,
+                 double * drift, double * diff)
+{
+    
+    for (size_t ii = 0; ii < sd->d; ii++){
+        sd->space[ii] = sd->slope[ii]*x[ii] + sd->off[ii];
+    }
+    
+    int res = dyn_eval(sd->dyn,time,sd->space,u,drift,diff);
+    if (res == 0){
+        return res;
+    }
+    else{
+        for (size_t ii = 0; ii < sd->d; ii++){
+            drift[ii]/=sd->m[ii];
+            diff[ii]/= sd->m[ii]; // not sure about this scaling for stochastic term;
+        }
+    }
+    return res;
+}

@@ -228,7 +228,7 @@ int trajectory_add_ref(struct Trajectory ** traj, struct State * s,
         (*traj)->next = NULL;
     }
     else{
-        trajectory_add(&((*traj)->next),s,u);
+        trajectory_add_ref(&((*traj)->next),s,u);
     }
     return 0;
 }
@@ -260,8 +260,8 @@ struct State * trajectory_last_state(struct Trajectory * traj)
         }
         return traj->s;
     }
-
 }
+
 
 int trajectory_step(struct Trajectory * traj, struct Policy * pol, 
                     struct Dyn * dyn, double dt, char * method, 
