@@ -30,21 +30,22 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
-int f1(double t, double * x, double * u, double * out)
+int f1(double t, double * x, double * u, double * out, void * args)
 {
     (void)(t);
+    (void)(args);
     
     out[0] = x[1];
     out[1] = u[0];
     return 0;
 }
 
-int s1(double t, double * x, double * u, double * out)
+int s1(double t, double * x, double * u, double * out, void * args)
 {
     (void)(t);
     (void)(x);
     (void)(u);
-    (void)(t);
+    (void)(args);
     
     out[0] = 1.0;
     out[1] = 0.0;
@@ -131,15 +132,19 @@ int main(int argc, char * argv[])
     
     struct Drift drift;
     drift_init(&drift,dx,du,NULL,NULL,NULL,NULL);
+    drift.b = f1;
+
     struct Diff diff;
     diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
+    diff.s = s1;
+
     struct Dyn dyn = {&drift, &diff};
 
     struct State * state = state_alloc();
     struct Control * control = control_alloc();
     
     double t0 = 0.0;
-    double xs[2] = {0.0,0.0};
+    double xs[2] = {1.0,0.5};
     double us[1] = {0.0};
     
     state_init(state,dx,t0,xs);
@@ -152,6 +157,17 @@ int main(int argc, char * argv[])
     policy_init(pol,dx,du,NULL,NULL);
     policy_add_feedback(pol,polfunc);
 
+    size_t nsteps = 100;
+    double space[2];
+    double dt = 1e-2;
+    int res;
+    for (size_t ii = 0; ii < nsteps; ii++){
+        res = trajectory_step(traj,pol,&dyn,dt,"euler",space);
+        if (res != 0){
+            break;
+        }
+    }
+    
     trajectory_print(traj,stdout,4);
 
     state_free(state);

@@ -25,7 +25,7 @@ int drift_eval(struct Drift * b, double time, double * x, double * u,
     int res;
     if (b->b == NULL){
         fprintf(stderr,"Warning: drift dynamics (Drift->b) are not\n");
-        fprintf(stderr,"yet specified\n");
+        fprintf(stderr,"         yet specified\n");
         return 1;
     }
     res = b->b(time,x,u,out,b->bargs);
@@ -55,7 +55,7 @@ int diff_eval(struct Diff * b, double time, double * x,
     int res;
     if (b->s == NULL){
         fprintf(stderr,"Warning: Diff dynamics (Diff->s) are not\n");
-        fprintf(stderr,"yet specified\n");
+        fprintf(stderr,"         yet specified\n");
         return 1;
     }
     res = b->s(time,x,u,out,b->sargs);
