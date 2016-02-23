@@ -6,6 +6,7 @@
 #include <getopt.h>
 
 #include "c3.h"
+#include "c3sc.h"
 
 static char * program_name;
 
@@ -29,6 +30,44 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
+int f1(double t, double * x, double * u, double * out)
+{
+    (void)(t);
+    
+    out[0] = x[1];
+    out[1] = u[0];
+    return 0;
+}
+
+int s1(double t, double * x, double * u, double * out)
+{
+    (void)(t);
+    (void)(x);
+    (void)(u);
+    (void)(t);
+    
+    out[0] = 1.0;
+    out[1] = 0.0;
+    out[2] = 0.0;
+    out[1] = 1.0;
+    
+    return 0;
+}
+
+int polfunc(double t, double * x, double * u)
+{
+    (void)(t);
+    if (x[1] > 0){
+        u[0] = -1.0;
+    }
+    else if (x[1] < 0){
+        u[0] = 1.0;
+    }
+    else{
+        u[0] = 0.0;
+    }
+    return 0;
+}
 
 int main(int argc, char * argv[])
 {
@@ -85,127 +124,39 @@ int main(int argc, char * argv[])
                 abort();
         }
     } while (next_option != -1);
+    
+    size_t dx = 2;
+    size_t dw = 2;
+    size_t du = 1;
+    
+    struct Drift drift;
+    drift_init(&drift,dx,du,NULL,NULL,NULL,NULL);
+    struct Diff diff;
+    diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
+    struct Dyn dyn = {&drift, &diff};
 
-    size_t dim = 2;
-    struct BoundingBox * bds = bounding_box_init(dim,lb,ub);
+    struct State * state = state_alloc();
+    struct Control * control = control_alloc();
+    
+    double t0 = 0.0;
+    double xs[2] = {0.0,0.0};
+    double us[1] = {0.0};
+    
+    state_init(state,dx,t0,xs);
+    control_init(control,du,us);
 
-    struct LinElemExpAopts aopts = {n,0};
-    struct FtApproxArgs * fapp = ft_approx_args_create_le(dim,&aopts);
-    double * xnodes = linspace(lb,ub,n);
-    struct c3Vector c3v = {n,xnodes};
-    struct FiberOptArgs * fopt = fiber_opt_args_bf_same(dim,&c3v);
+    struct Trajectory * traj = NULL;
+    trajectory_add(&traj,state,control);
 
-    size_t init_ranks[3] = {1,3,1};
-    struct FtCrossArgs fca;
-    ft_cross_args_init(&fca);
-    fca.dim = dim;
-    fca.ranks = init_ranks;
-    fca.epsilon = 1e-7;
-    fca.maxiter = 10;
-    fca.epsround = 1e-10;
-    fca.kickrank = 2;
-    fca.maxiteradapt = 5;
-    fca.verbose = verbose;
-    fca.optargs = fopt;
-   
-    struct FunctionMonitor * fm = NULL;
-    double (*ff)(double *, void *);
+    struct Policy * pol = policy_alloc();
+    policy_init(pol,dx,du,NULL,NULL);
+    policy_add_feedback(pol,polfunc);
 
-    if (function == 0){
-        fm = function_monitor_initnd(f0,NULL,dim,1000*dim);
-        ff = f0;
-    }
-    else if (function == 1){
-        fm = function_monitor_initnd(f1,NULL,dim,1000*dim);
-        ff = f1;
-    }
-    else if (function == 2){
-        fm = function_monitor_initnd(f2,NULL,dim,1000*dim);
-        ff = f2;
-    }
-    else{
-        printf("Function %zu not yet implemented\n",function);
-        return 1;
-    }
+    trajectory_print(traj,stdout,4);
 
-    // Done with setup
-    if (verbose == 1){
-        printf("nodes are\n");
-        dprint(n,xnodes);
-    }
-    assert ( n > 4);
-    double startx[3] = {xnodes[0], xnodes[5], xnodes[n-1]};
-    double starty[3] = {xnodes[0], xnodes[4], xnodes[n-1]};
-    double * start[2];
-    start[0] = startx;
-    start[1] = starty;
-    struct FunctionTrain * ft = 
-        function_train_cross(function_monitor_eval,fm,bds,start,&fca,fapp);
-
-    size_t nevals = nstored_hashtable_cp(fm->evals);
-    size_t ntot = n*n;
-    if (verbose == 1){
-        printf("Final ranks are "); iprint_sz(3,ft->ranks);
-        printf("Number of evaluations = %zu\n",nevals);
-        printf("Number of total nodes = %zu\n",ntot);
-        printf("Fraction of nodes used is %3.15G\n",(double)nevals/(double)ntot);
-    }
-
-    char evals[256];
-    sprintf(evals,"%s/%s_%zu.dat",dirout,"evals",n);
-    FILE *fp;
-    fp =  fopen(evals, "w");
-    if (fp == NULL){
-        fprintf(stderr, "cat: can't open %s\n", evals);
-        return 0;
-    }
-    function_monitor_print_to_file(fm,fp);
-    fclose(fp);
-
-
-    FILE *fp2;
-    char toterrs[256];
-    sprintf(toterrs,"%s/%s_%zu.dat",dirout,"recon",n);
-    fp2 =  fopen(toterrs, "w");
-    if (fp2 == NULL){
-        fprintf(stderr, "cat: can't open %s\n", toterrs);
-        return 0;
-    }
-
-    fprintf(fp2,"x y f f0 df0\n");
-    size_t N1 = 40;
-    size_t N2 = 40;
-    double * xtest = linspace(lb,ub,N1);
-    double * ytest = linspace(lb,ub,N2);
-
-    double out1=0.0;
-    double den=0.0;
-    double pt[2];
-    double v1,v2;
-    for (size_t ii = 0; ii < N1; ii++){
-        for (size_t jj = 0; jj < N2; jj++){
-            pt[0] = xtest[ii]; pt[1] = ytest[jj];
-            v1 = ff(pt,NULL);
-            v2 = function_train_eval(ft,pt);
-            fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f %3.5f \n", 
-                    xtest[ii], ytest[jj],v1,v2,v1-v2);
-            den += pow(v1,2.0);
-            out1 += pow(v1-v2,2.0);
-        }
-        fprintf(fp2,"\n");
-    }
-    if (verbose == 1){
-        printf("RMS Error of Final = %G\n", out1/den);
-    }
-
-
-    fclose(fp2);
-    free(xtest); free(ytest);
-
-    function_train_free(ft);
-    function_monitor_free(fm);
-    ft_approx_args_free(fapp);
-    fiber_opt_args_free(fopt);
-    bounding_box_free(bds);
+    state_free(state);
+    control_free(control);
+    trajectory_free(traj);
+    
     return 0;
 }

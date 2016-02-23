@@ -23,6 +23,11 @@ int drift_eval(struct Drift * b, double time, double * x, double * u,
                double * out)
 {
     int res;
+    if (b->b == NULL){
+        fprintf(stderr,"Warning: drift dynamics (Drift->b) are not\n");
+        fprintf(stderr,"yet specified\n");
+        return 1;
+    }
     res = b->b(time,x,u,out,b->bargs);
     return res;
 }
@@ -44,9 +49,15 @@ void diff_init(struct Diff * s, size_t dw,
     s->sargs = NULL;
 }
 
-int diff_eval(struct Diff * b, double time, double * x, double * u, double * out)
+int diff_eval(struct Diff * b, double time, double * x, 
+              double * u, double * out)
 {
     int res;
+    if (b->s == NULL){
+        fprintf(stderr,"Warning: Diff dynamics (Diff->s) are not\n");
+        fprintf(stderr,"yet specified\n");
+        return 1;
+    }
     res = b->s(time,x,u,out,b->sargs);
     return res;
 }
@@ -55,11 +66,11 @@ int dyn_eval(struct Dyn * dyn, double time, double * x, double * u,
              double * drift, double * diff)
 {
     int res;
-    res = drift_eval(dyn->b,time,x,u,drift);
+    res = drift_eval(dyn->drift,time,x,u,drift);
     if (res != 0){
         return res;
     }
-    res = diff_eval(dyn->s,time,x,u,diff);
+    res = diff_eval(dyn->diff,time,x,u,diff);
     return res;
 }
 

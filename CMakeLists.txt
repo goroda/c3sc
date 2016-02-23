@@ -33,6 +33,8 @@ set(CMAKE_CXX_COMPILER "gcc")
 set(static_libs 0)
 
 include_directories(${BLAS_INCLUDE_DIR}, ${LAPACK_INCLUDE_DIR})
+include_directories("../c3/include")
+include_directories("src")
 
 set(CMAKE_C_FLAGS "${compiler_flags}")
 
