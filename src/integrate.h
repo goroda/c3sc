@@ -5,7 +5,7 @@
 
 struct State * 
 euler_step(struct State *, struct Control *, double,
-           struct Drift *, double *);
+           struct Dyn *, double *);
 
 struct State * 
 euler_maruyama_step(struct State *, double *,

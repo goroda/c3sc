@@ -19,9 +19,16 @@ void drift_init(struct Drift * b, size_t dx, size_t du,
     b->bargs = NULL;
 }
 
+size_t drift_getdx(struct Drift * b)
+{
+    assert (b != NULL);
+    return b->dx;
+}
+
 int drift_eval(struct Drift * b, double time, double * x, double * u,
                double * out)
 {
+    assert ( b != NULL);
     int res;
     if (b->b == NULL){
         fprintf(stderr,"Warning: drift dynamics (Drift->b) are not\n");
@@ -67,16 +74,29 @@ size_t diff_getdw(struct Diff * b){
     return b->dw;
 }
 
-int dyn_eval(struct Dyn * dyn, double time, double * x,
-             double * u, double * drift, double * diff)
+void dyn_init_ref(struct Dyn *dyn, struct Drift *drift, 
+                  struct Diff *diff)
 {
-    int res;
-    res = drift_eval(dyn->drift,time,x,u,drift);
-    if (res != 0){
-        return res;
-    }
-    res = diff_eval(dyn->diff,time,x,u,diff);
-    return res;
+    dyn->trans = 0;
+    dyn->drift = drift;
+    dyn->diff = diff;
+    
+    dyn->lt = NULL;
+    dyn->space = NULL;
+}
+
+void dyn_add_transform_ref(struct Dyn * dyn, struct LinTransform * lt,
+                           double * space)
+{
+    dyn->trans = 1;
+    dyn->lt = lt;
+    dyn->space = space;
+}
+
+size_t dyn_getdx(struct Dyn * dyn)
+{
+    assert (dyn != NULL);
+    return drift_getdx(dyn->drift);
 }
 
 size_t dyn_getdw(struct Dyn * dyn)
@@ -85,24 +105,57 @@ size_t dyn_getdw(struct Dyn * dyn)
     return diff_getdw(dyn->diff);
 }
 
-int std_dyn_eval(struct StdDyn * sd, double time,
-                 double * x, double * u,
-                 double * drift, double * diff)
+static int dyn_eval_base(struct Dyn * dyn, double time, double * x,
+                         double * u, double * drift, double * diff)
+{
+    int res = 0;
+    if (drift != NULL){
+        res = drift_eval(dyn->drift,time,x,u,drift);
+    }
+    if (res != 0){
+        return res;
+    }
+    if (diff != NULL){
+        res = diff_eval(dyn->diff,time,x,u,diff);
+    }
+    return res;
+}
+
+static int dyn_eval_std(struct Dyn * sd, double time,
+                        double * x, double * u,
+                        double * drift, double * diff)
 {
     
-    for (size_t ii = 0; ii < sd->d; ii++){
-        sd->space[ii] = sd->slope[ii]*x[ii] + sd->off[ii];
-    }
-    
-    int res = dyn_eval(sd->dyn,time,sd->space,u,drift,diff);
+    size_t dx = dyn_getdx(sd);
+    lin_transform_eval(sd->lt,x,sd->space);
+    int res = dyn_eval_base(sd,time,sd->space,u,drift,diff);
     if (res == 0){
         return res;
     }
     else{
-        for (size_t ii = 0; ii < sd->d; ii++){
-            drift[ii]/=sd->slope[ii];
-            diff[ii]/= sd->slope[ii]; // not sure about this scaling for stochastic term;
+        if (drift != NULL){
+            for (size_t ii = 0; ii < dx; ii++){
+                drift[ii] /= lin_transform_get_slopei(sd->lt,ii);
+            }
+            // not sure about this scaling for stochastic term;
+            //diff[ii]  /= lin_transform_get_slopei(sd->lt,ii);
         }
     }
     return res;
 }
+
+int dyn_eval(struct Dyn * dyn, double time, double * x,
+             double * u, double * drift, double * diff)
+{
+    int res;
+    //printf("dyn->trans = %d\n",dyn->trans);
+    if (dyn->trans == 0){
+        res = dyn_eval_base(dyn,time,x,u,drift,diff);
+    }
+    else{
+        res = dyn_eval_std(dyn,time,x,u,drift,diff);
+    }
+    return res;
+
+}
+

@@ -9,6 +9,19 @@
 #include "control.h"
 #include "integrate.h"
 
+void lin_transform_eval(struct LinTransform * lt, double * x, 
+                        double * out)
+{
+    for (size_t ii = 0; ii < lt->d; ii++){
+        out[ii] = lt->slope[ii]*x[ii] + lt->offset[ii];
+    }
+}
+
+double lin_transform_get_slopei(struct LinTransform * lt, size_t ii)
+{
+    return lt->slope[ii];
+}
+
 struct State * state_alloc()
 {
     struct State * ss = NULL;
@@ -306,10 +319,8 @@ int trajectory_step(struct Trajectory * traj, struct Policy * pol,
     }
     struct State * s = NULL;
     if (strcmp(method,"euler") == 0){
-
         s = euler_step(current_state,u,dt,
-                       dyn->drift,space);
-
+                       dyn,space);
     }
     else if (strcmp(method,"euler-maruyama") == 0){
         // args is a realization of the noise

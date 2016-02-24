@@ -22,6 +22,10 @@ struct Policy * policy_alloc()
     pol->lbx = NULL;
     pol->ubx = NULL;
     pol->feedback = NULL;
+    pol->trans = 0;
+    pol->lt = NULL;
+    pol->space = NULL;
+    
     return pol;
 }
 
@@ -41,6 +45,15 @@ void policy_init(struct Policy * pol, size_t dx, size_t du,
    
 }
 
+void policy_add_transform_ref(struct Policy * pol,
+                              struct LinTransform * lt, 
+                              double * space)
+{
+    pol->trans = 0;
+    pol->lt = lt;
+    pol->space = space;
+}
+
 void policy_free(struct Policy * pol)
 {
     if (pol != NULL){
@@ -57,12 +70,20 @@ void policy_add_feedback(struct Policy * pol,
     pol->feedback = f;
 }
 
-int policy_eval(struct Policy * pol, double time, double * x, 
+int policy_eval(struct Policy * pol, double time, double * xin, 
                 struct Control ** u)
 {
     assert (pol != NULL);
     assert (pol->feedback != NULL);
-
+    double * x;
+    if (pol->trans == 0){
+        x = xin;
+    }
+    else{
+        lin_transform_eval(pol->lt,xin,pol->space);
+        x = pol->space;
+    }
+    
     int res = c3sc_check_bounds(pol->dx,pol->lbx,pol->ubx,x);
     if (res != 0){
         return res;

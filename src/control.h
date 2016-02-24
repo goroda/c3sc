@@ -7,6 +7,9 @@
 struct Policy * policy_alloc();
 void policy_init(struct Policy *, size_t, size_t, 
                  double *, double *);
+void policy_add_transform_ref(struct Policy *,
+                              struct LinTransform *, 
+                              double *);
 void policy_free(struct Policy *);
 
 void policy_add_feedback(struct Policy *, 

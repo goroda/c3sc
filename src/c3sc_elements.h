@@ -1,6 +1,16 @@
 #ifndef c3sc_ELEMENTS_H
 #define c3sc_ELEMENTS_H
 
+
+struct LinTransform
+{
+    size_t d;
+    double * slope;
+    double * offset;
+};
+void lin_transform_eval(struct LinTransform *, double *, double *);
+double lin_transform_get_slopei(struct LinTransform *, size_t);
+
 struct Control
 {
     size_t d;
@@ -29,6 +39,10 @@ struct Policy
     double * lbx;
     double * ubx;
     int (*feedback)(double, double *, double *);
+
+    int trans;
+    struct LinTransform * lt;
+    double * space;
 };
 
 
@@ -61,19 +75,17 @@ struct Diff
 
 struct Dyn
 {
+    int trans;
     struct Drift * drift;
     struct Diff  * diff;
-};
 
-
-// for normalizing states
-struct StdDyn
-{
-    size_t d;
-    double * slope; //slope
-    double * off; //offset
+// slope and offset for going from
+// [-1,1] -> [a,b]
+// the drift and dynamics above are all defined on
+// [a,b]
+    struct LinTransform * lt;
     double * space;
-    struct Dyn * dyn;
+
 };
 
 #endif

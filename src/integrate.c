@@ -11,13 +11,13 @@
 
 struct State * 
 euler_step(struct State * s, struct Control * u, double dt,
-           struct Drift * drift, double * driftv)
+           struct Dyn * dyn, double * driftv)
 {
     size_t d = state_getd(s);
     double time = state_gett(s);
     double * x = state_getx_ref(s);
     double * uu = control_getu_ref(u);
-    int res = drift_eval(drift,time,x,uu,driftv);
+    int res = dyn_eval(dyn,time,x,uu,driftv,NULL);
     if (res != 0){
         return NULL;
     }
@@ -53,8 +53,10 @@ euler_maruyama_step(struct State * s, double * noise,
     state_init_zero(new,d,time+dt);
     double * newx = state_getx_ref(new);
     for (size_t ii = 0; ii < d; ii++ ){
-        newx[ii] = x[ii] + dt * drift[ii] +
-            cblas_ddot(dw,diff+ii,d,noise,1);
+        double val = cblas_ddot(dw,diff+ii,d,noise,1);
+        //printf("val = %G\n",val);
+        newx[ii] = x[ii] + dt * drift[ii] + val;
+            
     }
     return new;
 }
