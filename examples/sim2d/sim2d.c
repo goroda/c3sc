@@ -18,13 +18,6 @@ void print_code_usage (FILE * stream, int exit_code)
     fprintf(stream,
             " -h --help      Display this usage information.\n"
             " -d --directory Output directory (defaults to .)\n"
-            " -f --function  Which function to approximate \n"
-            "                0: (default) x + y \n"
-            "                1: x*y \n"
-            "                2: sin(5xy)\n"
-            " -n --n         Discretization level (default 6)\n"
-            " -l --lower     Lower bounds on x,y (default -1)\n"
-            " -u --upper     Upper bounds on x,y (default 1)\n"
             " -v --verbose   Output words (default 0)\n"
         );
     exit (exit_code);
@@ -50,7 +43,7 @@ int s1(double t, double * x, double * u, double * out, void * args)
     out[0] = 1.0;
     out[1] = 0.0;
     out[2] = 0.0;
-    out[1] = 1.0;
+    out[3] = 1.0;
     
     return 0;
 }
@@ -73,24 +66,16 @@ int polfunc(double t, double * x, double * u)
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:f:n:l:u:v:v:";
+    const char * const short_options = "hd:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
-        { "function" , 1, NULL, 'd' },
-        { "n"        , 1, NULL, 'd' },
-        { "lower"    , 1, NULL, 'd' },
-        { "upper"    , 1, NULL, 'd' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
     };
     program_name = argv[0];
 
     char * dirout = ".";
-    size_t function = 0;
-    size_t n = 6;
-    double lb = -1.0;
-    double ub = 1.0;
     int verbose = 0;
 
     do {
@@ -101,18 +86,6 @@ int main(int argc, char * argv[])
                 print_code_usage(stdout, 0);
             case 'd':
                 dirout = optarg;
-                break;
-            case 'f':
-                function = (size_t) strtol(optarg,NULL,10);
-                break;
-            case 'n':
-                n = (size_t) strtol(optarg,NULL,10);
-                break;
-            case 'l':
-                lb = strtod(optarg,NULL);
-                break;
-            case 'u':
-                ub = strtod(optarg,NULL);
                 break;
             case 'v':
                 verbose = strtol(optarg,NULL,10);
@@ -157,18 +130,34 @@ int main(int argc, char * argv[])
     policy_init(pol,dx,du,NULL,NULL);
     policy_add_feedback(pol,polfunc);
 
-    size_t nsteps = 100;
-    double space[2];
+    size_t nsteps = 1000;
+    double space[2 + 2];
     double dt = 1e-2;
+    double noise[2];
     int res;
     for (size_t ii = 0; ii < nsteps; ii++){
-        res = trajectory_step(traj,pol,&dyn,dt,"euler",space);
+        noise[0] = randn()*sqrt(dt);
+        noise[1] = randn()*sqrt(dt);
+        //res = trajectory_step(traj,pol,&dyn,dt,"euler",
+        //                      space,NULL);
+        res = trajectory_step(traj,pol,&dyn,dt,
+                              "euler-maruyama",
+                              space,noise);
         if (res != 0){
             break;
         }
     }
-    
-    trajectory_print(traj,stdout,4);
+
+    if (verbose == 1){
+        trajectory_print(traj,stdout,4);
+    }
+
+    char filename[256];
+    sprintf(filename,"%s/%s.dat",dirout,"traj");
+    FILE * fp = fopen(filename,"w");
+    assert (fp != NULL);
+    trajectory_print(traj,fp,4);
+    fclose(fp);
 
     state_free(state);
     control_free(control);

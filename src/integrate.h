@@ -7,9 +7,9 @@ struct State *
 euler_step(struct State *, struct Control *, double,
            struct Drift *, double *);
 
-int euler_maruyama_step(double *, double *, double,
-                        double, double *,
-                        double *,double *,
-                        struct Dyn *);
-
+struct State * 
+euler_maruyama_step(struct State *, double *,
+                   struct Control *, double,
+                   struct Dyn *,
+                    double *, double *);
 #endif

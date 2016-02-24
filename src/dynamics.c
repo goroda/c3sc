@@ -62,8 +62,13 @@ int diff_eval(struct Diff * b, double time, double * x,
     return res;
 }
 
-int dyn_eval(struct Dyn * dyn, double time, double * x, double * u,
-             double * drift, double * diff)
+size_t diff_getdw(struct Diff * b){
+    assert (b != NULL);
+    return b->dw;
+}
+
+int dyn_eval(struct Dyn * dyn, double time, double * x,
+             double * u, double * drift, double * diff)
 {
     int res;
     res = drift_eval(dyn->drift,time,x,u,drift);
@@ -74,7 +79,14 @@ int dyn_eval(struct Dyn * dyn, double time, double * x, double * u,
     return res;
 }
 
-int std_dyn_eval(struct StdDyn * sd, double * time, double * x, double *,
+size_t dyn_getdw(struct Dyn * dyn)
+{
+    assert (dyn != NULL);
+    return diff_getdw(dyn->diff);
+}
+
+int std_dyn_eval(struct StdDyn * sd, double time,
+                 double * x, double * u,
                  double * drift, double * diff)
 {
     
@@ -88,8 +100,8 @@ int std_dyn_eval(struct StdDyn * sd, double * time, double * x, double *,
     }
     else{
         for (size_t ii = 0; ii < sd->d; ii++){
-            drift[ii]/=sd->m[ii];
-            diff[ii]/= sd->m[ii]; // not sure about this scaling for stochastic term;
+            drift[ii]/=sd->slope[ii];
+            diff[ii]/= sd->slope[ii]; // not sure about this scaling for stochastic term;
         }
     }
     return res;

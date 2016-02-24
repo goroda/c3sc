@@ -42,7 +42,7 @@ int trajectory_add_ref(struct Trajectory **, struct State *,
 struct State * trajectory_last_state(struct Trajectory *);
 int trajectory_step(struct Trajectory *, struct Policy *, 
                     struct Dyn *, double, char *, 
-                    double *);
+                    double *, void *);
 void trajectory_print(struct Trajectory *, FILE *, int);
 
 #endif  

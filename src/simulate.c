@@ -237,7 +237,8 @@ void trajectory_print(struct Trajectory * traj, FILE *fp, int prec)
 {
     
     if (traj == NULL){
-        fprintf(fp,"NULL\n");
+//        fprintf(fp,"NULL\n");
+        fprintf(fp,"\n");
     }
     else{
         //fprintf(fp, "State: ");
@@ -265,7 +266,7 @@ struct State * trajectory_last_state(struct Trajectory * traj)
 
 int trajectory_step(struct Trajectory * traj, struct Policy * pol, 
                     struct Dyn * dyn, double dt, char * method, 
-                    double * space)
+                    double * space, void * args)
 {
     
     if (traj == NULL){
@@ -284,32 +285,43 @@ int trajectory_step(struct Trajectory * traj, struct Policy * pol,
         return 1;
     }
     assert (dt > 0);
-    
-    if (strcmp(method,"euler") == 0){
-        struct State * current_state = trajectory_last_state(traj);
-        if (current_state == NULL){
-            return 1;
-        }
 
-        double t = state_gett(current_state);
-        double * x = state_getx_ref(current_state);
-        if (x == NULL){
-            return 1;
-        }
+    struct State * current_state = trajectory_last_state(traj);
+    if (current_state == NULL){
+        return 1;
+    }
 
-        struct Control * u = NULL;
-        int res = policy_eval(pol,t,x,&u);
-        if (res != 0){
-            control_free(u);
-            return res;
-        }
-        struct State * s = euler_step(current_state,u,dt,
-                                      dyn->drift,space);
-        res = trajectory_add_ref(&traj,s,u);
+    size_t d = state_getd(current_state);
+    double t = state_gett(current_state);
+    double * x = state_getx_ref(current_state);
+    if (x == NULL){
+        return 1;
+    }
+
+    struct Control * u = NULL;
+    int res = policy_eval(pol,t,x,&u);
+    if (res != 0){
+        control_free(u);
         return res;
+    }
+    struct State * s = NULL;
+    if (strcmp(method,"euler") == 0){
+
+        s = euler_step(current_state,u,dt,
+                       dyn->drift,space);
+
+    }
+    else if (strcmp(method,"euler-maruyama") == 0){
+        // args is a realization of the noise
+        // should be generated with variance dt
+        s = euler_maruyama_step(current_state,args,u,dt,
+                                dyn,space,space+d);
     }
     else{
         return 1;
     }
+
+    res = trajectory_add_ref(&traj,s,u);
+    return res;
 
 }

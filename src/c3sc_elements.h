@@ -74,6 +74,6 @@ struct StdDyn
     double * off; //offset
     double * space;
     struct Dyn * dyn;
-}
+};
 
 #endif
