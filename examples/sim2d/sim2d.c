@@ -33,17 +33,17 @@ int f1(double t, double * x, double * u, double * out, void * args)
     return 0;
 }
 
-int s1(double t, double * x, double * u, double * out, void * args)
+int s1(double t,double * x,double * u,double * out,void * args)
 {
     (void)(t);
     (void)(x);
     (void)(u);
     (void)(args);
     
-    out[0] = 1.0;
+    out[0] = sin(3.0*x[0]);
     out[1] = 0.0;
     out[2] = 0.0;
-    out[3] = 1.0;
+    out[3] = cos(8.0*x[1]);
     
     return 0;
 }
@@ -60,7 +60,7 @@ int polfunc(double t, double * x, double * u)
     else{
         u[0] = 0.0;
     }
-    u[0] = 0.0;
+//    u[0] = 0.0;
     return 0;
 }
 
@@ -115,12 +115,13 @@ int main(int argc, char * argv[])
     struct Dyn dyn;
     dyn_init_ref(&dyn,&drift,&diff);
 
-    double lb = -2, ub = 2;
+    double lb = 0.124, ub = 2;
     double slope[2] = {(ub-lb)/2, (ub-lb)/2};
     double offset[2] = {(ub+lb)/2, (ub+lb)/2};
     struct LinTransform lt = {2,slope,offset};
     double temp[2]; 
     printf("slope=(%G,%G)\n",slope[0],slope[1]);
+    printf("offset=(%G,%G)\n",offset[0],offset[1]);
     struct Dyn dyn2;
     dyn_init_ref(&dyn2,&drift,&diff);
     dyn_add_transform_ref(&dyn2,&lt,temp);
@@ -165,23 +166,24 @@ int main(int argc, char * argv[])
     for (size_t ii = 0; ii < nsteps; ii++){
         noise[0] = randn()*sqrt(dt);
         noise[1] = randn()*sqrt(dt);
-        res = trajectory_step(traj,pol,&dyn,dt,"euler",
-                              space,NULL);
-        res = trajectory_step(traj2,pol2,&dyn2,dt,"euler",
-                              space,NULL);
-        /* res = trajectory_step(traj,pol,&dyn,dt, */
-        /*                       "euler-maruyama", */
-        /*                       space,noise); */
-        /* res = trajectory_step(traj2,pol2,&dyn2,dt, */
-        /*                       "euler-maruyama", */
-        /*                       space,noise); */
+        /* res = trajectory_step(traj,pol,&dyn,dt,"euler", */
+        /*                       space,NULL); */
+        /* res = trajectory_step(traj2,pol2,&dyn2,dt,"euler", */
+        /*                       space,NULL); */
+        
+        res = trajectory_step(traj,pol,&dyn,dt,
+                              "euler-maruyama",
+                              space,noise);
+        res = trajectory_step(traj2,pol2,&dyn2,dt,
+                              "euler-maruyama",
+                              space,noise);
         if (res != 0){
             break;
         }
     }
 
     if (verbose == 1){
-        trajectory_print(traj,stdout,4);
+        trajectory_print(traj2,stdout,4);
     }
 
     char filename[256];

@@ -57,9 +57,9 @@
           },
           no marks,
         ]
-        \addplot[dotted] table [x index=0,y expr=\thisrowno{1}*2] 
+        \addplot[dotted] table [x index=0,y expr=\thisrowno{1}*.938 + 1.062] 
                 {traj_std.dat};
-        \addplot[dashed] table [x index=0,y expr=\thisrowno{2}*2] 
+        \addplot[dashed] table [x index=0,y expr=\thisrowno{2}*.938 + 1.062] 
                 {traj_std.dat};
         
       \end{axis}

@@ -17,7 +17,8 @@ void lin_transform_eval(struct LinTransform * lt, double * x,
     }
 }
 
-double lin_transform_get_slopei(struct LinTransform * lt, size_t ii)
+double lin_transform_get_slopei(struct LinTransform * lt,
+                                size_t ii)
 {
     return lt->slope[ii];
 }
@@ -45,7 +46,8 @@ void state_free(struct State *s)
     }
 }
 
-void state_init(struct State * s,size_t d, double time, double * x)
+void state_init(struct State * s,size_t d,double time,
+                double * x)
 {
     assert (x != NULL);
     s->d = d;
@@ -71,7 +73,7 @@ struct State * state_copy(struct State * ss)
 }
 
 
-void state_up(struct State * s,size_t d, double time, double * x)
+void state_up(struct State * s,size_t d,double time,double * x)
 {
     s->d = d;
     s->t = time;

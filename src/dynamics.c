@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "c3.h"
+
 #include "dynamics.h"
 
 void drift_init(struct Drift * b, size_t dx, size_t du,
@@ -25,8 +27,8 @@ size_t drift_getdx(struct Drift * b)
     return b->dx;
 }
 
-int drift_eval(struct Drift * b, double time, double * x, double * u,
-               double * out)
+int drift_eval(struct Drift * b,double time,double * x,
+               double * u,double * out)
 {
     assert ( b != NULL);
     int res;
@@ -105,8 +107,10 @@ size_t dyn_getdw(struct Dyn * dyn)
     return diff_getdw(dyn->diff);
 }
 
-static int dyn_eval_base(struct Dyn * dyn, double time, double * x,
-                         double * u, double * drift, double * diff)
+static int dyn_eval_base(struct Dyn * dyn,double time,
+                         double * x,
+                         double * u, double * drift,
+                         double * diff)
 {
     int res = 0;
     if (drift != NULL){
@@ -129,16 +133,24 @@ static int dyn_eval_std(struct Dyn * sd, double time,
     size_t dx = dyn_getdx(sd);
     lin_transform_eval(sd->lt,x,sd->space);
     int res = dyn_eval_base(sd,time,sd->space,u,drift,diff);
-    if (res == 0){
+    if (res != 0){
         return res;
     }
     else{
         if (drift != NULL){
             for (size_t ii = 0; ii < dx; ii++){
-                drift[ii] /= lin_transform_get_slopei(sd->lt,ii);
+                drift[ii] /=
+                    lin_transform_get_slopei(sd->lt,ii);
             }
-            // not sure about this scaling for stochastic term;
-            //diff[ii]  /= lin_transform_get_slopei(sd->lt,ii);
+        }
+        if (diff != NULL){
+            size_t dw = dyn_getdw(sd);
+            for (size_t ii = 0; ii < dx; ii++){
+                for (size_t jj = 0; jj < dw; jj++){
+                    diff[jj*dx+ii] /=
+                        lin_transform_get_slopei(sd->lt,ii);
+                }
+            }
         }
     }
     return res;
