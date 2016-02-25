@@ -49,7 +49,7 @@ void policy_add_transform_ref(struct Policy * pol,
                               struct LinTransform * lt, 
                               double * space)
 {
-    pol->trans = 0;
+    pol->trans = 1;
     pol->lt = lt;
     pol->space = space;
 }
@@ -70,7 +70,8 @@ void policy_add_feedback(struct Policy * pol,
     pol->feedback = f;
 }
 
-int policy_eval(struct Policy * pol, double time, double * xin, 
+int policy_eval(struct Policy * pol, double time,
+                double * xin, 
                 struct Control ** u)
 {
     assert (pol != NULL);

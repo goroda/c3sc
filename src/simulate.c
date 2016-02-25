@@ -327,6 +327,7 @@ int trajectory_step(struct Trajectory * traj, struct Policy * pol,
     else if (strcmp(method,"euler-maruyama") == 0){
         // args is a realization of the noise
         // should be generated with variance dt
+        
         s = euler_maruyama_step(current_state,args,u,dt,
                                 dyn,space,space+d);
     }

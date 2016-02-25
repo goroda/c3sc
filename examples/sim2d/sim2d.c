@@ -60,7 +60,7 @@ int polfunc(double t, double * x, double * u)
     else{
         u[0] = 0.0;
     }
-//    u[0] = 0.0;
+    //u[0] = 0.0;
     return 0;
 }
 
