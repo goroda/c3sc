@@ -60,7 +60,7 @@ int polfunc(double t, double * x, double * u)
     else{
         u[0] = 0.0;
     }
-    //u[0] = 0.0;
+//    u[0] = 0.0;
     return 0;
 }
 
@@ -112,9 +112,7 @@ int main(int argc, char * argv[])
     diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
     diff.s = s1;
 
-    struct Dyn dyn;
-    dyn_init_ref(&dyn,&drift,&diff);
-
+    //double lb = -1.0, ub = 1.0;
     double lb = 0.124, ub = 2;
     double slope[2] = {(ub-lb)/2, (ub-lb)/2};
     double offset[2] = {(ub+lb)/2, (ub+lb)/2};
@@ -122,21 +120,21 @@ int main(int argc, char * argv[])
     double temp[2]; 
     printf("slope=(%G,%G)\n",slope[0],slope[1]);
     printf("offset=(%G,%G)\n",offset[0],offset[1]);
-    struct Dyn dyn2;
-    dyn_init_ref(&dyn2,&drift,&diff);
-    dyn_add_transform_ref(&dyn2,&lt,temp);
+    struct Dyn dyn;
+    dyn_init_ref(&dyn,&drift,&diff);
+    dyn_add_transform_ref(&dyn,&lt,temp);
+
+    struct TensorMM mm;
+    double h = 1e-3;
+    double spaces[10];
+    tensor_mm_init_ref(&mm,dx,h,&dyn,spaces);
 
     double t0 = 0.0;
     double xstd[2] = {0.2,0.5};
-    double xs[2] = {xstd[0]*slope[0]+offset[0],
-                    xstd[1]*slope[1]+offset[1]};
-
     double us[1] = {0.0};
 
     struct State * state = state_alloc();
-    state_init(state,dx,t0,xs);
-    struct State * state_std = state_alloc();
-    state_init(state_std,dx,t0,xstd);
+    state_init(state,dx,t0,xstd);
 
     struct Control * control = control_alloc();    
     control_init(control,du,us);
@@ -144,37 +142,31 @@ int main(int argc, char * argv[])
     struct Trajectory * traj = NULL;
     trajectory_add(&traj,state,control);
 
-    struct Trajectory * traj2 = NULL;
-    trajectory_add(&traj2,state_std,control);
-
+    double t3[2];
     struct Policy * pol = policy_alloc();
     policy_init(pol,dx,du,NULL,NULL);
     policy_add_feedback(pol,polfunc);
+    policy_add_transform_ref(pol,&lt,t3);
 
-    struct Policy * pol2 = policy_alloc();
-    policy_init(pol2,dx,du,NULL,NULL);
-    policy_add_feedback(pol2,polfunc);
-    double t3[2];
-    policy_add_transform_ref(pol2,&lt,t3);
-
-
-    size_t nsteps = 100;
+    size_t nsteps = 10000;
     double space[2 + 4];
     double dt = 1e-2;
+    //double time = 0.0
     double noise[1];
     int res;
     for (size_t ii = 0; ii < nsteps; ii++){
         noise[0] = randu();
+        //printf("noise = %G\n",noise[0]);
         res = trajectory_step(traj,pol,&dyn,dt,
                               "markov-chain",
-                              space,noise,NULL);
+                              space,noise,&mm);
         if (res != 0){
             break;
         }
     }
 
     if (verbose == 1){
-        trajectory_print(traj2,stdout,4);
+        trajectory_print(traj,stdout,4);
     }
 
     char filename[256];
@@ -184,19 +176,11 @@ int main(int argc, char * argv[])
     trajectory_print(traj,fp,4);
     fclose(fp);
 
-    sprintf(filename,"%s/%s.dat",dirout,"traj_std");
-    fp = fopen(filename,"w");
-    assert (fp != NULL);
-    trajectory_print(traj2,fp,4);
-    fclose(fp);
 
     state_free(state);
-    state_free(state_std);
     control_free(control);
     trajectory_free(traj);
-    trajectory_free(traj2);
     policy_free(pol);
-    policy_free(pol2);
     
     return 0;
 }

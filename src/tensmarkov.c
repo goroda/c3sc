@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 
 #include "c3.h"
@@ -9,13 +10,12 @@
 #include "dynamics.h"
 
 void tensor_mm_init_ref(struct TensorMM *tens, size_t d, 
-                        double h, struct Dyn * dyn,
-                        struct Boundary * bound)
+                        double h, struct Dyn * dyn, double * space)
 {
     tens->d = d;
     tens->h = h;
     tens->dyn = dyn;
-    tens->bound = bound;
+    tens->space = space;
 }
 
 int tensor_mm_tprob(struct TensorMM * tens, double t,
@@ -26,8 +26,10 @@ int tensor_mm_tprob(struct TensorMM * tens, double t,
     // probs are +- state for each dimension
     size_t dim = tens->d;
     double h = tens->h;
+    //printf("eval dyn\n");
     int res = dyn_eval(tens->dyn,t,x,u,tens->space,
                        tens->space+dim);
+    //printf("res = %d\n",res);
     if (res != 0){
         return res;
     }
@@ -41,7 +43,7 @@ int tensor_mm_tprob(struct TensorMM * tens, double t,
                           tens->space+dim+ii,dim);
         probs[ii*2] = diff/2.0;
         probs[ii*2+1] = diff/2.0;
-        norm = diff;
+        norm += diff;
         if (tens->space[ii] > 0){
             probs[ii*2+1] += h * tens->space[ii];
             norm += h * tens->space[ii];
@@ -59,7 +61,6 @@ int tensor_mm_tprob(struct TensorMM * tens, double t,
         probs[dim*2] -= probs[ii*2];
         probs[dim*2] -= probs[ii*2+1];
     }
-
     return 0;
 }
 
@@ -73,20 +74,29 @@ tensor_mm_step(struct TensorMM * mm,
     double time = state_gett(s);
     double * x = state_getx_ref(s);
     double * uu = control_getu_ref(u);
+//    printf("state = "); dprint(d,x);
     int res = tensor_mm_tprob(mm,time,x,uu,probs,dt);
+//    printf("probs are = "); dprint(2*d+1,probs);
+//    printf("got probs\n");
 
     if (res != 0){
         return NULL;
     }
 
-    int ind = c3sc_sample_discrete_rv(2*d+1,probs,noise);
+    size_t ind = c3sc_sample_discrete_rv(2*d+1,probs,noise);
 
     struct State * new = state_alloc();
     state_init_zero(new,d,time + *dt);
     double * newx = state_getx_ref(new);
     memmove(newx,x,d*sizeof(double));
-
-    //add the movement term
+    if (ind != 2*d){
+        if ((ind % 2) == 0){ // even move backwards
+            newx[ind/2] = x[ind/2] - mm->h;
+        }
+        else{
+            newx[(ind+1)/2 -1] = x[(ind+1)/2-1] + mm->h;
+        }
+    }
     
     return new;
     
