@@ -10,6 +10,13 @@
 #include "integrate.h"
 #include "tensmarkov.h"
 
+/***********************************************************//**
+    Evaluate a linear transformation
+
+    \param[in]  lt  - linear transformation
+    \param[in]  x   - (d,)
+    \param[out] out - must be preallocated to (d,)
+***************************************************************/
 void lin_transform_eval(struct LinTransform * lt, double * x, 
                         double * out)
 {
@@ -18,12 +25,26 @@ void lin_transform_eval(struct LinTransform * lt, double * x,
     }
 }
 
+/***********************************************************//**
+    Evaluate the slope of the transformation in dimension ii
+
+    \param[in]  lt - linear transformation
+    \param[in]  ii - dimension 
+
+    \return Slope lt->slope[ii]
+***************************************************************/
 double lin_transform_get_slopei(struct LinTransform * lt,
                                 size_t ii)
 {
+    assert (ii < lt->d);
     return lt->slope[ii];
 }
 
+/***********************************************************//**
+    Allocate State structure and set everything to 0/null
+
+    \return allocated state
+***************************************************************/
 struct State * state_alloc()
 {
     struct State * ss = NULL;
@@ -39,6 +60,9 @@ struct State * state_alloc()
     return ss;
 }
 
+/***********************************************************//**
+    Free memory allocated for state
+***************************************************************/
 void state_free(struct State *s)
 {
     if (s != NULL){
@@ -47,9 +71,12 @@ void state_free(struct State *s)
     }
 }
 
-void state_init(struct State * s,size_t d,double time,
-                double * x)
+/***********************************************************//**
+    Initialize a state by copying \f$ x \f$ 
+***************************************************************/
+void state_init(struct State * s,size_t d,double time,double * x)
 {
+    assert (s != NULL);
     assert (x != NULL);
     s->d = d;
     s->t = time;
@@ -58,6 +85,9 @@ void state_init(struct State * s,size_t d,double time,
     s->spec = NULL;
 }
 
+/***********************************************************//**
+    Initialize a state to zero
+***************************************************************/
 void state_init_zero(struct State * s,size_t d, double time)
 {
     s->d = d;
@@ -66,14 +96,22 @@ void state_init_zero(struct State * s,size_t d, double time)
     s->spec = NULL;
 }
 
+/***********************************************************//**
+    Copy a state
+***************************************************************/
 struct State * state_copy(struct State * ss)
 {
+    if (ss == NULL){
+        return NULL;
+    }
     struct State * s = state_alloc();
     state_init(s,ss->d,ss->t,ss->x);
     return s;
 }
 
-
+/***********************************************************//**
+    Update a state by copying
+**************************************************************/
 void state_up(struct State * s,size_t d,double time,double * x)
 {
     s->d = d;
