@@ -167,16 +167,16 @@ int main(int argc, char * argv[])
         noise[0] = randn()*sqrt(dt);
         noise[1] = randn()*sqrt(dt);
         /* res = trajectory_step(traj,pol,&dyn,dt,"euler", */
-        /*                       space,NULL); */
+        /*                       space,NULL,NULL); */
         /* res = trajectory_step(traj2,pol2,&dyn2,dt,"euler", */
-        /*                       space,NULL); */
+        /*                       space,NULL,NULL); */
         
         res = trajectory_step(traj,pol,&dyn,dt,
                               "euler-maruyama",
-                              space,noise);
+                              space,noise,NULL);
         res = trajectory_step(traj2,pol2,&dyn2,dt,
                               "euler-maruyama",
-                              space,noise);
+                              space,noise,NULL);
         if (res != 0){
             break;
         }

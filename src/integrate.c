@@ -34,9 +34,9 @@ euler_step(struct State * s, struct Control * u, double dt,
 
 struct State * 
 euler_maruyama_step(struct State * s, double * noise,
-                   struct Control * u, double dt,
-                   struct Dyn * dyn,
-                   double * drift, double * diff)
+                    struct Control * u, double dt,
+                    struct Dyn * dyn,
+                    double * drift, double * diff)
 {
 
     size_t d = state_getd(s);

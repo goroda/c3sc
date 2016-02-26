@@ -8,6 +8,7 @@
 #include "simulate.h"
 #include "control.h"
 #include "integrate.h"
+#include "tensmarkov.h"
 
 void lin_transform_eval(struct LinTransform * lt, double * x, 
                         double * out)
@@ -279,9 +280,12 @@ struct State * trajectory_last_state(struct Trajectory * traj)
 }
 
 
-int trajectory_step(struct Trajectory * traj, struct Policy * pol, 
-                    struct Dyn * dyn, double dt, char * method, 
-                    double * space, void * args)
+int trajectory_step(struct Trajectory * traj,
+                    struct Policy * pol, 
+                    struct Dyn * dyn,
+                    double dt, char * method, 
+                    double * space,
+                    void * noise, void * args)
 {
     
     if (traj == NULL){
@@ -327,9 +331,14 @@ int trajectory_step(struct Trajectory * traj, struct Policy * pol,
     else if (strcmp(method,"euler-maruyama") == 0){
         // args is a realization of the noise
         // should be generated with variance dt
-        
-        s = euler_maruyama_step(current_state,args,u,dt,
+        s = euler_maruyama_step(current_state,noise,u,dt,
                                 dyn,space,space+d);
+    }
+    else if (strcmp(method,"markov-chain") == 0){
+        struct TensorMM * mm = args;
+        double no = *(double *)noise;
+        s = tensor_mm_step(mm,current_state,no,u,
+                           &dt,space);
     }
     else{
         return 1;

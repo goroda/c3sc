@@ -161,22 +161,13 @@ int main(int argc, char * argv[])
     size_t nsteps = 100;
     double space[2 + 4];
     double dt = 1e-2;
-    double noise[2];
+    double noise[1];
     int res;
     for (size_t ii = 0; ii < nsteps; ii++){
-        noise[0] = randn()*sqrt(dt);
-        noise[1] = randn()*sqrt(dt);
-        /* res = trajectory_step(traj,pol,&dyn,dt,"euler", */
-        /*                       space,NULL); */
-        /* res = trajectory_step(traj2,pol2,&dyn2,dt,"euler", */
-        /*                       space,NULL); */
-        
+        noise[0] = randu();
         res = trajectory_step(traj,pol,&dyn,dt,
-                              "euler-maruyama",
-                              space,noise);
-        res = trajectory_step(traj2,pol2,&dyn2,dt,
-                              "euler-maruyama",
-                              space,noise);
+                              "markov-chain",
+                              space,noise,NULL);
         if (res != 0){
             break;
         }

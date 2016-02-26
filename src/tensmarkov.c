@@ -4,6 +4,8 @@
 #include "c3.h"
 
 #include "tensmarkov.h"
+#include "util.h"
+#include "simulate.h"
 #include "dynamics.h"
 
 void tensor_mm_init_ref(struct TensorMM *tens, size_t d, 
@@ -24,7 +26,8 @@ int tensor_mm_tprob(struct TensorMM * tens, double t,
     // probs are +- state for each dimension
     size_t dim = tens->d;
     double h = tens->h;
-    int res = dyn_eval(tens->dyn,t,x,u,tens->space,tens->space+dim);
+    int res = dyn_eval(tens->dyn,t,x,u,tens->space,
+                       tens->space+dim);
     if (res != 0){
         return res;
     }
@@ -58,4 +61,33 @@ int tensor_mm_tprob(struct TensorMM * tens, double t,
     }
 
     return 0;
+}
+
+struct State *
+tensor_mm_step(struct TensorMM * mm,
+               struct State * s, double noise,
+               struct Control * u, double * dt,
+               double * probs)
+{
+    size_t d = dyn_getdx(mm->dyn);
+    double time = state_gett(s);
+    double * x = state_getx_ref(s);
+    double * uu = control_getu_ref(u);
+    int res = tensor_mm_tprob(mm,time,x,uu,probs,dt);
+
+    if (res != 0){
+        return NULL;
+    }
+
+    int ind = c3sc_sample_discrete_rv(2*d+1,probs,noise);
+
+    struct State * new = state_alloc();
+    state_init_zero(new,d,time + *dt);
+    double * newx = state_getx_ref(new);
+    memmove(newx,x,d*sizeof(double));
+
+    //add the movement term
+    
+    return new;
+    
 }

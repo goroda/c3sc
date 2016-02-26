@@ -27,5 +27,10 @@ int tensor_mm_tprob(struct TensorMM *, double,
                     double *, double *,
                     double *, double *);
 
+struct State *
+tensor_mm_step(struct TensorMM *,
+               struct State *, double,
+               struct Control *, double *,
+               double *);
 
 #endif
