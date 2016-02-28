@@ -8,6 +8,7 @@
 #include "util.h"
 #include "simulate.h"
 #include "dynamics.h"
+#include "cost.h"
 
 void tensor_mm_init_ref(struct TensorMM *tens, size_t d, 
                         double h, struct Dyn * dyn, double * space)
@@ -100,4 +101,37 @@ tensor_mm_step(struct TensorMM * mm,
     
     return new;
     
+}
+
+
+// assumes only transitions to neighbors
+double tensor_mm_cost(struct TensorMM * mm,
+                      double t, double * x,
+                      double * uu,
+                      struct Cost * cost,
+                      double * probs)
+{
+    double dt;
+    int res = tensor_mm_tprob(mm,t,x,uu,probs,&dt);
+    assert (res != 0);
+    double evals[2];
+    double pt[2];
+    double out = 0.0;
+
+    //evaluate transition to oneself
+    res = cost_eval(cost,t,x,&out);
+    assert (res != 0);
+    out *= probs[2*mm->d];
+
+    for (size_t ii = 0; ii < mm->h; ii++){
+        pt[0] = x[ii]-mm->h;
+        pt[1] = x[ii]+mm->h;
+        res = cost_eval_neigh(cost,t,x,ii,pt,evals);
+        assert (res != 0);
+        out += probs[ii*mm->d]*evals[0];
+        out += probs[ii*mm->d+1]*evals[1];
+    }
+
+
+    return out;
 }

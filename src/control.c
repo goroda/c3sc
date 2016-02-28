@@ -9,6 +9,9 @@
 #include "simulate.h"
 #include "util.h"
 
+/**********************************************************//**
+    Allocate policy
+**************************************************************/
 struct Policy * policy_alloc()
 {
     struct Policy * pol = NULL;
@@ -29,6 +32,15 @@ struct Policy * policy_alloc()
     return pol;
 }
 
+/**********************************************************//**
+    Initialize Policy
+
+    \param[in,out] pol - allocated policy
+    \param[in]     dx  - dimension of state space
+    \param[in]     du  - dimension of control space
+    \param[in]     lbx - lower bounds of state space
+    \param[in]     ubx - upper bounds of state space
+**************************************************************/
 void policy_init(struct Policy * pol, size_t dx, size_t du, 
                  double * lbx, double * ubx)
 {
@@ -45,6 +57,14 @@ void policy_init(struct Policy * pol, size_t dx, size_t du,
    
 }
 
+
+/**********************************************************//**
+    Add a linear transform
+
+    \param[in,out] pol - policy
+    \param[in]     lt  - linear transform
+
+**************************************************************/
 void policy_add_transform_ref(struct Policy * pol,
                               struct LinTransform * lt, 
                               double * space)

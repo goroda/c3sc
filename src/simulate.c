@@ -10,13 +10,13 @@
 #include "integrate.h"
 #include "tensmarkov.h"
 
-/***********************************************************//**
+/**********************************************************//**
     Evaluate a linear transformation
 
     \param[in]  lt  - linear transformation
     \param[in]  x   - (d,)
     \param[out] out - must be preallocated to (d,)
-***************************************************************/
+**************************************************************/
 void lin_transform_eval(struct LinTransform * lt, double * x, 
                         double * out)
 {
@@ -25,14 +25,14 @@ void lin_transform_eval(struct LinTransform * lt, double * x,
     }
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Evaluate the slope of the transformation in dimension ii
 
     \param[in]  lt - linear transformation
     \param[in]  ii - dimension 
 
     \return Slope lt->slope[ii]
-***************************************************************/
+**************************************************************/
 double lin_transform_get_slopei(struct LinTransform * lt,
                                 size_t ii)
 {
@@ -40,11 +40,11 @@ double lin_transform_get_slopei(struct LinTransform * lt,
     return lt->slope[ii];
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Allocate State structure and set everything to 0/null
 
     \return allocated state
-***************************************************************/
+**************************************************************/
 struct State * state_alloc()
 {
     struct State * ss = NULL;
@@ -60,9 +60,9 @@ struct State * state_alloc()
     return ss;
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Free memory allocated for state
-***************************************************************/
+**************************************************************/
 void state_free(struct State *s)
 {
     if (s != NULL){
@@ -71,9 +71,9 @@ void state_free(struct State *s)
     }
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Initialize a state by copying \f$ x \f$ 
-***************************************************************/
+**************************************************************/
 void state_init(struct State * s,size_t d,double time,double * x)
 {
     assert (s != NULL);
@@ -85,9 +85,9 @@ void state_init(struct State * s,size_t d,double time,double * x)
     s->spec = NULL;
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Initialize a state to zero
-***************************************************************/
+**************************************************************/
 void state_init_zero(struct State * s,size_t d, double time)
 {
     s->d = d;
@@ -96,9 +96,9 @@ void state_init_zero(struct State * s,size_t d, double time)
     s->spec = NULL;
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Copy a state
-***************************************************************/
+**************************************************************/
 struct State * state_copy(struct State * ss)
 {
     if (ss == NULL){
@@ -109,7 +109,7 @@ struct State * state_copy(struct State * ss)
     return s;
 }
 
-/***********************************************************//**
+/**********************************************************//**
     Update a state by copying
 **************************************************************/
 void state_up(struct State * s,size_t d,double time,double * x)
@@ -121,21 +121,38 @@ void state_up(struct State * s,size_t d,double time,double * x)
     s->spec = NULL;
 }
 
+/***********************************************************//**
+    Return dimension of state
+**************************************************************/
 size_t state_getd(struct State * s)
 {
     return s->d;
 }
 
+/**********************************************************//**
+    Return time of state
+**************************************************************/
 double state_gett(struct State * s)
 {
     return s->t;
 }
 
+/**********************************************************//**
+    Return state by reference
+**************************************************************/
 double * state_getx_ref(struct State * s)
 {
     return s->x;
 }
 
+/**********************************************************//**
+    Print a state
+
+    \param[in] s          - state
+    \param[in] fp         - stream to print to
+    \param[in] print_time - 1 print time, 0 dont
+    \param[in] prec       - precision to print
+**************************************************************/
 void state_print(struct State * s, FILE * fp, int print_time, 
                  int prec)
 {
@@ -163,6 +180,9 @@ void state_print(struct State * s, FILE * fp, int print_time,
 
 //////////////////////////////////////////////////////////////
 
+/**********************************************************//**
+    Allocate control
+**************************************************************/
 struct Control * control_alloc()
 {
     struct Control * ss = NULL;
@@ -177,6 +197,9 @@ struct Control * control_alloc()
     return ss;
 }
 
+/**********************************************************//**
+    Free control
+**************************************************************/
 void control_free(struct Control *s)
 {
     if (s != NULL){
@@ -185,6 +208,13 @@ void control_free(struct Control *s)
     }
 }
 
+/**********************************************************//**
+    Initialize control
+
+    \param[in] s - control
+    \param[in] d - dimension of control
+    \param[in] u - control value to copy
+**************************************************************/
 void control_init(struct Control * s, size_t d, double * u)
 {
     assert (u != NULL);
@@ -193,6 +223,9 @@ void control_init(struct Control * s, size_t d, double * u)
     memmove(s->u,u,d*sizeof(double));
 }
 
+/**********************************************************//**
+    Copy a control
+**************************************************************/
 struct Control * control_copy(struct Control * ss)
 {
     struct Control * s = control_alloc();
@@ -200,6 +233,12 @@ struct Control * control_copy(struct Control * ss)
     return s;
 }
 
+/**********************************************************//**
+    Update a control 
+
+    \note
+    Overwrites previous structure elements
+**************************************************************/
 void control_up(struct Control * s,size_t d, double * u)
 {
     assert (s->u != NULL);
@@ -207,16 +246,29 @@ void control_up(struct Control * s,size_t d, double * u)
     memmove(s->u,u,d*sizeof(double));
 }
 
+/**********************************************************//**
+    Get dimension of control
+**************************************************************/
 size_t control_getd(struct Control * s)
 {
     return s->d;
 }
 
+/**********************************************************//**
+    Get a reference to control value
+**************************************************************/
 double * control_getu_ref(struct Control * s)
 {
     return s->u;
 }
 
+/**********************************************************//**
+    Print control
+
+    \param[in] c    - control
+    \param[in] fp   - stream to print to
+    \param[in] prec - precision to print
+**************************************************************/
 void control_print(struct Control * s, FILE * fp, int prec)
 {
     if (s == NULL){
@@ -233,6 +285,10 @@ void control_print(struct Control * s, FILE * fp, int prec)
 }
 
 ////////////////////////////////////////////////////////
+
+/**********************************************************//**
+    Allocate Trajectory
+**************************************************************/
 struct Trajectory * trajectory_alloc()
 {
     struct Trajectory * t = malloc(sizeof(struct Trajectory ));
@@ -247,6 +303,9 @@ struct Trajectory * trajectory_alloc()
     return t;
 }
 
+/**********************************************************//**
+    Free Trajectory
+**************************************************************/
 void trajectory_free(struct Trajectory * traj)
 {
     if (traj != NULL){
@@ -257,7 +316,15 @@ void trajectory_free(struct Trajectory * traj)
     }
 }
 
-int trajectory_add(struct Trajectory ** traj, struct State * s,
+/**********************************************************//**
+    Add a state and control to the trajectory
+
+    \param[in,out] traj - trajectory
+    \param[in]     s    - state
+    \param[in]     u    - control
+**************************************************************/
+int trajectory_add(struct Trajectory ** traj,
+                   struct State * s,
                    struct Control * u)
 {
     if (*traj == NULL){
@@ -272,8 +339,16 @@ int trajectory_add(struct Trajectory ** traj, struct State * s,
     return 0;
 }
 
-int trajectory_add_ref(struct Trajectory ** traj, struct State * s,
-                   struct Control * u)
+/**********************************************************//**
+    Add a state and control to the trajectory by reference
+
+    \param[in,out] traj - trajectory
+    \param[in]     s    - state
+    \param[in]     u    - control
+**************************************************************/
+int trajectory_add_ref(struct Trajectory ** traj,
+                       struct State * s,
+                       struct Control * u)
 {
     if (*traj == NULL){
         (*traj) = trajectory_alloc();
@@ -287,7 +362,16 @@ int trajectory_add_ref(struct Trajectory ** traj, struct State * s,
     return 0;
 }
 
-void trajectory_print(struct Trajectory * traj, FILE *fp, int prec)
+/**********************************************************//**
+    Print the trajectory
+
+    \param[in,out] traj - trajectory
+    \param[in]     fp   - stream to print to
+    \param[in]     u    - precision with which to print
+**************************************************************/
+void trajectory_print(struct Trajectory * traj,
+                      FILE *fp,
+                      int prec)
 {
     
     if (traj == NULL){
@@ -304,6 +388,9 @@ void trajectory_print(struct Trajectory * traj, FILE *fp, int prec)
     }
 }
 
+/**********************************************************//**
+    Get a reference to the last state
+**************************************************************/
 struct State * trajectory_last_state(struct Trajectory * traj)
 {
     if (traj == NULL){
@@ -317,7 +404,35 @@ struct State * trajectory_last_state(struct Trajectory * traj)
     }
 }
 
+/**********************************************************//**
+    Take a step of a trajectory
 
+    \param[in,out] traj   - trajectory
+    \param[in]     pol    - policy
+    \param[in]     dyn    - dynamics
+    \param[in]     dt     - time step
+                            Used when method=
+                            "euler" or 
+                            "euler-maruyama"
+    \param[in]     method - integration algorithm
+    \param[in]     space  - free space to use for computation
+    \param[in]     noise  - noise arguments
+    \param[in]     args   - additional arguments
+
+    \note
+    Let d denote dimension of state \n
+    Let dw denote dimension of noise \n
+    Method "euler" - space (d), \n
+                     noise NULL, \n
+                     args NULL  \n
+    Method "euler-maruyama" - space(d + d*dw), \n
+                              noise (dw) gaussian samples, \n 
+                              args NULL \n
+    Method "markov-chain" (kushner 2001) \n
+                          - space (2d+1) \n
+                          - noise (1) uniform (0,1) sample \n
+                          - args TensorMM
+**************************************************************/
 int trajectory_step(struct Trajectory * traj,
                     struct Policy * pol, 
                     struct Dyn * dyn,
