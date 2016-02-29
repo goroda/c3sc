@@ -18,6 +18,7 @@ void print_code_usage (FILE * stream, int exit_code)
     fprintf(stream,
             " -h --help      Display this usage information.\n"
             " -d --directory Output directory (defaults to .)\n"
+            " -n --nodes     Number of nodes (defaults to 10)\n"
             " -v --verbose   Output words (default 0)\n"
         );
     exit (exit_code);
@@ -71,21 +72,22 @@ int outbounds(double * x, void * args, int * dirs)
     // and the inside box [-0.1,0.1]^2
     (void)(args);
     
+    double bound = 1.0;
     int out = 0;
     for (size_t ii = 0; ii < 2; ii++){
         dirs[ii] = 0;
-        if (x[ii] > 2.0){
+        if (x[ii] > bound){
             return 1;
         }
-        else if (x[ii] < -2.0){
+        else if (x[ii] < -bound){
             return 1;
         }
-        else if (fabs(x[ii] - 2.0) < 1e-15){
+        else if (fabs(x[ii] - bound) < 1e-15){
             dirs[ii] = 1;
             out = -1;
             //return = -1;
         }
-        else if (fabs(x[ii] + 2.0) < 1e-15){
+        else if (fabs(x[ii] + bound) < 1e-15){
             dirs[ii] = -1;
             out = -1;
             //return = -1;
@@ -114,6 +116,7 @@ int boundcost(double t, double * x, double * out)
     *out = 0.0;
 
     if ( (fabs(x[0]) <= 1e-1) && (fabs(x[1]) <= 1e-1)){
+        //printf("here !\n");
         *out = 0.0;
     }
     else{
@@ -133,10 +136,11 @@ double startcost(double * x, void * args)
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:v:";
+    const char * const short_options = "hd:n:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
+        { "nodes"    , 1, NULL, 'n' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
     };
@@ -144,7 +148,7 @@ int main(int argc, char * argv[])
 
     char * dirout = ".";
     int verbose = 0;
-
+    size_t N = 10;
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
         switch (next_option)
@@ -153,6 +157,9 @@ int main(int argc, char * argv[])
                 print_code_usage(stdout, 0);
             case 'd':
                 dirout = optarg;
+                break;
+            case 'n':
+                N = strtol(optarg,NULL,10);
                 break;
             case 'v':
                 verbose = strtol(optarg,NULL,10);
@@ -179,7 +186,7 @@ int main(int argc, char * argv[])
     diff.s = s1;
 
     //double lb = -1.0, ub = 1.0;
-    double lb = -2.0, ub = 2.0;
+    double lb = -1.0, ub = 1.0;
     // slope from [-1,1] to (a,b)
     double slope[2] = {(ub-lb)/2, (ub-lb)/2};
     double offset[2] = {(ub+lb)/2, (ub+lb)/2};
@@ -192,7 +199,6 @@ int main(int argc, char * argv[])
     dyn_add_transform_ref(&dyn,&lt,temp);
 
     struct TensorMM mm;
-    size_t N = 10;
     double h = 2.0/((double)N-1.0);
     double spaces[10];
     tensor_mm_init_ref(&mm,dx,h,&dyn,spaces);
@@ -219,14 +225,44 @@ int main(int argc, char * argv[])
     dpih_init_ref(&prob,&bound,&mm,cost,pol,beta,stagecost,boundcost);
     dpih_add_transform_ref(&prob,&lt,t4);
 
-    size_t niter = 10;
+    size_t niter = 1;
     double delta;
-    for (size_t ii = 0; ii < niter; ii++){
+    for (size_t ii = 0; ii < niter+1; ii++){
+
+        FILE *fp2;
+        char filename[256];
+        sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii);
+        fp2 =  fopen(filename, "w");
+        if (fp2 == NULL){
+            fprintf(stderr, "cat: can't open %s\n", filename);
+            return 0;
+        }
+
+        fprintf(fp2,"x y f\n");
+        size_t N1 = 30;
+        size_t N2 = 30;
+        double * xtest = linspace(-1.0,1.0,N1);
+        double * ytest = linspace(-1.0,1.0,N2);
+
+        double pt[2];
+        double v2;
+        for (size_t zz = 0; zz < N1; zz++){
+            for (size_t jj = 0; jj < N2; jj++){
+                pt[0] = xtest[zz]; pt[1] = ytest[jj];
+                cost_eval(cost,0.0,pt,&v2);
+                fprintf(fp2, "%3.5f %3.5f %3.5f \n", 
+                        xtest[zz],ytest[jj],v2);
+            }
+            fprintf(fp2,"\n");
+        }
+        free(xtest); xtest = NULL;
+        free(ytest); ytest = NULL;
+        fclose(fp2);
+
         delta = dpih_pi_iter_approx(&prob,verbose);
         printf("ii=%zu, delta=%G\n",ii,delta);
-    }
-    
-    
+    }    
+
     policy_free(pol);
     cost_free(cost);
     

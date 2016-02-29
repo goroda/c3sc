@@ -136,9 +136,9 @@ cost_approx_new(struct Cost * c,
     }
     fca.ranks[0] = 1;
     fca.ranks[d] = 1;
-    fca.epsilon = 1e-7;
+    fca.epsilon = 1e-8;
     fca.maxiter = 10;
-    fca.epsround = 1e-5;
+    fca.epsround = 1e-14;
     fca.kickrank = 2;
     fca.maxiteradapt = 5;
     fca.verbose = verbose;

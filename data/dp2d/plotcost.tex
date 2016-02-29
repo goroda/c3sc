@@ -1,0 +1,40 @@
+\documentclass[border={0pt 0pt 0pt 0pt}]{standalone}
+%\documentclass[]{article}
+
+\setlength{\textwidth}{6.5in}
+\setlength{\textheight}{8in}
+
+\usepackage{graphicx}
+\usepackage{tabularx}
+\usepackage{tikz}
+\usepackage{pgfplots}
+%\usepackage{pgfplotstable}
+%\pgfplotsset{compat=newest}
+%\usetikzlibrary{plotmarks}
+%\usepgfplotslibrary{colormaps}
+
+%\pgfplotsset{
+%    /pgfplots/colormap={gray}{rgb255=(0,0,0) rgb255=(255,255,255)}
+%}
+
+\begin{document}
+
+\foreach \j in {0,1}
+%\foreach \j in {0,10,...,100}
+{
+  \begin{tikzpicture}
+    \begin{axis}[
+        xlabel=$x$, 
+        ylabel=$y$,
+        zlabel=$z$,
+        title=\j,
+        view={0}{90},
+        %colorbar,
+      ]
+      \addplot3[surf,mesh/ordering=y varies]
+      table {dat50/costfunc_\j.dat};
+    \end{axis}
+  \end{tikzpicture}
+}
+
+\end{document}
