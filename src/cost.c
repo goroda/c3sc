@@ -79,7 +79,7 @@ void cost_approx(struct Cost * c,
     fca.ranks[d] = 1;
     fca.epsilon = 1e-7;
     fca.maxiter = 10;
-    fca.epsround = 1e-5;
+    fca.epsround = 1e-10;
     fca.kickrank = 2;
     fca.maxiteradapt = 5;
     fca.verbose = verbose;

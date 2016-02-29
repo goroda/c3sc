@@ -29,7 +29,7 @@ int f1(double t, double * x, double * u, double * out, void * args)
     (void)(t);
     (void)(args);
     
-    out[0] = x[1] + sin(4.0*x[0]);
+    out[0] = x[1];// + sin(4.0*x[0]);
     out[1] = u[0];
     return 0;
 }
@@ -219,7 +219,7 @@ int main(int argc, char * argv[])
     cost_init_discrete(cost,2,N,NULL);
     cost_approx(cost,startcost,NULL,verbose);
         
-    double beta = 0.0;    
+    double beta = 1.0;    
     double t4[2];
     struct DPih prob;
     dpih_init_ref(&prob,&bound,&mm,cost,pol,beta,stagecost,boundcost);
