@@ -265,7 +265,7 @@ double * control_getu_ref(struct Control * s)
 /**********************************************************//**
     Print control
 
-    \param[in] c    - control
+    \param[in] s    - control
     \param[in] fp   - stream to print to
     \param[in] prec - precision to print
 **************************************************************/
@@ -367,7 +367,7 @@ int trajectory_add_ref(struct Trajectory ** traj,
 
     \param[in,out] traj - trajectory
     \param[in]     fp   - stream to print to
-    \param[in]     u    - precision with which to print
+    \param[in]     prec - precision with which to print
 **************************************************************/
 void trajectory_print(struct Trajectory * traj,
                       FILE *fp,
@@ -420,17 +420,17 @@ struct State * trajectory_last_state(struct Trajectory * traj)
     \param[in]     args   - additional arguments
 
     \note
-    Let d denote dimension of state \n
-    Let dw denote dimension of noise \n
-    Method "euler" - space (d), \n
-                     noise NULL, \n
-                     args NULL  \n
-    Method "euler-maruyama" - space(d + d*dw), \n
-                              noise (dw) gaussian samples, \n 
-                              args NULL \n
-    Method "markov-chain" (kushner 2001) \n
-                          - space (2d+1) \n
-                          - noise (1) uniform (0,1) sample \n
+    Let d denote dimension of state 
+    Let dw denote dimension of noise 
+    Method "euler" - space (d), 
+                     noise NULL, 
+                     args NULL  
+    Method "euler-maruyama" - space(d + d*dw), 
+                              noise (dw) gaussian samples,  
+                              args NULL 
+    Method "markov-chain" (kushner 2001) 
+                          - space (2d+1) 
+                          - noise (1) uniform (0,1) sample 
                           - args TensorMM
 **************************************************************/
 int trajectory_step(struct Trajectory * traj,

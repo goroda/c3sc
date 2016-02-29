@@ -61,9 +61,9 @@ void policy_init(struct Policy * pol, size_t dx, size_t du,
 /**********************************************************//**
     Add a linear transform
 
-    \param[in,out] pol - policy
-    \param[in]     lt  - linear transform
-
+    \param[in,out] pol   - policy
+    \param[in]     lt    - linear transform
+    \param[in]     space - array (pol->d) of allocated space 
 **************************************************************/
 void policy_add_transform_ref(struct Policy * pol,
                               struct LinTransform * lt, 
@@ -74,6 +74,9 @@ void policy_add_transform_ref(struct Policy * pol,
     pol->space = space;
 }
 
+/**********************************************************//**
+    Free a policy
+**************************************************************/
 void policy_free(struct Policy * pol)
 {
     if (pol != NULL){

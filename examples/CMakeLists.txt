@@ -4,3 +4,4 @@ SET(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 
 add_subdirectory(sim2d)
 add_subdirectory(markov2d)
+add_subdirectory(dp2d)

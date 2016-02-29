@@ -11,7 +11,8 @@
 #include "cost.h"
 
 void tensor_mm_init_ref(struct TensorMM *tens, size_t d, 
-                        double h, struct Dyn * dyn, double * space)
+                        double h, struct Dyn * dyn,
+                        double * space)
 {
     tens->d = d;
     tens->h = h;
@@ -109,10 +110,11 @@ double tensor_mm_cost(struct TensorMM * mm,
                       double t, double * x,
                       double * uu,
                       struct Cost * cost,
+                      double * dt,
                       double * probs)
 {
-    double dt;
-    int res = tensor_mm_tprob(mm,t,x,uu,probs,&dt);
+    
+    int res = tensor_mm_tprob(mm,t,x,uu,probs,dt);
     assert (res != 0);
     double evals[2];
     double pt[2];
@@ -131,7 +133,6 @@ double tensor_mm_cost(struct TensorMM * mm,
         out += probs[ii*mm->d]*evals[0];
         out += probs[ii*mm->d+1]*evals[1];
     }
-
 
     return out;
 }

@@ -2,12 +2,8 @@
 #define TENS_MARKOV_H
 
 #include "c3sc_elements.h"
+#include "cost.h"
 
-struct Boundary
-{
-    int (*bcheck)(double *, void *);
-    void * args;
-};
 
 // Tensor markov model;
 struct TensorMM
@@ -34,4 +30,11 @@ tensor_mm_step(struct TensorMM *,
                struct Control *, double *,
                double *);
 
+
+double tensor_mm_cost(struct TensorMM *,
+                      double, double *,
+                      double *,
+                      struct Cost *,
+                      double *,
+                      double *);
 #endif

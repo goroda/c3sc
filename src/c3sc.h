@@ -9,5 +9,7 @@
 #include "control.h"
 #include "tensmarkov.h"
 #include "integrate.h"
+#include "cost.h"
+#include "dp.h"
 
 #endif
