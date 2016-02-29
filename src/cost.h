@@ -13,11 +13,17 @@ struct Cost
 
 struct Cost * cost_alloc();
 void cost_init_discrete(struct Cost *,size_t,
-                        double *, double *,
                         size_t, struct FunctionTrain *);
 void cost_approx(struct Cost *,
                  double (*)(double *, void *),
                  void *, int);
+
+struct FunctionTrain *
+cost_approx_new(struct Cost *,
+                double (*)(double *, void *),
+                void *, int);
+
+void cost_update_ref(struct Cost *,struct FunctionTrain *);
 void cost_free(struct Cost *);
 
 

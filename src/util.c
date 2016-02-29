@@ -11,6 +11,7 @@ int c3sc_check_bounds(size_t dx, double * lbx,
     }
     for (size_t ii = 0; ii < dx; ii++){
         if (x[ii] < lbx[ii]){
+//            printf("x-lbx = %G",x[ii]-lbx[ii]);
             return - (ii+1);
         }
         else if (x[ii] > ubx[ii]){

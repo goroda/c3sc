@@ -64,16 +64,31 @@ int polfunc(double t, double * x, double * u)
     return 0;
 }
 
-int outbounds(double * x, void * args)
+int outbounds(double * x, void * args, int * dirs)
 {
     // two boundaries
     // outside of the box([-2,2]^2)
     // and the inside box [-0.1,0.1]^2
     (void)(args);
     
+    int out = 0;
     for (size_t ii = 0; ii < 2; ii++){
-        if (fabs(x[ii]) >= 2.0){
+        dirs[ii] = 0;
+        if (x[ii] > 2.0){
             return 1;
+        }
+        else if (x[ii] < -2.0){
+            return 1;
+        }
+        else if (fabs(x[ii] - 2.0) < 1e-15){
+            dirs[ii] = 1;
+            out = -1;
+            //return = -1;
+        }
+        else if (fabs(x[ii] + 2.0) < 1e-15){
+            dirs[ii] = -1;
+            out = -1;
+            //return = -1;
         }
     }
 
@@ -81,9 +96,8 @@ int outbounds(double * x, void * args)
         return 1;
     }
     
-    return 0;
+    return out;
 }
-
 
 int stagecost(double t, double * x, double * u, double * out)
 {
@@ -152,10 +166,6 @@ int main(int argc, char * argv[])
         }
     } while (next_option != -1);
 
-    struct Boundary bound;
-    bound.bcheck = outbounds;
-    bound.args = NULL;
-    
     size_t dx = 2;
     size_t dw = 2;
     size_t du = 1;
@@ -169,7 +179,7 @@ int main(int argc, char * argv[])
     diff.s = s1;
 
     //double lb = -1.0, ub = 1.0;
-    double lb = -1.0, ub = 1.0;
+    double lb = -2.0, ub = 2.0;
     // slope from [-1,1] to (a,b)
     double slope[2] = {(ub-lb)/2, (ub-lb)/2};
     double offset[2] = {(ub+lb)/2, (ub+lb)/2};
@@ -187,29 +197,35 @@ int main(int argc, char * argv[])
     double spaces[10];
     tensor_mm_init_ref(&mm,dx,h,&dyn,spaces);
 
-    double t3[2];
+    //double t3[2];
     struct Policy * pol = policy_alloc();
     policy_init(pol,dx,du,NULL,NULL);
     policy_add_feedback(pol,polfunc);
-    policy_add_transform_ref(pol,&lt,t3);
+    //policy_add_transform_ref(pol,&lt,t3);
+
+
+    int dirs[2];
+    struct Boundary bound;
+    boundary_init_ref(&bound,2,dirs,outbounds,NULL);
+    //boundary_add_transform_ref(&bound,&lt,t4);
 
     struct Cost * cost = cost_alloc();
-    double lbx[2] = {lb,lb};
-    double ubx[2] = {ub,ub};
-    cost_init_discrete(cost,2,lbx,ubx,N,NULL);
-    cost_approx(cost,startcost,NULL,1);
+    cost_init_discrete(cost,2,N,NULL);
+    cost_approx(cost,startcost,NULL,verbose);
         
+    double beta = 0.0;    
+    double t4[2];
     struct DPih prob;
-    prob.bound = &bound;
-    prob.mm = &mm;
-    prob.cost = cost;
-    prob.pol = pol;
-    prob.beta = 0.0;
-    prob.stagecost = stagecost;
-    prob.boundcost = boundcost;
+    dpih_init_ref(&prob,&bound,&mm,cost,pol,beta,stagecost,boundcost);
+    dpih_add_transform_ref(&prob,&lt,t4);
 
-
-    double delta = dpih_pi_iter(&prob);
+    size_t niter = 10;
+    double delta;
+    for (size_t ii = 0; ii < niter; ii++){
+        delta = dpih_pi_iter_approx(&prob,verbose);
+        printf("ii=%zu, delta=%G\n",ii,delta);
+    }
+    
     
     policy_free(pol);
     cost_free(cost);

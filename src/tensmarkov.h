@@ -18,11 +18,16 @@ struct TensorMM
 void tensor_mm_init_ref(struct TensorMM *, size_t, 
                         double, struct Dyn *,
                         double *);
-                        //struct Boundary *);
+
+int tensor_mm_dyn_eval(struct TensorMM *, double,
+                       double *, double *);
+
 
 int tensor_mm_tprob(struct TensorMM *, double,
                     double *, double *,
                     double *, double *);
+
+
 
 struct State *
 tensor_mm_step(struct TensorMM *,
