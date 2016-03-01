@@ -71,7 +71,7 @@ int tensor_mm_tprob(struct TensorMM * tens, double t,
         probs[ii*2] = diff/2.0;
         probs[ii*2+1] = diff/2.0;
         norm += diff;
-        if (tens->space[ii] > 0){
+        if (drift[ii] > 0){
             probs[ii*2+1] += h * drift[ii];
             norm += h * drift[ii];
         }
@@ -155,14 +155,17 @@ double tensor_mm_cost(struct TensorMM * mm,
         exit(1);
     }
 //    assert (res == 0);
+
+    //printf("probs are ");
+    //dprint(2*mm->d+1,probs);
     out *= probs[2*mm->d];
 
-    for (size_t ii = 0; ii < mm->h; ii++){
+    for (size_t ii = 0; ii < mm->d; ii++){
         pt[0] = x[ii]-mm->h;
         pt[1] = x[ii]+mm->h;
         res = cost_eval_neigh(cost,t,x,ii,pt,evals);
         if (res != 0){
-            fprintf(stderr, "point x is out of bounds\n \t x = ");
+            fprintf(stderr, "point x is out of bounds\n\t x=");
             for (size_t jj = 0; jj < mm->d; jj++){
                 fprintf(stderr,"%G ", x[ii]);
             }

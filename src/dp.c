@@ -114,11 +114,11 @@ double dpih_rhs(struct DPih * dp, double t, double * xin,
 
     // first check if x is in bounds
     int bound = boundary_ob(dp->bound,x);
-    //printf("check boundary for point ");
-    //dprint(dp->bound->d, x);
-    //printf("bound=%d\n",bound);
+    /* printf("check boundary for point "); */
+    /* dprint(dp->bound->d, x); */
+    /* printf("bound=%d\n",bound); */
 
-    double out; 
+    double out = 0.0;
     if (bound == 0){
         // inbounds, can do standard kushner update
 
@@ -127,18 +127,30 @@ double dpih_rhs(struct DPih * dp, double t, double * xin,
         int res = dp->stagecost(t,x,u,&out);
         assert (res == 0);
 
+
+        //printf("check boundary for point ");
+        //dprint(dp->bound->d, x);
+        //printf(" control is %G\n",u[0]);
+
         // additional cost
         double dt;
         double probs[1000];
         // note xin here!!
         double newval = tensor_mm_cost(dp->mm,t,xin,u,dp->cost,
                                        &dt,probs);
+        //printf("dt = %G\n",dt);
+        //printf("stage cost =%G\n",dt*out);
         out = dt*out + newval*exp(-dp->beta * dt);
+        //printf("otherwise out=%G\n",out);
     }
     else if (bound == 1){
+
         // unrecoverable
         int res = dp->boundcost(t,x,&out);
         assert (res == 0);
+        //printf("check boundary for point ");
+        //dprint(dp->bound->d, x);
+        //printf("in here out=%G\n",out);
     }
     else{
         // possibly recoverable
@@ -148,7 +160,7 @@ double dpih_rhs(struct DPih * dp, double t, double * xin,
 
         // check direction of movement
         int dirin = 0;
-        if (dirin)
+        if (dirin == 1)
         { //direction of movement is into the domain so ok
             fprintf(stderr, "movement away from boundary not yet implemented\n")  ;
         }
@@ -157,6 +169,7 @@ double dpih_rhs(struct DPih * dp, double t, double * xin,
             int res = dp->boundcost(t,x,&out);
             assert (res == 0);
         }
+        //printf("out = %G\n",out);
     }
 
     return out;
@@ -184,9 +197,11 @@ double dpih_pi_iter_approx(struct DPih * dp,int verbose)
 {
 
     struct FunctionTrain * cost = 
-        cost_approx_new(dp->cost,dpih_pi_rhs_approx,dp,verbose);
+        cost_approx_new(dp->cost,dpih_pi_rhs_approx,
+                        dp,verbose);
 
-    double diff = function_train_norm2diff(cost,dp->cost->cost);
+    double diff = function_train_norm2diff(cost,
+                                           dp->cost->cost);
     cost_update_ref(dp->cost,cost);
 
     return diff;

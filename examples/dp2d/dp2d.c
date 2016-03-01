@@ -41,10 +41,10 @@ int s1(double t,double * x,double * u,double * out,void * args)
     (void)(u);
     (void)(args);
     
-    out[0] = sin(3.0*x[0]);
+    out[0] = 1.0;//sin(3.0*x[0]);
     out[1] = 0.0;
     out[2] = 0.0;
-    out[3] = cos(8.0*x[1]);
+    out[3] = 1.0;//cos(8.0*x[1]);
     
     return 0;
 }
@@ -61,7 +61,7 @@ int polfunc(double t, double * x, double * u)
     else{
         u[0] = 0.0;
     }
-//    u[0] = 0.0;
+    // u[0] = 0.0;
     return 0;
 }
 
@@ -95,6 +95,7 @@ int outbounds(double * x, void * args, int * dirs)
     }
 
     if ( (fabs(x[0]) <= 1e-1) && (fabs(x[1]) <= 1e-1)){
+//        printf("here!!!!! (%G,%G)\n",x[0],x[1]);
         return 1;
     }
     
@@ -130,7 +131,12 @@ double startcost(double * x, void * args)
 {
     (void)(args);
     (void)(x);
-    return 3.0;
+    if ((fabs(x[0]) <= 1e-1) && (fabs(x[1]) < 1e-1)){
+        return 0.0;
+    }
+    else{
+        return 0.0;
+    }
 }
 
 int main(int argc, char * argv[])
@@ -159,7 +165,7 @@ int main(int argc, char * argv[])
                 dirout = optarg;
                 break;
             case 'n':
-                N = strtol(optarg,NULL,10);
+                N = strtoul(optarg,NULL,10);
                 break;
             case 'v':
                 verbose = strtol(optarg,NULL,10);
@@ -222,10 +228,11 @@ int main(int argc, char * argv[])
     double beta = 1.0;    
     double t4[2];
     struct DPih prob;
-    dpih_init_ref(&prob,&bound,&mm,cost,pol,beta,stagecost,boundcost);
+    dpih_init_ref(&prob,&bound,&mm,cost,pol,beta,
+                  stagecost,boundcost);
     dpih_add_transform_ref(&prob,&lt,t4);
 
-    size_t niter = 1;
+    size_t niter = 1000;
     double delta;
     for (size_t ii = 0; ii < niter+1; ii++){
 
@@ -239,8 +246,8 @@ int main(int argc, char * argv[])
         }
 
         fprintf(fp2,"x y f\n");
-        size_t N1 = 30;
-        size_t N2 = 30;
+        size_t N1 = 50;
+        size_t N2 = 50;
         double * xtest = linspace(-1.0,1.0,N1);
         double * ytest = linspace(-1.0,1.0,N2);
 
@@ -260,9 +267,15 @@ int main(int argc, char * argv[])
         fclose(fp2);
 
         delta = dpih_pi_iter_approx(&prob,verbose);
-        printf("ii=%zu, delta=%G\n",ii,delta);
+        if (verbose != 0){
+            printf("ii=%zu, delta=%G\n",ii,delta);
+        }
     }    
 
+    double pt2[2] = {0.08,0.08};
+    double value;
+    cost_eval(cost,0.0,pt2,&value);
+    printf("value = %G -- should be %G\n",value,0.0);
     policy_free(pol);
     cost_free(cost);
     

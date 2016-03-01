@@ -136,20 +136,22 @@ cost_approx_new(struct Cost * c,
     }
     fca.ranks[0] = 1;
     fca.ranks[d] = 1;
-    fca.epsilon = 1e-8;
+    fca.epsilon = 1e-10;
     fca.maxiter = 10;
-    fca.epsround = 1e-14;
-    fca.kickrank = 2;
+    fca.epsround = 1e-10;
+    fca.kickrank = 5;
     fca.maxiteradapt = 5;
     fca.verbose = verbose;
     fca.optargs = fopt;
 
     double ** start = malloc_dd(d);
 
+    size_t mid = n/2;
+    //printf("mid = %zu\n",mid);
     for (size_t ii = 0; ii < d; ii++){
         start[ii] = calloc_double(3);
         start[ii][0] = xnodes[0];
-        start[ii][1] = xnodes[4];
+        start[ii][1] = xnodes[mid];
         start[ii][2] = xnodes[n-1];
     }
 
