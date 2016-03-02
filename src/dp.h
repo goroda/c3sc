@@ -5,23 +5,7 @@
 
 
 
-struct DPih
-{
-
-    struct Boundary * bound;
-    struct TensorMM * mm;
-    struct Cost * cost;
-    struct Policy * pol;
-
-    double beta; // discount factor
-    int (*stagecost)(double,double *,double *,double *);
-    int (*boundcost)(double,double *,double *);
-
-    int trans;
-    struct LinTransform * lt;
-    double * space;
-};
-
+struct DPih;
 
 void dpih_init_ref(struct DPih *, struct Boundary *,
                    struct TensorMM *, struct Cost *,

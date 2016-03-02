@@ -13,101 +13,94 @@
 #include "dp.h"
 #include "tensmarkov.h"
 
-///////////////////////////////////////////////////////////////
-void dpih_init_ref(struct DPih * dp , struct Boundary * bound,
-                   struct TensorMM * mm , struct Cost * cost,
-                   struct Policy * pol, double beta,
-                   int (*stage)(double,double*,double*,double*),
-                   int (*boundc)(double,double*,double*))
+struct DPih;
 {
-    dp->bound = bound;
-    dp->mm = mm;
-    dp->cost = cost;
-    dp->pol = pol;
-    dp->beta = beta;
-    dp->stagecost = stage;
-    dp->boundcost = boundc;
+    struct MCA * mm;
+    struct Cost * cost;
+    struct Policy * pol;
 
-    dp->trans = 0;
-    dp->lt = NULL;
-    dp->space = NULL;
+    double beta; // discount factor
+    int (*stagecost)(double *,double *,double *);
+    int (*boundcost)(double *,double *);
+};
+
+///////////////////////////////////////////////////////////////
+struct DPih * dpih_alloc(double beta,
+                         int (*s)(double*,double*,double*),
+                         int (*b)(double*,double*))
+{
+    struct DPih * dp = malloc(sizeof(struct DPih));
+    if (dp == NULL){
+        fprintf(stderr, "Allocating DPih failed\n");
+        exit(1);
+    }
+
+    dp->mm = NULL;
+    dp->cost = NULL;
+    dp->pol = NULL;
+    dp->beta = beta;
+    dp->stagecost = s;
+    dp->boundcost = b;
 }
 
-/* double dpih_rhs(struct DPih * dp, double t, double * xin, */
-/*                 double * u) */
-/* { */
-/*     double * x; */
-/*     if (dp->trans == 0){ */
-/*         x = xin; */
-/*     } */
-/*     else{ */
-/*         lin_transform_eval(dp->lt,xin,dp->space); */
-/*         x = dp->space; */
-/*     } */
+void dpih_free(struct DPih * dp)
+{
+    if (dp != NULL){
+        free(dp); dp = NULL;
+    }
+}
 
-/*     // first check if x is in bounds */
-/*     //int bound = boundary_ob(dp->bound,x); */
-/*     int bound = 0; */
-/*     /\* printf("check boundary for point "); *\/ */
-/*     /\* dprint(dp->bound->d, x); *\/ */
-/*     /\* printf("bound=%d\n",bound); *\/ */
+void dpih_attach_mca(struct DPih * dp, struct MCA * mm)
+{
+    assert(dp!= NULL);
+    dp->mm = mca;
+}
 
-/*     double out = 0.0; */
-/*     if (bound == 0){ */
-/*         // inbounds, can do standard kushner update */
+void dpih_attach_cost(struct DPih * dp, struct Cost * cost)
+{
+    assert(dp != NULL);
+    dp->cost = cost;
+}
 
-/*         //NEED TO ADD SCALING */
-/*         // stagecost */
-/*         int res = dp->stagecost(t,x,u,&out); */
-/*         assert (res == 0); */
+void dpih_attach_policy(struct DPih * dp, struct Policy * pol)
+{
+    assert (dp != NULL);
+    dp->pol = pol;
+}
 
+double dpih_rhs(struct DPih * dp,double * xin,double * u)
+{
 
-/*         //printf("check boundary for point "); */
-/*         //dprint(dp->bound->d, x); */
-/*         //printf(" control is %G\n",u[0]); */
+    double dt;
 
-/*         // additional cost */
-/*         double dt; */
-/*         double probs[1000]; */
-/*         // note xin here!! */
-/*         double newval = tensor_mm_cost(dp->mm,t,xin,u,dp->cost, */
-/*                                        &dt,probs); */
-/*         //printf("dt = %G\n",dt); */
-/*         //printf("stage cost =%G\n",dt*out); */
-/*         out = dt*out + newval*exp(-dp->beta * dt); */
-/*         //printf("otherwise out=%G\n",out); */
-/*     } */
-/*     else if (bound == 1){ */
+        int res = dp->boundcost(t,x,&out);
+        assert (res == 0);
+        //printf("check boundary for point ");
+        //dprint(dp->bound->d, x);
+        //printf("in here out=%G\n",out);
+    }
+    else{
+        // possibly recoverable
+        //int res = tensor_mm_dyn_eval(dp->tens,t,x,u);
+        //double drift * tensor_mm_drift_ref(dp->tens);
+        //assert (res == 0);
 
-/*         // unrecoverable */
-/*         int res = dp->boundcost(t,x,&out); */
-/*         assert (res == 0); */
-/*         //printf("check boundary for point "); */
-/*         //dprint(dp->bound->d, x); */
-/*         //printf("in here out=%G\n",out); */
-/*     } */
-/*     else{ */
-/*         // possibly recoverable */
-/*         //int res = tensor_mm_dyn_eval(dp->tens,t,x,u); */
-/*         //double drift * tensor_mm_drift_ref(dp->tens); */
-/*         //assert (res == 0); */
+        // check direction of movement
+        int dirin = 0;
+        if (dirin == 1)
+        { //direction of movement is into the domain so ok
+            fprintf(stderr, "movement away from boundary not yet implemented\n")  ;
+        }
+        else{
+            // unrecoverable
+            int res = dp->boundcost(t,x,&out);
+            assert (res == 0);
+        }
+        //printf("out = %G\n",out);
+    }
 
-/*         // check direction of movement */
-/*         int dirin = 0; */
-/*         if (dirin == 1) */
-/*         { //direction of movement is into the domain so ok */
-/*             fprintf(stderr, "movement away from boundary not yet implemented\n")  ; */
-/*         } */
-/*         else{ */
-/*             // unrecoverable */
-/*             int res = dp->boundcost(t,x,&out); */
-/*             assert (res == 0); */
-/*         } */
-/*         //printf("out = %G\n",out); */
-/*     } */
-
-/*     return out; */
-/* } */
+    return out;
+}
 
 
 /* double dpih_pi_rhs_approx(double * x, void * arg) */
