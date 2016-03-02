@@ -134,10 +134,10 @@ double startcost(double * x, void * args)
     (void)(args);
     (void)(x);
     if ((fabs(x[0]) <= 1e-1) && (fabs(x[1]) < 1e-1)){
-        return 0.0;
+        return 0.2;
     }
     else{
-        return 0.0;
+        return 0.2;
     }
 }
 
@@ -210,8 +210,17 @@ int main(int argc, char * argv[])
     double lb[2] = {-2.0, -2.0};
     double ub[2] = {2.0, 2.0};
     struct Cost * cost = cost_alloc(dx,lb,ub);
+    size_t Narr[2] = {N, N};
+    double * x = linspace(lb[0],ub[0],Narr[0]);
+    double * y = linspace(lb[1],ub[1],Narr[1]);
+    double * z[2]; 
+    z[0] = x;
+    z[1] = y;
+    cost_init_discrete(cost,Narr,z);
+    free(x); x = NULL;
+    free(y); y = NULL;
     cost_approx(cost,startcost,NULL,verbose);
-        
+       
     /* double beta = 1.0;     */
     /* double t4[2]; */
     /* struct DPih prob; */

@@ -52,16 +52,15 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
 void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
 {
     assert (cost != NULL);
-    assert (cost->cost == NULL);
     
-    cost->x = calloc_dd(cost->d);
+    cost->x = malloc_dd(cost->d);
     cost->N = calloc_size_t(cost->d);
     for (size_t ii = 0; ii < cost->d; ii++){
         cost->N[ii] = N[ii];
         cost->x[ii] = calloc_double(N[ii]);
         memmove(cost->x[ii],x[ii],N[ii]*sizeof(double));
     }
-    cost->cost = function_train_copy(ft);
+
 }
 
 
@@ -73,8 +72,8 @@ void cost_free(struct Cost * c)
     if (c != NULL){
         bounding_box_free(c->bds); c->bds = NULL;
         function_train_free(c->cost); c->cost = NULL;
-        free_dd(cost->x,cost->d); cost->x = NULL;
-        free(cost->N); cost->N = NULL;
+        free_dd(c->d,c->x); c->x = NULL;
+        free(c->N); c->N = NULL;
         free(c); c= NULL;
     }
 }
@@ -98,30 +97,37 @@ void cost_approx(struct Cost * c,
     assert (c != NULL);
     assert (c->bds != NULL);
     assert (c->cost == NULL);
+    assert (c->N != NULL);
+    assert (c->x != NULL);
+
     
-    size_t n = c->ndisc;
-    size_t d = c->bds->dim;
-    double lb = -1.0;
-    double ub = 1.0;
-    
-    struct LinElemExpAopts aopts = {n,0};
+    struct LinElemExpAopts ** aopts = NULL;
+    aopts = malloc(c->d*sizeof(struct LinElemExpAopts *));
+    assert (aopts != NULL);
+
+    for (size_t ii = 0; ii < c->d;ii++){
+        aopts[ii] = lin_elem_exp_aopts_alloc(c->N[ii], c->x[ii]);
+    }
+
     struct FtApproxArgs * fapp = NULL;
     struct FiberOptArgs * fopt = NULL;
-    fapp = ft_approx_args_create_le(d,&aopts); //linear elements
+    fapp = ft_approx_args_create_le2(c->d,aopts); 
     
-    double * xnodes = linspace(lb,ub,n);
-    struct c3Vector c3v = {n,xnodes};
-    fopt = fiber_opt_args_bf_same(d,&c3v);
+    struct c3Vector ** c3v = c3vector_alloc_array(c->d);
+    for (size_t ii = 0; ii < c->d; ii++){
+        c3v[ii] = c3vector_alloc(c->N[ii],c->x[ii]);
+    }
+    fopt = fiber_opt_args_bf(c->d,c3v);
 
     struct FtCrossArgs fca;
     ft_cross_args_init(&fca);
-    fca.dim = d;
-    fca.ranks = calloc_size_t(d+1);
-    for (size_t ii = 0; ii < d+1; ii++){
+    fca.dim = c->d;
+    fca.ranks = calloc_size_t(c->d+1);
+    for (size_t ii = 0; ii < c->d+1; ii++){
         fca.ranks[ii] = 3;
     }
     fca.ranks[0] = 1;
-    fca.ranks[d] = 1;
+    fca.ranks[c->d] = 1;
     fca.epsilon = 1e-7;
     fca.maxiter = 10;
     fca.epsround = 1e-10;
@@ -130,22 +136,27 @@ void cost_approx(struct Cost * c,
     fca.verbose = verbose;
     fca.optargs = fopt;
 
-    double ** start = malloc_dd(d);
+    double ** start = malloc_dd(c->d);
 
-    for (size_t ii = 0; ii < d; ii++){
+    for (size_t ii = 0; ii < c->d; ii++){
+        size_t mid = c->N[ii]/2;
         start[ii] = calloc_double(3);
-        start[ii][0] = xnodes[0];
-        start[ii][1] = xnodes[4];
-        start[ii][2] = xnodes[n-1];
+        start[ii][0] = c->x[ii][0];
+        start[ii][1] = c->x[ii][mid];
+        start[ii][2] = c->x[ii][c->N[ii]-1];
     }
 
     c->cost = function_train_cross(f,args,c->bds,
                                    start,&fca,fapp);
-
+    
+    for (size_t ii = 0; ii < c->d; ii++){
+        lin_elem_exp_aopts_free(aopts[ii]); aopts[ii] = NULL;
+    }
+    free(aopts); aopts = NULL;
+    c3vector_free_array(c3v,c->d); c3v = NULL;
     ft_approx_args_free(fapp); fapp = NULL;
     free(fca.ranks); fca.ranks = NULL;
-    free(xnodes); xnodes = NULL;
-    free_dd(d,start);
+    free_dd(c->d,start);
     fiber_opt_args_free(fopt); fopt = NULL;
 }
 
@@ -156,68 +167,68 @@ void cost_approx(struct Cost * c,
     \note 
     This function doesn't make sense here 
 **************************************************************/
-struct FunctionTrain *
-cost_approx_new(struct Cost * c,
-                double (*f)(double *, void *),
-                void * args, int verbose)
-{
-    assert (c != NULL);
-    assert (c->bds != NULL);
+/* struct FunctionTrain * */
+/* cost_approx_new(struct Cost * c, */
+/*                 double (*f)(double *, void *), */
+/*                 void * args, int verbose) */
+/* { */
+/*     assert (c != NULL); */
+/*     assert (c->bds != NULL); */
     
-    size_t n = c->ndisc;
-    size_t d = c->bds->dim;
-    double lb = -1.0;
-    double ub = 1.0;
+/*     size_t n = c->ndisc; */
+/*     size_t d = c->bds->dim; */
+/*     double lb = -1.0; */
+/*     double ub = 1.0; */
     
-    struct LinElemExpAopts aopts = {n,0};
-    struct FtApproxArgs * fapp =
-        ft_approx_args_create_le(d,&aopts);
+/*     struct LinElemExpAopts aopts = {n,0}; */
+/*     struct FtApproxArgs * fapp = */
+/*         ft_approx_args_create_le(d,&aopts); */
     
-    double * xnodes = linspace(lb,ub,n);
+/*     double * xnodes = linspace(lb,ub,n); */
     
-    struct c3Vector c3v = {n,xnodes};
-    struct FiberOptArgs * fopt =
-        fiber_opt_args_bf_same(d,&c3v);
+/*     struct c3Vector c3v = {n,xnodes}; */
+/*     struct FiberOptArgs * fopt = */
+/*         fiber_opt_args_bf_same(d,&c3v); */
 
-    struct FtCrossArgs fca;
-    ft_cross_args_init(&fca);   
-    fca.dim = d;
-    fca.ranks = calloc_size_t(d+1);
-    for (size_t ii = 0; ii < d+1; ii++){
-        fca.ranks[ii] = 3;
-    }
-    fca.ranks[0] = 1;
-    fca.ranks[d] = 1;
-    fca.epsilon = 1e-10;
-    fca.maxiter = 10;
-    fca.epsround = 1e-10;
-    fca.kickrank = 5;
-    fca.maxiteradapt = 5;
-    fca.verbose = verbose;
-    fca.optargs = fopt;
+/*     struct FtCrossArgs fca; */
+/*     ft_cross_args_init(&fca);    */
+/*     fca.dim = d; */
+/*     fca.ranks = calloc_size_t(d+1); */
+/*     for (size_t ii = 0; ii < d+1; ii++){ */
+/*         fca.ranks[ii] = 3; */
+/*     } */
+/*     fca.ranks[0] = 1; */
+/*     fca.ranks[d] = 1; */
+/*     fca.epsilon = 1e-10; */
+/*     fca.maxiter = 10; */
+/*     fca.epsround = 1e-10; */
+/*     fca.kickrank = 5; */
+/*     fca.maxiteradapt = 5; */
+/*     fca.verbose = verbose; */
+/*     fca.optargs = fopt; */
 
-    double ** start = malloc_dd(d);
+/*     double ** start = malloc_dd(d); */
 
-    size_t mid = n/2;
-    //printf("mid = %zu\n",mid);
-    for (size_t ii = 0; ii < d; ii++){
-        start[ii] = calloc_double(3);
-        start[ii][0] = xnodes[0];
-        start[ii][1] = xnodes[mid];
-        start[ii][2] = xnodes[n-1];
-    }
+/*     size_t mid = n/2; */
+/*     //printf("mid = %zu\n",mid); */
+/*     for (size_t ii = 0; ii < d; ii++){ */
+/*         start[ii] = calloc_double(3); */
+/*         start[ii][0] = xnodes[0]; */
+/*         start[ii][1] = xnodes[mid]; */
+/*         start[ii][2] = xnodes[n-1]; */
+/*     } */
 
-    struct FunctionTrain * cost = 
-        function_train_cross(f,args,c->bds,start,&fca,fapp);
+/*     struct FunctionTrain * cost =  */
+/*         function_train_cross(f,args,c->bds,start,&fca,fapp); */
 
-    ft_approx_args_free(fapp); fapp = NULL;
-    free(fca.ranks); fca.ranks = NULL;
-    free(xnodes); xnodes = NULL;
-    free_dd(d,start);
-    fiber_opt_args_free(fopt); fopt = NULL;
+/*     ft_approx_args_free(fapp); fapp = NULL; */
+/*     free(fca.ranks); fca.ranks = NULL; */
+/*     free(xnodes); xnodes = NULL; */
+/*     free_dd(d,start); */
+/*     fiber_opt_args_free(fopt); fopt = NULL; */
 
-    return cost;
-}
+/*     return cost; */
+/* } */
 
 
 /**********************************************************//**
