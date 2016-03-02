@@ -9,10 +9,21 @@
 #include "cost.h"
 
 
+struct Cost 
+{
+    size_t d;
+    struct BoundingBox * bds;
+    struct FunctionTrain * cost;
+
+    size_t * N;
+    double ** x;
+
+};
+
 /**********************************************************//**
     Allocate the cost
 **************************************************************/
-struct Cost * cost_alloc()
+struct Cost * cost_alloc(size_t d,double * lb, double * ub)
 {
     struct Cost * cost = NULL;
     cost = malloc(sizeof(struct Cost));
@@ -20,10 +31,13 @@ struct Cost * cost_alloc()
         fprintf(stderr,"Could not allocate cost\n");
         exit(1);
     }
-    cost->discrete = 0;
-    cost->ndisc = 0;
-    cost->bds = NULL;
+    cost->d = d;
+    cost->bds = bounding_box_vec(d,lb,ub);
     cost->cost = NULL;
+    
+    cost->N = NULL;
+    cost->x = NULL;
+
     return cost;
 }
 
@@ -32,19 +46,21 @@ struct Cost * cost_alloc()
     Initialize the cost of a discrete cost function
 
     \param[in,out] cost - allocated cost
-    \param[in]     dim  - dimension of cost function
-    \param[in]     N    - discretization level (same each dim)
-    \param[in]     ft   - discrete cost function
+    \param[in]     N    - number of nodes in each dimension
+    \param[in]     x    - nodes in each dimension
 **************************************************************/
-void cost_init_discrete(struct Cost * cost,size_t dim,
-                        size_t N, struct FunctionTrain * ft)
+void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
 {
     assert (cost != NULL);
-    assert (cost->bds == NULL);
     assert (cost->cost == NULL);
-    cost->discrete = 1;
-    cost->ndisc = N;
-    cost->bds = bounding_box_init_std(dim); // [-1,1] bounds
+    
+    cost->x = calloc_dd(cost->d);
+    cost->N = calloc_size_t(cost->d);
+    for (size_t ii = 0; ii < cost->d; ii++){
+        cost->N[ii] = N[ii];
+        cost->x[ii] = calloc_double(N[ii]);
+        memmove(cost->x[ii],x[ii],N[ii]*sizeof(double));
+    }
     cost->cost = function_train_copy(ft);
 }
 
@@ -57,6 +73,8 @@ void cost_free(struct Cost * c)
     if (c != NULL){
         bounding_box_free(c->bds); c->bds = NULL;
         function_train_free(c->cost); c->cost = NULL;
+        free_dd(cost->x,cost->d); cost->x = NULL;
+        free(cost->N); cost->N = NULL;
         free(c); c= NULL;
     }
 }
@@ -89,7 +107,7 @@ void cost_approx(struct Cost * c,
     struct LinElemExpAopts aopts = {n,0};
     struct FtApproxArgs * fapp = NULL;
     struct FiberOptArgs * fopt = NULL;
-    fapp = ft_approx_args_create_le(d,&aopts);
+    fapp = ft_approx_args_create_le(d,&aopts); //linear elements
     
     double * xnodes = linspace(lb,ub,n);
     struct c3Vector c3v = {n,xnodes};

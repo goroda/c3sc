@@ -65,11 +65,13 @@ int polfunc(double t, double * x, double * u)
     return 0;
 }
 
-int outbounds(double * x, void * args, int * dirs)
+int outbounds(double time, double * x, void * args, int * dirs)
 {
+    
     // two boundaries
     // outside of the box([-2,2]^2)
     // and the inside box [-0.1,0.1]^2
+    (void)(time);
     (void)(args);
     
     double bound = 1.0;
@@ -191,23 +193,11 @@ int main(int argc, char * argv[])
     diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
     diff.s = s1;
 
-    //double lb = -1.0, ub = 1.0;
-    double lb = -1.0, ub = 1.0;
-    // slope from [-1,1] to (a,b)
-    double slope[2] = {(ub-lb)/2, (ub-lb)/2};
-    double offset[2] = {(ub+lb)/2, (ub+lb)/2};
-    struct LinTransform lt = {2,slope,offset};
-    double temp[2]; 
-    printf("slope=(%G,%G)\n",slope[0],slope[1]);
-    printf("offset=(%G,%G)\n",offset[0],offset[1]);
     struct Dyn dyn;
     dyn_init_ref(&dyn,&drift,&diff);
-    dyn_add_transform_ref(&dyn,&lt,temp);
 
-    struct TensorMM mm;
-    double h = 2.0/((double)N-1.0);
-    double spaces[10];
-    tensor_mm_init_ref(&mm,dx,h,&dyn,spaces);
+    double h[2] = {1e-2,1e-2};
+    struct MCA * mm = mca_alloc(dx,dw,h);
 
     //double t3[2];
     struct Policy * pol = policy_alloc();
@@ -215,69 +205,71 @@ int main(int argc, char * argv[])
     policy_add_feedback(pol,polfunc);
     //policy_add_transform_ref(pol,&lt,t3);
 
-
-    int dirs[2];
-    struct Boundary bound;
-    boundary_init_ref(&bound,2,dirs,outbounds,NULL);
-    //boundary_add_transform_ref(&bound,&lt,t4);
-
-    struct Cost * cost = cost_alloc();
-    cost_init_discrete(cost,2,N,NULL);
+    struct Boundary * bound = boundary_alloc(dx,outbounds,NULL);
+    
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0};
+    struct Cost * cost = cost_alloc(dx,lb,ub);
     cost_approx(cost,startcost,NULL,verbose);
         
-    double beta = 1.0;    
-    double t4[2];
-    struct DPih prob;
-    dpih_init_ref(&prob,&bound,&mm,cost,pol,beta,
-                  stagecost,boundcost);
-    dpih_add_transform_ref(&prob,&lt,t4);
+    /* double beta = 1.0;     */
+    /* double t4[2]; */
+    /* struct DPih prob; */
+    /* dpih_init_ref(&prob,&bound,&mm,cost,pol,beta, */
+    /*               stagecost,boundcost); */
+    /* dpih_add_transform_ref(&prob,&lt,t4); */
 
-    size_t niter = 1000;
-    double delta;
-    for (size_t ii = 0; ii < niter+1; ii++){
+    /* size_t niter = 1000; */
+    /* double delta; */
+    /* for (size_t ii = 0; ii < niter+1; ii++){ */
 
-        FILE *fp2;
-        char filename[256];
-        sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii);
-        fp2 =  fopen(filename, "w");
-        if (fp2 == NULL){
-            fprintf(stderr, "cat: can't open %s\n", filename);
-            return 0;
-        }
+    /*     FILE *fp2; */
+    /*     char filename[256]; */
+    /*     sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii); */
+    /*     fp2 =  fopen(filename, "w"); */
+    /*     if (fp2 == NULL){ */
+    /*         fprintf(stderr, "cat: can't open %s\n", filename); */
+    /*         return 0; */
+    /*     } */
 
-        fprintf(fp2,"x y f\n");
-        size_t N1 = 50;
-        size_t N2 = 50;
-        double * xtest = linspace(-1.0,1.0,N1);
-        double * ytest = linspace(-1.0,1.0,N2);
+    /*     fprintf(fp2,"x y f\n"); */
+    /*     size_t N1 = 50; */
+    /*     size_t N2 = 50; */
+    /*     double * xtest = linspace(-1.0,1.0,N1); */
+    /*     double * ytest = linspace(-1.0,1.0,N2); */
 
-        double pt[2];
-        double v2;
-        for (size_t zz = 0; zz < N1; zz++){
-            for (size_t jj = 0; jj < N2; jj++){
-                pt[0] = xtest[zz]; pt[1] = ytest[jj];
-                cost_eval(cost,0.0,pt,&v2);
-                fprintf(fp2, "%3.5f %3.5f %3.5f \n", 
-                        xtest[zz],ytest[jj],v2);
-            }
-            fprintf(fp2,"\n");
-        }
-        free(xtest); xtest = NULL;
-        free(ytest); ytest = NULL;
-        fclose(fp2);
+    /*     double pt[2]; */
+    /*     double v2; */
+    /*     for (size_t zz = 0; zz < N1; zz++){ */
+    /*         for (size_t jj = 0; jj < N2; jj++){ */
+    /*             pt[0] = xtest[zz]; pt[1] = ytest[jj]; */
+    /*             cost_eval(cost,0.0,pt,&v2); */
+    /*             fprintf(fp2, "%3.5f %3.5f %3.5f \n",  */
+    /*                     xtest[zz],ytest[jj],v2); */
+    /*         } */
+    /*         fprintf(fp2,"\n"); */
+    /*     } */
+    /*     free(xtest); xtest = NULL; */
+    /*     free(ytest); ytest = NULL; */
+    /*     fclose(fp2); */
 
-        delta = dpih_pi_iter_approx(&prob,verbose);
-        if (verbose != 0){
-            printf("ii=%zu, delta=%G\n",ii,delta);
-        }
-    }    
+    /*     delta = dpih_pi_iter_approx(&prob,verbose); */
+    /*     if (verbose != 0){ */
+    /*         printf("ii=%zu, delta=%G\n",ii,delta); */
+    /*     } */
+    /* }     */
 
-    double pt2[2] = {0.08,0.08};
-    double value;
-    cost_eval(cost,0.0,pt2,&value);
-    printf("value = %G -- should be %G\n",value,0.0);
+    /* double pt2[2] = {0.08,0.08}; */
+    /* double value; */
+    /* cost_eval(cost,0.0,pt2,&value); */
+    /* printf("value = %G -- should be %G\n",value,0.0); */
+
+
+    boundary_free(bound);
     policy_free(pol);
+    mca_free(mm);
     cost_free(cost);
+    
     
     return 0;
 }

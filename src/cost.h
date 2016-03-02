@@ -3,17 +3,12 @@
 
 #include "c3.h"
 
-struct Cost
-{
-    int discrete;
-    size_t ndisc;
-    struct BoundingBox * bds;
-    struct FunctionTrain * cost;
-};
+struct Cost;
 
-struct Cost * cost_alloc();
-void cost_init_discrete(struct Cost *,size_t,
-                        size_t, struct FunctionTrain *);
+struct Cost * cost_alloc(size_t d, double *, double *);
+
+void cost_init_discrete(struct Cost *,size_t *,double **);
+
 void cost_approx(struct Cost *,
                  double (*)(double *, void *),
                  void *, int);
