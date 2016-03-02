@@ -38,9 +38,9 @@
           },
           no marks,
         ]
-        \addplot[dotted] table [x index=0,y expr=\thisrowno{1}*0.938 + 1.062] 
+        \addplot[dotted] table [x index=0,y expr=\thisrowno{1}] 
                 {\myvar};
-        \addplot[dashed] table [x index=0,y expr=\thisrowno{2}*0.938 + 1.062] 
+        \addplot[dashed] table [x index=0,y expr=\thisrowno{2}] 
                 {\myvar};
         
       \end{axis}

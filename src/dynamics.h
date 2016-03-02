@@ -20,8 +20,6 @@ size_t diff_getdw(struct Diff *);
 ///////////////////////////////////////////////////////////
 
 void dyn_init_ref(struct Dyn*,struct Drift *, struct Diff *);
-void dyn_add_transform_ref(struct Dyn *, struct LinTransform *,
-                           double *);
 size_t dyn_getdx(struct Dyn *);
 size_t dyn_getdw(struct Dyn *);
 int dyn_eval(struct Dyn *,double,double *,double *,double *,

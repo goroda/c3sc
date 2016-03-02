@@ -79,20 +79,8 @@ size_t diff_getdw(struct Diff * b){
 void dyn_init_ref(struct Dyn *dyn, struct Drift *drift, 
                   struct Diff *diff)
 {
-    dyn->trans = 0;
     dyn->drift = drift;
     dyn->diff = diff;
-    
-    dyn->lt = NULL;
-    dyn->space = NULL;
-}
-
-void dyn_add_transform_ref(struct Dyn * dyn, struct LinTransform * lt,
-                           double * space)
-{
-    dyn->trans = 1;
-    dyn->lt = lt;
-    dyn->space = space;
 }
 
 size_t dyn_getdx(struct Dyn * dyn)
@@ -107,10 +95,10 @@ size_t dyn_getdw(struct Dyn * dyn)
     return diff_getdw(dyn->diff);
 }
 
-static int dyn_eval_base(struct Dyn * dyn,double time,
-                         double * x,
-                         double * u, double * drift,
-                         double * diff)
+int dyn_eval(struct Dyn * dyn,double time,
+                  double * x,
+                  double * u, double * drift,
+                  double * diff)
 {
     int res = 0;
     if (drift != NULL){
@@ -125,49 +113,4 @@ static int dyn_eval_base(struct Dyn * dyn,double time,
     return res;
 }
 
-static int dyn_eval_std(struct Dyn * sd, double time,
-                        double * x, double * u,
-                        double * drift, double * diff)
-{
-    
-    size_t dx = dyn_getdx(sd);
-    lin_transform_eval(sd->lt,x,sd->space);
-    int res = dyn_eval_base(sd,time,sd->space,u,drift,diff);
-    if (res != 0){
-        return res;
-    }
-    else{
-        if (drift != NULL){
-            for (size_t ii = 0; ii < dx; ii++){
-                drift[ii] /=
-                    lin_transform_get_slopei(sd->lt,ii);
-            }
-        }
-        if (diff != NULL){
-            size_t dw = dyn_getdw(sd);
-            for (size_t ii = 0; ii < dx; ii++){
-                for (size_t jj = 0; jj < dw; jj++){
-                    diff[jj*dx+ii] /=
-                        lin_transform_get_slopei(sd->lt,ii);
-                }
-            }
-        }
-    }
-    return res;
-}
-
-int dyn_eval(struct Dyn * dyn, double time, double * x,
-             double * u, double * drift, double * diff)
-{
-    int res;
-    //printf("dyn->trans = %d\n",dyn->trans);
-    if (dyn->trans == 0){
-        res = dyn_eval_base(dyn,time,x,u,drift,diff);
-    }
-    else{
-        res = dyn_eval_std(dyn,time,x,u,drift,diff);
-    }
-    return res;
-
-}
 

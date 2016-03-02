@@ -1,26 +1,6 @@
 #ifndef c3sc_ELEMENTS_H
 #define c3sc_ELEMENTS_H
 
-/** \struct LinTransform
- *  \brief Defines a linear transform 
- *  \var LinTransform::d
- *  dimension
- *  \var LinTransform::slope
- *  slope
- *  \var LinTransform::offset
- *  offset
- */
-struct LinTransform
-{
-    size_t d;
-    double * slope;
-    double * offset;
-};
-
-void lin_transform_eval(struct LinTransform *, double *, double *);
-double lin_transform_get_slopei(struct LinTransform *, size_t);
-
-
 /** \struct State
  *  \brief Defines a state
  *  \var State::d
@@ -82,14 +62,6 @@ struct Trajectory
  *  Upper bounds for state space
  *  \var Policy::feedback
  *  Function mapping time,state to control
- *  \var Policy::trans
- *  0 no state transformation required
- *  1 state transformation according to LinTransform is required
- *  before evaluating the feedback function
- *  \var Policy::lt
- *  Linear Transform
- *  \var Policy::space
- *  space for computation (should be an array that is of size (dx))
  */
 struct Policy
 {
@@ -98,10 +70,6 @@ struct Policy
     double * lbx;
     double * ubx;
     int (*feedback)(double, double *, double *);
-
-    int trans;
-    struct LinTransform * lt;
-    double * space;
 };
 
 
@@ -184,24 +152,11 @@ struct Diff
  *  RHS of diffusion term of stochastic differential equation
  *  \var Dyn::sargs
  *  Additional arguments to dynamics
- *  \var Dyn::trans
- *  0 no state transformation required
- *  1 state transformation according to LinTransform is required
- *  before evaluating the dynamics
- *  \var Dyn::lt
- *  Linear Transform, Typically from [-1,1] -> [a,b] if specified
- *  where the dynamics are specified over [a,b]
- *  \var Dyn::space
- *  space for computation (should be an array that is of size (dx))
  */
 struct Dyn
 {
     struct Drift * drift;
     struct Diff  * diff;
-
-    int trans;
-    struct LinTransform * lt;
-    double * space;
 };
 
 

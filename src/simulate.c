@@ -11,36 +11,6 @@
 #include "tensmarkov.h"
 
 /**********************************************************//**
-    Evaluate a linear transformation
-
-    \param[in]  lt  - linear transformation
-    \param[in]  x   - (d,)
-    \param[out] out - must be preallocated to (d,)
-**************************************************************/
-void lin_transform_eval(struct LinTransform * lt, double * x, 
-                        double * out)
-{
-    for (size_t ii = 0; ii < lt->d; ii++){
-        out[ii] = lt->slope[ii]*x[ii] + lt->offset[ii];
-    }
-}
-
-/**********************************************************//**
-    Evaluate the slope of the transformation in dimension ii
-
-    \param[in]  lt - linear transformation
-    \param[in]  ii - dimension 
-
-    \return Slope lt->slope[ii]
-**************************************************************/
-double lin_transform_get_slopei(struct LinTransform * lt,
-                                size_t ii)
-{
-    assert (ii < lt->d);
-    return lt->slope[ii];
-}
-
-/**********************************************************//**
     Allocate State structure and set everything to 0/null
 
     \return allocated state
@@ -488,10 +458,15 @@ int trajectory_step(struct Trajectory * traj,
                                 dyn,space,space+d);
     }
     else if (strcmp(method,"markov-chain") == 0){
-        struct TensorMM * mm = args;
+        struct MCA * mm = args;
         double no = *(double *)noise;
-        s = tensor_mm_step(mm,current_state,no,u,
-                           &dt,space);
+        double * uu = control_getu_ref(u);
+
+        s = state_alloc();
+        state_init_zero(s,d,t);
+        double * newx = state_getx_ref(s);
+        mca_step(mm,t,x,uu,no,&dt,newx);
+        s->t = t+dt;
     }
     else{
         return 1;

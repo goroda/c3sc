@@ -28,7 +28,7 @@ int f1(double t, double * x, double * u, double * out, void * args)
     (void)(t);
     (void)(args);
     
-    out[0] = x[1] + sin(4.0*x[0]);
+    out[0] = x[1];// + sin(4.0*x[0]);
     out[1] = u[0];
     return 0;
 }
@@ -112,23 +112,13 @@ int main(int argc, char * argv[])
     diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
     diff.s = s1;
 
-    //double lb = -1.0, ub = 1.0;
-    double lb = 0.124, ub = 2;
-    double slope[2] = {(ub-lb)/2, (ub-lb)/2};
-    double offset[2] = {(ub+lb)/2, (ub+lb)/2};
-    struct LinTransform lt = {2,slope,offset};
-    double temp[2]; 
-    printf("slope=(%G,%G)\n",slope[0],slope[1]);
-    printf("offset=(%G,%G)\n",offset[0],offset[1]);
     struct Dyn dyn;
     dyn_init_ref(&dyn,&drift,&diff);
-    dyn_add_transform_ref(&dyn,&lt,temp);
 
-    struct TensorMM mm;
-    double h = 1e-3;
-    double spaces[10];
-    tensor_mm_init_ref(&mm,dx,h,&dyn,spaces);
-
+    double h[2] = {1e-2, 2e-2};
+    struct MCA * mm = mca_alloc(dx,dw,h);
+    mca_attach_dyn(mm,&dyn);
+    
     double t0 = 0.0;
     double xstd[2] = {0.2,0.5};
     double us[1] = {0.0};
@@ -142,11 +132,9 @@ int main(int argc, char * argv[])
     struct Trajectory * traj = NULL;
     trajectory_add(&traj,state,control);
 
-    double t3[2];
     struct Policy * pol = policy_alloc();
     policy_init(pol,dx,du,NULL,NULL);
     policy_add_feedback(pol,polfunc);
-    policy_add_transform_ref(pol,&lt,t3);
 
     size_t nsteps = 10000;
     double space[2 + 4];
@@ -155,11 +143,12 @@ int main(int argc, char * argv[])
     double noise[1];
     int res;
     for (size_t ii = 0; ii < nsteps; ii++){
+
         noise[0] = randu();
         //printf("noise = %G\n",noise[0]);
         res = trajectory_step(traj,pol,&dyn,dt,
                               "markov-chain",
-                              space,noise,&mm);
+                              space,noise,mm);
         if (res != 0){
             break;
         }
@@ -181,6 +170,7 @@ int main(int argc, char * argv[])
     control_free(control);
     trajectory_free(traj);
     policy_free(pol);
+    mca_free(mm);
     
     return 0;
 }

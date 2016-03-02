@@ -4,27 +4,6 @@
 #include "c3sc_elements.h"
 
 
-struct Boundary
-{
-    size_t d;
-    int * dirs;
-    int (*bcheck)(double *, void *, int *);
-    void * args;
-
-    int trans;
-    struct LinTransform * lt;
-    double * space;
-
-};
-
-void boundary_init_ref(struct Boundary *, size_t,
-                       int *,
-                       int (*)(double *, void *, int *),
-                       void *);
-
-void boundary_add_transform_ref(struct Boundary *,
-                                struct LinTransform *, 
-                                double *);
 
 struct DPih
 {

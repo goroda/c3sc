@@ -24,7 +24,7 @@
 
 
 \begin{document}
-    \begin{tabular}{cc}
+    \begin{tabular}{c}
     \begin{tikzpicture}
 	  \begin{axis}[
           cycle list name=black white,
@@ -43,27 +43,6 @@
         
       \end{axis}
     \end{tikzpicture}
-    & 
-    \begin{tikzpicture}
-	  \begin{axis}[
-          cycle list name=black white,
-          xlabel={Time},
-          ylabel={State},
-          grid=major,
-	      enlargelimits=true,
-          legend entries={$x$, $\dot{x}$},
-          legend style={
-            legend pos = north west,
-          },
-          no marks,
-        ]
-        \addplot[dotted] table [x index=0,y expr=\thisrowno{1}*0.938+1.062] 
-                {traj_std.dat};
-        \addplot[dashed] table [x index=0,y expr=\thisrowno{2}*0.938+1.062] 
-                {traj_std.dat};
-        
-      \end{axis}
-    \end{tikzpicture}
     \\
     \begin{tikzpicture}
 	  \begin{axis}[
@@ -79,24 +58,6 @@
 %          no marks,
         ]
         \addplot[thick] table [x index=0,y index=3] {\myvar};
-        
-      \end{axis}
-    \end{tikzpicture}
-    &
-    \begin{tikzpicture}
-	  \begin{axis}[
-          cycle list name=black white,
-          xlabel={Time},
-          ylabel={Control},
-          grid=major,
-	      enlargelimits=true,
-%          legend entries={$x$, $\dot{x}$},
-%          legend style={
-%            legend pos = north west,
-%          },
-%          no marks,
-        ]
-        \addplot[thick] table [x index=0,y index=3] {traj_std.dat};
         
       \end{axis}
     \end{tikzpicture}

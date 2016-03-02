@@ -2,44 +2,44 @@
 #define TENS_MARKOV_H
 
 #include "c3sc_elements.h"
+
+#include "dynamics.h"
+#include "boundary.h"
 #include "cost.h"
 
 
-// Tensor markov model;
-struct TensorMM
-{
-    size_t d;
-    double h;
-    struct Dyn * dyn;
-//    struct Boundary * bound;
-    double * space;
-};
+enum NodeType {INBOUNDS,OUTBOUNDS,ONBOUNDS};
 
-void tensor_mm_init_ref(struct TensorMM *, size_t, 
-                        double, struct Dyn *,
-                        double *);
-
-int tensor_mm_dyn_eval(struct TensorMM *, double,
-                       double *, double *);
+struct MCNode;
+struct MCNode * mcnode_alloc(size_t);
+struct MCNode ** mcnode_alloc_array(size_t);
+void mcnode_free_array(struct MCNode **, size_t);
+void mcnode_free(struct MCNode *);
+struct MCNode * mcnode_init(size_t, double *);
+double * mcnode_getx_ref(struct MCNode *);
+void mcnode_add_neighbors_hspace(struct MCNode *, 
+                                 double *, double,
+                                 double *);
+void mcnode_sample_neighbor(struct MCNode *, double, double *);
+void mcnode_print(struct MCNode *, FILE *, int);
 
 
-int tensor_mm_tprob(struct TensorMM *, double,
-                    double *, double *,
-                    double *, double *);
+/////////////////////////////////////////////////
+struct MCA;
+struct MCA * mca_alloc(size_t, size_t, double *);
+void mca_free(struct MCA *);
+void mca_attach_dyn(struct MCA *, struct Dyn *);
+void mca_attach_bound(struct MCA *, struct Boundary *);
+int mca_node_type(struct MCA *, double, double *);
+struct MCNode *
+mca_inbound_node(struct MCA *,double,double *,double *,double *);
+void mca_step(struct MCA *, double, double *, double *,double,
+              double *, double *);
 
-
-
-struct State *
-tensor_mm_step(struct TensorMM *,
-               struct State *, double,
-               struct Control *, double *,
-               double *);
-
-
-double tensor_mm_cost(struct TensorMM *,
-                      double, double *,
-                      double *,
-                      struct Cost *,
-                      double *,
-                      double *);
+/* double tensor_mm_cost(struct TensorMM *, */
+/*                       double, double *, */
+/*                       double *, */
+/*                       struct Cost *, */
+/*                       double *, */
+/*                       double *); */
 #endif
