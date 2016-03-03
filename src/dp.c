@@ -13,21 +13,47 @@
 #include "dp.h"
 #include "tensmarkov.h"
 
-struct DPih;
+
+/** \struct DPih
+ *  \brief Infinite Horizon dynamic program
+ *  \var DPih::mm
+ *  markov chain approximation
+ *  \var DPih::cost
+ *  cost function
+ *  \var DPih::pol
+ *  policy
+ *  \var DPih::beta
+ *  >0 discount factor
+ *  \var DPih::stagecost
+ *  stage cost
+ *  \var DPih::boundcost
+ *  boundary cost
+ */
+struct DPih
 {
     struct MCA * mm;
     struct Cost * cost;
     struct Policy * pol;
 
     double beta; // discount factor
-    int (*stagecost)(double *,double *,double *);
-    int (*boundcost)(double *,double *);
+    int (*stagecost)(double,double *,double *,double *);
+    int (*boundcost)(double,double *,double *);
 };
 
 ///////////////////////////////////////////////////////////////
+
+/**********************************************************//**
+    Allocate an infinite horizon Dynamic program
+
+    \param[in] beta - discount factor
+    \param[in] s    - stagecost
+    \param[in] b    - boundary cost
+
+    \return dynamic program
+**************************************************************/
 struct DPih * dpih_alloc(double beta,
-                         int (*s)(double*,double*,double*),
-                         int (*b)(double*,double*))
+                         int (*s)(double,double*,double*,double*),
+                         int (*b)(double,double*,double*))
 {
     struct DPih * dp = malloc(sizeof(struct DPih));
     if (dp == NULL){
@@ -41,8 +67,13 @@ struct DPih * dpih_alloc(double beta,
     dp->beta = beta;
     dp->stagecost = s;
     dp->boundcost = b;
+
+    return dp;
 }
 
+/**********************************************************//**
+    Free dynamic program
+**************************************************************/
 void dpih_free(struct DPih * dp)
 {
     if (dp != NULL){
@@ -50,86 +81,95 @@ void dpih_free(struct DPih * dp)
     }
 }
 
+/**********************************************************//**
+    Attach a reference to a markov chain approximation
+**************************************************************/
 void dpih_attach_mca(struct DPih * dp, struct MCA * mm)
 {
     assert(dp!= NULL);
-    dp->mm = mca;
+    dp->mm = mm;
 }
 
+/**********************************************************//**
+   Attach a reference to a cost function 
+**************************************************************/
 void dpih_attach_cost(struct DPih * dp, struct Cost * cost)
 {
     assert(dp != NULL);
     dp->cost = cost;
 }
 
+/**********************************************************//**
+   Attach a reference to a policy
+**************************************************************/
 void dpih_attach_policy(struct DPih * dp, struct Policy * pol)
 {
     assert (dp != NULL);
     dp->pol = pol;
 }
 
-double dpih_rhs(struct DPih * dp,double * xin,double * u)
+/**********************************************************//**
+   Evaluate right hand side of Bellman equation at a given node *x*
+   and for a given control *u*
+**************************************************************/
+double dpih_rhs(struct DPih * dp,double * x,double * u)
 {
 
     double dt;
+    double t = 0.0;
+    int absorb = 0;
+    double val = mca_expectation(dp->mm,t,x,u,&dt,
+                                 cost_eval_bb,dp->cost,
+                                 &absorb);
 
+    double out;
+    if (absorb == 1){
+        //printf("state absorbed\n");
+        //dprint(2,x);
         int res = dp->boundcost(t,x,&out);
+        //printf("cost = %G\n",out);
         assert (res == 0);
-        //printf("check boundary for point ");
-        //dprint(dp->bound->d, x);
-        //printf("in here out=%G\n",out);
     }
     else{
-        // possibly recoverable
-        //int res = tensor_mm_dyn_eval(dp->tens,t,x,u);
-        //double drift * tensor_mm_drift_ref(dp->tens);
-        //assert (res == 0);
-
-        // check direction of movement
-        int dirin = 0;
-        if (dirin == 1)
-        { //direction of movement is into the domain so ok
-            fprintf(stderr, "movement away from boundary not yet implemented\n")  ;
-        }
-        else{
-            // unrecoverable
-            int res = dp->boundcost(t,x,&out);
-            assert (res == 0);
-        }
-        //printf("out = %G\n",out);
+        //printf("state not absorbed\n");
+        //dprint(2,x);
+        double sc;
+        int res = dp->stagecost(t,x,u,&sc);
+        assert (res == 0);
+        out = exp(-dp->beta*dt)*val + dt*sc;
+        //printf("dt = %G, out = %G\n",dt,out);
     }
 
     return out;
 }
 
+double dpih_rhs_pol(struct DPih * dp, double * x)
+{
+    struct Control * u = NULL;
+    double t = 0.0;
+    int res = policy_eval(dp->pol,t,x,&u);
+    assert (res == 0);
 
-/* double dpih_pi_rhs_approx(double * x, void * arg) */
-/* { */
-/*     struct DPih * dp = arg; */
-/*     struct Control * u = NULL; */
-/*     double t = 0.0; */
-/*     int res = policy_eval(dp->pol,t,x,&u); */
-/*     assert (res == 0); */
-
-/*     double * uu = control_getu_ref(u); */
-/*     double val = dpih_rhs(dp,t,x,uu); */
+    double * uu = control_getu_ref(u);
+    double val = dpih_rhs(dp,x,uu);
     
-/*     control_free(u); u = NULL; */
+    control_free(u); u = NULL;
+    return val;    
+}
 
-/*     return val; */
-/* } */
+double dpih_rhs_bb(double * x, void * dp)
+{
+    double ret = dpih_rhs_pol(dp,x);
+    return ret;
+}
 
+struct Cost * dpih_iter_pol(struct DPih * dp,int verbose)
+{
 
-/* double dpih_pi_iter_approx(struct DPih * dp,int verbose) */
-/* { */
+    struct Cost * oldcost = dp->cost;
+    struct Cost * cost = cost_alloc(oldcost->d,oldcost->bds->lb,oldcost->bds->ub);
+    cost_init_discrete(cost,oldcost->N,oldcost->x);
+    cost_approx(cost,dpih_rhs_bb,dp,verbose);
+    return cost;
 
-/*     struct FunctionTrain * cost =  */
-/*         cost_approx_new(dp->cost,dpih_pi_rhs_approx, */
-/*                         dp,verbose); */
-
-/*     double diff = function_train_norm2diff(cost, */
-/*                                            dp->cost->cost); */
-/*     cost_update_ref(dp->cost,cost); */
-
-/*     return diff; */
-/* } */
+}

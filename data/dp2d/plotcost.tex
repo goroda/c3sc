@@ -21,7 +21,8 @@
 
 %\foreach \j in {0,1}
 %\foreach \j in {1,10,...,100}
-\foreach \j in {1,200,...,1000}
+%\foreach \j in {1,200,...,1000}
+\foreach \j in {1,1000,...,10000}
 {
   \begin{tikzpicture}
     \begin{axis}[
@@ -30,11 +31,11 @@
         zlabel=$z$,
         title=\j,
         view={0}{90},
-        colorbar,
+        %colorbar,
         grid=both,
       ]
       \addplot3[surf,shader=interp,mesh/ordering=y varies]
-      table {dat200/costfunc_\j.dat};
+      table {dat50/costfunc_\j.dat};
     \end{axis}
   \end{tikzpicture}
 }

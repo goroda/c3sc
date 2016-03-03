@@ -9,16 +9,6 @@
 #include "cost.h"
 
 
-struct Cost 
-{
-    size_t d;
-    struct BoundingBox * bds;
-    struct FunctionTrain * cost;
-
-    size_t * N;
-    double ** x;
-
-};
 
 /**********************************************************//**
     Allocate the cost
@@ -41,6 +31,19 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     return cost;
 }
 
+/**********************************************************//**
+    Free a cost function
+**************************************************************/
+void cost_free(struct Cost * c)
+{
+    if (c != NULL){
+        bounding_box_free(c->bds); c->bds = NULL;
+        function_train_free(c->cost); c->cost = NULL;
+        free_dd(c->d,c->x); c->x = NULL;
+        free(c->N); c->N = NULL;
+        free(c); c= NULL;
+    }
+}
 
 /**********************************************************//**
     Initialize the cost of a discrete cost function
@@ -61,21 +64,6 @@ void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
         memmove(cost->x[ii],x[ii],N[ii]*sizeof(double));
     }
 
-}
-
-
-/**********************************************************//**
-    Free a cost function
-**************************************************************/
-void cost_free(struct Cost * c)
-{
-    if (c != NULL){
-        bounding_box_free(c->bds); c->bds = NULL;
-        function_train_free(c->cost); c->cost = NULL;
-        free_dd(c->d,c->x); c->x = NULL;
-        free(c->N); c->N = NULL;
-        free(c); c= NULL;
-    }
 }
 
 /**********************************************************//**
@@ -138,12 +126,16 @@ void cost_approx(struct Cost * c,
 
     double ** start = malloc_dd(c->d);
 
+    
     for (size_t ii = 0; ii < c->d; ii++){
+        assert (c->N[ii] > 5);
         size_t mid = c->N[ii]/2;
+        //printf("mid = %zu\n",mid);
         start[ii] = calloc_double(3);
-        start[ii][0] = c->x[ii][0];
+        start[ii][0] = c->x[ii][1];
         start[ii][1] = c->x[ii][mid];
-        start[ii][2] = c->x[ii][c->N[ii]-1];
+        start[ii][2] = c->x[ii][c->N[ii]-2];
+        printf("start is "); dprint(3,start[ii]);
     }
 
     c->cost = function_train_cross(f,args,c->bds,
@@ -160,93 +152,26 @@ void cost_approx(struct Cost * c,
     fiber_opt_args_free(fopt); fopt = NULL;
 }
 
-
 /**********************************************************//**
-    Approximate a new function that takes
+    Black box (bb) interface to cost function evaluation
 
-    \note 
-    This function doesn't make sense here 
+    \param[in]     N    - number of points at which to evaluate
+    \param[in]     t    - times of points
+    \param[in]     x    - locations of points
+    \param[in,out] out  - allocated evaluation space
+    \param[in]     args - pointer to cost function structure
 **************************************************************/
-/* struct FunctionTrain * */
-/* cost_approx_new(struct Cost * c, */
-/*                 double (*f)(double *, void *), */
-/*                 void * args, int verbose) */
-/* { */
-/*     assert (c != NULL); */
-/*     assert (c->bds != NULL); */
-    
-/*     size_t n = c->ndisc; */
-/*     size_t d = c->bds->dim; */
-/*     double lb = -1.0; */
-/*     double ub = 1.0; */
-    
-/*     struct LinElemExpAopts aopts = {n,0}; */
-/*     struct FtApproxArgs * fapp = */
-/*         ft_approx_args_create_le(d,&aopts); */
-    
-/*     double * xnodes = linspace(lb,ub,n); */
-    
-/*     struct c3Vector c3v = {n,xnodes}; */
-/*     struct FiberOptArgs * fopt = */
-/*         fiber_opt_args_bf_same(d,&c3v); */
-
-/*     struct FtCrossArgs fca; */
-/*     ft_cross_args_init(&fca);    */
-/*     fca.dim = d; */
-/*     fca.ranks = calloc_size_t(d+1); */
-/*     for (size_t ii = 0; ii < d+1; ii++){ */
-/*         fca.ranks[ii] = 3; */
-/*     } */
-/*     fca.ranks[0] = 1; */
-/*     fca.ranks[d] = 1; */
-/*     fca.epsilon = 1e-10; */
-/*     fca.maxiter = 10; */
-/*     fca.epsround = 1e-10; */
-/*     fca.kickrank = 5; */
-/*     fca.maxiteradapt = 5; */
-/*     fca.verbose = verbose; */
-/*     fca.optargs = fopt; */
-
-/*     double ** start = malloc_dd(d); */
-
-/*     size_t mid = n/2; */
-/*     //printf("mid = %zu\n",mid); */
-/*     for (size_t ii = 0; ii < d; ii++){ */
-/*         start[ii] = calloc_double(3); */
-/*         start[ii][0] = xnodes[0]; */
-/*         start[ii][1] = xnodes[mid]; */
-/*         start[ii][2] = xnodes[n-1]; */
-/*     } */
-
-/*     struct FunctionTrain * cost =  */
-/*         function_train_cross(f,args,c->bds,start,&fca,fapp); */
-
-/*     ft_approx_args_free(fapp); fapp = NULL; */
-/*     free(fca.ranks); fca.ranks = NULL; */
-/*     free(xnodes); xnodes = NULL; */
-/*     free_dd(d,start); */
-/*     fiber_opt_args_free(fopt); fopt = NULL; */
-
-/*     return cost; */
-/* } */
-
-
-/**********************************************************//**
-    Update the Cost function with cost (function train)
-
-    \param[in,out] c    - cost funciton
-    \param[in]     cost - new compressed cost
-
-    \note
-    This function free's the memory of the old cost function
-    and refers to the new one by reference
-**************************************************************/
-void cost_update_ref(struct Cost * c,
-                     struct FunctionTrain * cost)
+void cost_eval_bb(size_t N, double * t, double ** x, double * out, void * args)
 {
+
+    struct Cost * c = args;
+    int res;
+    for (size_t ii = 0; ii < N; ii++)
+    {
+        res = cost_eval(c,t[ii],x[ii],out+ii);
+        assert (res == 0);
+    }
     
-    function_train_free(c->cost); c->cost = NULL;
-    c->cost = cost;
 }
 
 /**********************************************************//**

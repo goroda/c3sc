@@ -173,13 +173,67 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
 }
 
 /**********************************************************//**
+    Compute the expectation of a function around a node
+
+    \param[in] mc  - node
+    \param[in] f   - function(nvals,times,states,evas,arg)
+    \param[in] arg - additional function arguments
+
+    \return average
+**************************************************************/
+double mcnode_expectation(
+    struct MCNode * mc,
+    void (*f)(size_t,double*,double**x,double*,void*),
+    void * arg)
+{
+    double avg = 0.0;
+    double * evals = NULL;
+    if (mc->pself > 0.0)
+    {
+        evals = calloc_double(mc->N+1);
+        double * t = calloc_double(mc->N+1);
+        double ** x = malloc_dd(mc->N+1);
+        x[0] = mcnode_getx_ref(mc);
+        for (size_t ii = 1; ii < mc->N+1; ii++)
+        {
+            x[ii] = mcnode_getx_ref(mc->neighbors[ii-1]);
+        }
+        f(mc->N+1,t,x,evals,arg);
+        avg = cblas_ddot(mc->N,mc->p,1,evals+1,1);
+        avg += mc->pself*evals[0];
+        
+        free(t); t = NULL;
+        free(x); x = NULL;
+        free(evals); evals = NULL;
+    }
+    else{
+        evals = calloc_double(mc->N);
+        double * t = calloc_double(mc->N);
+        double ** x = malloc_dd(mc->N);
+        for (size_t ii = 0; ii < mc->N; ii++)
+        {
+            x[ii] = mcnode_getx_ref(mc->neighbors[ii]);
+        }
+        f(mc->N,t,x,evals,arg);
+        avg = cblas_ddot(mc->N,mc->p,1,evals,1);
+
+        free(t); t = NULL;
+        free(x); x = NULL;
+        free(evals); evals = NULL;
+    }
+    return avg;
+}
+
+
+/**********************************************************//**
     Sample a transition to neighbors or oneself
 
     \param[in]     node     - node
     \param[in]     noise    - sample from [0,1]
     \param[in,out] neighbor - (node->d) sized allocated array
 **************************************************************/
-void mcnode_sample_neighbor(struct MCNode * node, double noise, double * neighbor)
+void mcnode_sample_neighbor(struct MCNode * node, double noise,
+                            double * neighbor)
 {
 
     assert (node != NULL);
@@ -334,7 +388,7 @@ void mca_attach_bound(struct MCA * mca, struct Boundary * bound)
 /**********************************************************//**
     Determine type of node for a given state and tie
 **************************************************************/
-int mca_node_type(struct MCA * mca, double time, double * x)
+enum NodeType mca_node_type(struct MCA * mca, double time, double * x)
 {
     assert (mca->bound != NULL);
     assert (mca->dyn   != NULL);
@@ -365,7 +419,24 @@ int mca_node_type(struct MCA * mca, double time, double * x)
 }
 
 /**********************************************************//**
-    Generate a node and its transitions
+    Generate a node that is outside the boundays
+    
+    \param[in]     mca  - markov chain approximation 
+    \param[in]     time - time (not used)
+    \param[in]     x    - current state
+    
+    \return node
+**************************************************************/
+struct MCNode *
+mca_outbound_node(struct MCA * mca, double time, double * x)
+{
+    (void)(time);
+    struct MCNode * mcn = mcnode_init(mca->d,x);
+    return mcn;
+}
+
+/**********************************************************//**
+    Generate a node that is inside the boundarys and its transitions
     
     \param[in]     mca  - markov chain approximation 
     \param[in]     time - time
@@ -376,7 +447,8 @@ int mca_node_type(struct MCA * mca, double time, double * x)
     \return node
 **************************************************************/
 struct MCNode *
-mca_inbound_node(struct MCA * mca, double time, double * x, double * u, double *dt)
+mca_inbound_node(struct MCA * mca, double time, double * x,
+                 double * u, double *dt)
 {
 
     assert(mca->dyn != NULL);
@@ -425,6 +497,80 @@ mca_inbound_node(struct MCA * mca, double time, double * x, double * u, double *
 }
 
 /**********************************************************//**
+    Generate a node of the Markov chain
+    
+    \param[in]     mca    - markov chain approximation 
+    \param[in]     time   - time
+    \param[in]     x      - current state
+    \param[in]     u      - current control
+    \param[in,out] dt     - time step
+    \param[in,out] ntype  - node type
+**************************************************************/
+struct MCNode *
+mca_get_node(struct MCA * mca, double time, double * x,
+             double * u, double * dt, enum NodeType * ntype)
+{
+    *ntype = mca_node_type(mca,time,x);
+    struct MCNode * mcn = NULL;
+    if (*ntype == INBOUNDS){
+        mcn = mca_inbound_node(mca,time,x,u,dt);
+    }
+    else if (*ntype == OUTBOUNDS){
+        *dt = 0;
+        mcn = mca_outbound_node(mca,time,x);
+    }
+    else if (*ntype == ONBOUNDS){
+        fprintf(stderr,"Not sure what to do with ONBOUND nodes yet\n");
+        exit(1);
+    }
+
+    return mcn;
+}
+
+/**********************************************************//**
+    Compute expectation of a function
+    
+    \param[in]     mca    - markov chain approximation 
+    \param[in]     time   - time
+    \param[in]     x      - current state
+    \param[in]     u      - current control
+    \param[in,out] dt     - time step
+    \param[in]     f      - function(npts,times,states,out,arg)
+    \param[in,out] arg    - function arguments
+    \param[in,out] absorb - absorption
+**************************************************************/
+double
+mca_expectation(struct MCA * mca, double time,
+                double * x, double * u, double * dt,
+                void (*f)(size_t,double *,double **,double*,void*),
+                void * arg, int * absorb)
+{
+    enum NodeType ntype;
+    struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,&ntype);
+
+    double val = 0.0;
+    if (ntype == INBOUNDS){
+        val = mcnode_expectation(mcn,f,arg);
+        *absorb = 0;
+    }
+    else if (ntype == OUTBOUNDS){
+        *absorb = 1;
+    }
+    else if (ntype == ONBOUNDS){
+        *absorb = 1;
+        fprintf(stderr,"Not sure what to do with ONBOUND nodes yet\n");
+        exit(1);
+    }
+    else{
+        fprintf(stderr,"Node type %d is unknown\n",ntype);
+        exit(1);
+    }
+    
+    mcnode_free(mcn); mcn = NULL;
+    return val;
+}
+
+/**********************************************************//**
     Sample a transition in the markov chain
     
     \param[in]     mca   - markov chain approximation 
@@ -436,8 +582,8 @@ mca_inbound_node(struct MCA * mca, double time, double * x, double * u, double *
     \param[in,out] newx  - space for new state
 **************************************************************/
 void
-mca_step(struct MCA * mca, double time, double * x, double * u,double noise,
-         double * dt, double * newx)
+mca_step(struct MCA * mca, double time, double * x, double * u,
+         double noise, double * dt, double * newx)
 {
 
     struct MCNode * node = mca_inbound_node(mca,time,x,u,dt);

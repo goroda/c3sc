@@ -3,20 +3,22 @@
 
 #include "c3sc_elements.h"
 
+#include "boundary.h"
+#include "cost.h"
+#include "tensmarkov.h"
+#include "control.h"
 
 
 struct DPih;
+struct DPih * dpih_alloc(double,
+                         int (*)(double,double*,double*,double*),
+                         int (*)(double,double*,double*));
 
-void dpih_init_ref(struct DPih *, struct Boundary *,
-                   struct TensorMM *, struct Cost *,
-                   struct Policy *, double,
-                   int (*)(double,double*,double*,double*),
-                   int (*)(double,double*,double*));
+void dpih_free(struct DPih *);
+void dpih_attach_mca(struct DPih *, struct MCA *);
+void dpih_attach_cost(struct DPih *, struct Cost *);
+void dpih_attach_policy(struct DPih *, struct Policy *);
 
-void dpih_add_transform_ref(struct DPih *,
-                            struct LinTransform *, 
-                            double *);
-
-double dpih_pi_iter_approx(struct DPih *,int);
-
+double dpih_rhs(struct DPih *,double *,double *);
+struct Cost * dpih_iter_pol(struct DPih *,int);
 #endif

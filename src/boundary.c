@@ -8,14 +8,13 @@
 
 #include "boundary.h"
 
-
-
 /** \struct Boundary
  *  \brief Structure to handle any boundary conditions
  *  \var Boundary::d
  *  dimension of state space
  *  \var Boundary::dirs
- *  (d) sized array with locations on boundaries (-1->left,1->right)
+ *  (d) sized array with locations on 
+ *  boundaries (-1->left,1->right)
  *  \var Boundary::bcheck
  *  user supplied function for checking
  *  \var Boundary::args
@@ -65,10 +64,12 @@ void boundary_free(struct Boundary * bound)
     }
 }
 
-int boundary_type(struct Boundary * bound, double time, double * x)
+int boundary_type(struct Boundary * bound, double time,
+                  double * x)
 {
     bound->clean = 1;
-    int outbounds = bound->bcheck(time,x,bound->args,bound->dirs);
+    int outbounds = bound->bcheck(time,x,bound->args,
+                                  bound->dirs);
     bound->clean = 0;
     return outbounds;
 }
