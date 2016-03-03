@@ -28,7 +28,7 @@ size_t drift_getdx(struct Drift * b)
 }
 
 int drift_eval(struct Drift * b,double time,double * x,
-               double * u,double * out)
+               double * u, double * out, double * jac)
 {
     assert ( b != NULL);
     int res;
@@ -37,7 +37,7 @@ int drift_eval(struct Drift * b,double time,double * x,
         fprintf(stderr,"         yet specified\n");
         return 1;
     }
-    res = b->b(time,x,u,out,b->bargs);
+    res = b->b(time,x,u,out,jac,b->bargs);
     return res;
 }
 
@@ -59,7 +59,7 @@ void diff_init(struct Diff * s, size_t dw,
 }
 
 int diff_eval(struct Diff * b, double time, double * x, 
-              double * u, double * out)
+              double * u, double * out, double * jac)
 {
     int res;
     if (b->s == NULL){
@@ -67,7 +67,7 @@ int diff_eval(struct Diff * b, double time, double * x,
         fprintf(stderr,"         yet specified\n");
         return 1;
     }
-    res = b->s(time,x,u,out,b->sargs);
+    res = b->s(time,x,u,out,jac,b->sargs);
     return res;
 }
 
@@ -96,19 +96,19 @@ size_t dyn_getdw(struct Dyn * dyn)
 }
 
 int dyn_eval(struct Dyn * dyn,double time,
-                  double * x,
-                  double * u, double * drift,
-                  double * diff)
+             double * x,
+             double * u, double * drift, double * jacdr,
+             double * diff, double * jacdiff)
 {
     int res = 0;
     if (drift != NULL){
-        res = drift_eval(dyn->drift,time,x,u,drift);
+        res = drift_eval(dyn->drift,time,x,u,drift,jacdr);
     }
     if (res != 0){
         return res;
     }
     if (diff != NULL){
-        res = diff_eval(dyn->diff,time,x,u,diff);
+        res = diff_eval(dyn->diff,time,x,u,diff,jacdiff);
     }
     return res;
 }

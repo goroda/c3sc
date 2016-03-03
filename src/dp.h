@@ -10,9 +10,10 @@
 
 
 struct DPih;
-struct DPih * dpih_alloc(double,
-                         int (*)(double,double*,double*,double*),
-                         int (*)(double,double*,double*));
+struct DPih * 
+dpih_alloc(double,
+           int (*)(double,double*,double*,double*,double*),
+           int (*)(double,double*,double*));
 
 void dpih_free(struct DPih *);
 void dpih_attach_mca(struct DPih *, struct MCA *);

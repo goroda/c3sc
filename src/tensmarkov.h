@@ -23,7 +23,7 @@ void mcnode_add_neighbors_hspace(struct MCNode *,
 double mcnode_expectation(
     struct MCNode *,
     void (*)(size_t,double*,double**x,double*,void*),
-    void *);
+    void *,double*);
 void mcnode_sample_neighbor(struct MCNode *, double, double *);
 void mcnode_print(struct MCNode *, FILE *, int);
 
@@ -37,16 +37,16 @@ void mca_attach_bound(struct MCA *, struct Boundary *);
 enum NodeType mca_node_type(struct MCA *, double, double *);
 double
 mca_expectation(struct MCA *,double,double *, double *, double *,
-                void (*)(size_t, double *, double **, double *, void *),
-                void *, int*);
+                void (*)(size_t,double *,double **,double *,void *),
+                void *, int*,double*);
 
 struct MCNode *
-mca_inbound_node(struct MCA *,double,double *,double *,double *);
+mca_inbound_node(struct MCA*,double,double*,double*,double*,double*);
 struct MCNode *
 mca_outbound_node(struct MCA *, double, double *);
 struct MCNode *
 mca_get_node(struct MCA *,double,double *,
-             double *,double *, enum NodeType *);
+             double *,double *, enum NodeType *,double*);
 
 void mca_step(struct MCA *, double, double *, double *,double,
               double *, double *);

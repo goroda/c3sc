@@ -17,7 +17,7 @@ euler_step(struct State * s, struct Control * u, double dt,
     double time = state_gett(s);
     double * x = state_getx_ref(s);
     double * uu = control_getu_ref(u);
-    int res = dyn_eval(dyn,time,x,uu,driftv,NULL);
+    int res = dyn_eval(dyn,time,x,uu,driftv,NULL,NULL,NULL);
     if (res != 0){
         return NULL;
     }
@@ -44,7 +44,7 @@ euler_maruyama_step(struct State * s, double * noise,
     double time = state_gett(s);
     double * x = state_getx_ref(s);
     double * uu = control_getu_ref(u);
-    int res = dyn_eval(dyn,time,x,uu,drift,diff);
+    int res = dyn_eval(dyn,time,x,uu,drift,NULL,diff,NULL);
     if (res != 0){
         return NULL;
     }

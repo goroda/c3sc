@@ -19,6 +19,7 @@ void print_code_usage (FILE * stream, int exit_code)
             " -h --help      Display this usage information.\n"
             " -d --directory Output directory (defaults to .)\n"
             " -n --nodes     Number of nodes (defaults to 10)\n"
+            " -s --steps     Number of iterations (default 100)\n"
             " -v --verbose   Output words (default 0)\n"
             "                1 - output main file stuff\n"
             "                >1 - also output approximation info\n"
@@ -26,17 +27,26 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
-int f1(double t, double * x, double * u, double * out, void * args)
+int f1(double t, double * x, double * u, double * out, double * jac,
+       void * args)
 {
     (void)(t);
     (void)(args);
     
     out[0] = x[1];// + sin(4.0*x[0]);
     out[1] = u[0];
+
+    if (jac != NULL){
+        //df1/du
+        jac[0] = 0.0;
+        jac[1] = 1.0;
+    }
+
     return 0;
 }
 
-int s1(double t,double * x,double * u,double * out,void * args)
+int s1(double t,double * x,double * u,double * out, double * grad,
+       void * args)
 {
     (void)(t);
     (void)(x);
@@ -47,7 +57,14 @@ int s1(double t,double * x,double * u,double * out,void * args)
     out[1] = 0.0;
     out[2] = 0.0;
     out[3] = 1.0;//cos(8.0*x[1]);
-    
+
+
+    if (grad != NULL){
+        grad[0] = 0.0;
+        grad[1] = 0.0;
+        grad[2] = 0.0;
+        grad[3] = 0.0;
+    }
     return 0;
 }
 
@@ -112,11 +129,17 @@ int outbounds(double time, double * x, void * args, int * dirs)
     return out;
 }
 
-int stagecost(double t, double * x, double * u, double * out)
+int stagecost(double t, double * x, double * u, double * out, 
+              double * grad)
 {
     (void)(t);
     *out = 0.0;
     *out += pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
+
+    if (grad!= NULL){
+        grad[0] = 2 * u[0];
+    }
+
     return 0;
 }
 
@@ -152,11 +175,12 @@ double startcost(double * x, void * args)
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:n:v:";
+    const char * const short_options = "hd:n:s:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
         { "nodes"    , 1, NULL, 'n' },
+        { "steps"    , 1, NULL, 's' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
     };
@@ -165,6 +189,7 @@ int main(int argc, char * argv[])
     char * dirout = ".";
     int verbose = 0;
     size_t N = 10;
+    size_t niter = 100;
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
         switch (next_option)
@@ -176,6 +201,9 @@ int main(int argc, char * argv[])
                 break;
             case 'n':
                 N = strtoul(optarg,NULL,10);
+                break;
+            case 's':
+                niter = strtoul(optarg,NULL,10);
                 break;
             case 'v':
                 verbose = strtol(optarg,NULL,10);
@@ -252,7 +280,7 @@ int main(int argc, char * argv[])
     dpih_attach_cost(dp, cost);
     dpih_attach_policy(dp, pol);
 
-    size_t niter = 10000;
+
     //double delta;
     for (size_t ii = 0; ii < niter+1; ii++){
 

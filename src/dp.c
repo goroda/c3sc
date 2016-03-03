@@ -25,9 +25,9 @@
  *  \var DPih::beta
  *  >0 discount factor
  *  \var DPih::stagecost
- *  stage cost
+ *  stage cost f(time,state,control,out,grad)
  *  \var DPih::boundcost
- *  boundary cost
+ *  boundary cost f(time,state,out)
  */
 struct DPih
 {
@@ -36,8 +36,8 @@ struct DPih
     struct Policy * pol;
 
     double beta; // discount factor
-    int (*stagecost)(double,double *,double *,double *);
-    int (*boundcost)(double,double *,double *);
+    int (*stagecost)(double,double*,double*,double*,double*);
+    int (*boundcost)(double,double*,double*);
 };
 
 ///////////////////////////////////////////////////////////////
@@ -51,9 +51,10 @@ struct DPih
 
     \return dynamic program
 **************************************************************/
-struct DPih * dpih_alloc(double beta,
-                         int (*s)(double,double*,double*,double*),
-                         int (*b)(double,double*,double*))
+struct DPih * 
+dpih_alloc(double beta,
+           int (*s)(double,double*,double*,double*,double*),
+           int (*b)(double,double*,double*))
 {
     struct DPih * dp = malloc(sizeof(struct DPih));
     if (dp == NULL){
@@ -114,35 +115,31 @@ void dpih_attach_policy(struct DPih * dp, struct Policy * pol)
 **************************************************************/
 double dpih_rhs(struct DPih * dp,double * x,double * u)
 {
-
     double dt;
     double t = 0.0;
     int absorb = 0;
     double val = mca_expectation(dp->mm,t,x,u,&dt,
                                  cost_eval_bb,dp->cost,
-                                 &absorb);
+                                 &absorb,NULL);
 
     double out;
     if (absorb == 1){
-        //printf("state absorbed\n");
-        //dprint(2,x);
         int res = dp->boundcost(t,x,&out);
-        //printf("cost = %G\n",out);
         assert (res == 0);
     }
     else{
-        //printf("state not absorbed\n");
-        //dprint(2,x);
         double sc;
-        int res = dp->stagecost(t,x,u,&sc);
+        int res = dp->stagecost(t,x,u,&sc,NULL);
         assert (res == 0);
         out = exp(-dp->beta*dt)*val + dt*sc;
-        //printf("dt = %G, out = %G\n",dt,out);
     }
 
     return out;
 }
 
+/**********************************************************//**
+   Use the DP policy to compute the rhs of Bellman equation
+**************************************************************/
 double dpih_rhs_pol(struct DPih * dp, double * x)
 {
     struct Control * u = NULL;
@@ -157,19 +154,24 @@ double dpih_rhs_pol(struct DPih * dp, double * x)
     return val;    
 }
 
+/**********************************************************//**
+   Helper function for sub iteration of policy iteration
+**************************************************************/
 double dpih_rhs_bb(double * x, void * dp)
 {
     double ret = dpih_rhs_pol(dp,x);
     return ret;
 }
 
+/**********************************************************//**
+   Generate a new cost function by iterating Bellman equation
+   with a *fixed* policy
+**************************************************************/
 struct Cost * dpih_iter_pol(struct DPih * dp,int verbose)
 {
-
-    struct Cost * oldcost = dp->cost;
-    struct Cost * cost = cost_alloc(oldcost->d,oldcost->bds->lb,oldcost->bds->ub);
-    cost_init_discrete(cost,oldcost->N,oldcost->x);
+    struct Cost * oc = dp->cost;
+    struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
+    cost_init_discrete(cost,oc->N,oc->x);
     cost_approx(cost,dpih_rhs_bb,dp,verbose);
     return cost;
-
 }

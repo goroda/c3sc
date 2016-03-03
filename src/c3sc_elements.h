@@ -88,7 +88,8 @@ struct Policy
  *  \var Drift::ubx
  *  Upper bounds for control space
  *  \var Drift::b
- *  RHS of rift termtochastic differential equation
+ *  RHS of drift term to stochastic differential equation
+ *  f(time,state,control,out,grad,args)
  *  \var Drift::bargs
  *  Additional arguments to dynamics
  */
@@ -102,7 +103,7 @@ struct Drift
     double * lbu;
     double * ubu;
 
-    int (*b)(double,double *, double *, double *, void *);
+    int (*b)(double,double *, double *, double *,double*,void *);
     void * bargs;
 };
 
@@ -124,6 +125,7 @@ struct Drift
  *  Upper bounds for control space
  *  \var Diff::s
  *  RHS of diffusion term of stochastic differential equation
+ *  f(time,state,control,out,grad,args)
  *  \var Diff::sargs
  *  Additional arguments to dynamics
  */
@@ -137,7 +139,7 @@ struct Diff
     double * lbu;
     double * ubu;
 
-    int (*s)(double,double *, double *, double *, void *);
+    int (*s)(double,double*,double*,double*,double*,void*);
     void * sargs;
 };
 

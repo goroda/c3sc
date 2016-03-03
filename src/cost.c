@@ -4,11 +4,8 @@
 #include <assert.h>
 
 #include "c3.h"
-
 #include "util.h"
 #include "cost.h"
-
-
 
 /**********************************************************//**
     Allocate the cost
@@ -135,7 +132,7 @@ void cost_approx(struct Cost * c,
         start[ii][0] = c->x[ii][1];
         start[ii][1] = c->x[ii][mid];
         start[ii][2] = c->x[ii][c->N[ii]-2];
-        printf("start is "); dprint(3,start[ii]);
+        //printf("start is "); dprint(3,start[ii]);
     }
 
     c->cost = function_train_cross(f,args,c->bds,
@@ -150,28 +147,6 @@ void cost_approx(struct Cost * c,
     free(fca.ranks); fca.ranks = NULL;
     free_dd(c->d,start);
     fiber_opt_args_free(fopt); fopt = NULL;
-}
-
-/**********************************************************//**
-    Black box (bb) interface to cost function evaluation
-
-    \param[in]     N    - number of points at which to evaluate
-    \param[in]     t    - times of points
-    \param[in]     x    - locations of points
-    \param[in,out] out  - allocated evaluation space
-    \param[in]     args - pointer to cost function structure
-**************************************************************/
-void cost_eval_bb(size_t N, double * t, double ** x, double * out, void * args)
-{
-
-    struct Cost * c = args;
-    int res;
-    for (size_t ii = 0; ii < N; ii++)
-    {
-        res = cost_eval(c,t[ii],x[ii],out+ii);
-        assert (res == 0);
-    }
-    
 }
 
 /**********************************************************//**
@@ -211,6 +186,27 @@ int cost_eval(struct Cost * cost,
 
     return 0;
     
+}
+
+/**********************************************************//**
+    Black box (bb) interface to cost function evaluation
+
+    \param[in]     N    - number of points at which to evaluate
+    \param[in]     t    - times of points
+    \param[in]     x    - locations of points
+    \param[in,out] out  - allocated evaluation space
+    \param[in]     args - pointer to cost function structure
+**************************************************************/
+void cost_eval_bb(size_t N, double * t, double ** x,
+                  double * out, void * args)
+{
+    struct Cost * c = args;
+    int res;
+    for (size_t ii = 0; ii < N; ii++)
+    {
+        res = cost_eval(c,t[ii],x[ii],out+ii);
+        assert (res == 0);
+    }
 }
 
 

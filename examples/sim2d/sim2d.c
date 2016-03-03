@@ -23,21 +23,23 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
-int f1(double t, double * x, double * u, double * out, void * args)
+int f1(double t,double *x,double *u,double *out, double *jac, 
+       void * args)
 {
     (void)(t);
     (void)(args);
-    
+    (void)(jac);
     out[0] = x[1] + sin(4.0*x[0]);
     out[1] = u[0];
     return 0;
 }
 
-int s1(double t,double * x,double * u,double * out,void * args)
+int s1(double t,double *x,double *u,double *out,double*jac,void * args)
 {
     (void)(t);
     (void)(x);
     (void)(u);
+    (void)(jac);
     (void)(args);
     
     out[0] = sin(3.0*x[0]);
