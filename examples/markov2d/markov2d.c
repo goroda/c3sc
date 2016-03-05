@@ -118,7 +118,7 @@ int main(int argc, char * argv[])
     dyn_init_ref(&dyn,&drift,&diff);
 
     double h[2] = {1e-2, 2e-2};
-    struct MCA * mm = mca_alloc(dx,dw,h);
+    struct MCA * mm = mca_alloc(dx,du,dw,h);
     mca_attach_dyn(mm,&dyn);
     
     double t0 = 0.0;

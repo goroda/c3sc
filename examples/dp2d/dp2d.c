@@ -260,17 +260,21 @@ int main(int argc, char * argv[])
     double h[2] = {x[1]-x[0],y[1]-y[0]};
     free(x); x = NULL;
     free(y); y = NULL;
-    struct MCA * mm = mca_alloc(dx,dw,h);
+    struct MCA * mm = mca_alloc(dx,du,dw,h);
     mca_attach_dyn(mm,&dyn);
     mca_attach_bound(mm,bound);
 
-//    double pt[2] = {1.0,1.0};
-//    double u[1] = {-1.0};
-//    double dt;
-//    int absorb;
-//    double val = mca_expectation(mm,0.0,pt,u,&dt,cost_eval_bb,cost,&absorb);
+    double pt[2] = {1.0,1.0};
+    double u[1] = {-1.0};
+    double dt;
+    int absorb;
+    double val = mca_expectation(mm,0.0,pt,u,&dt,NULL,cost_eval_bb,cost,&absorb,NULL);
 //    assert (absorb == 0);
-    //printf("value is %G\n", val);
+    printf("value is %G\n", val);
+    double grad[1];
+    double gdt[1];
+    val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad);
+    printf("value is %G, grad=%G, dtG=%G\n", val,grad[0],gdt[0]);
     // below should be true if startcost is constant
     //assert(fabs(val - startcost(pt,NULL)) < 1e-15);
     
@@ -331,11 +335,30 @@ int main(int argc, char * argv[])
     cost_eval(cost,0.0,pt2,&value);
     printf("value = %G -- should be %G\n",value,0.0);
 
+    pt2[0] = 0.6;
+    pt2[1] = -0.4;
+    cost_eval(cost,0.0,pt2,&value);
+    printf("value = %G \n",value);
+
+    u[0] = 0.5;
+    val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad);
+    printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]);
+    double dhu = 1e-4;
+    u[0] = 0.5+dhu;
+    double val2;
+    double dt2;
+    val2 = mca_expectation(mm,0.0,pt,u,&dt2,gdt,cost_eval_bb,cost,&absorb,grad);
+    printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]);
+    printf("grad should be about %3.15G\n",(val2-val)/dhu);
+    printf("gdt should be about %3.15G\n",(dt2-dt)/dhu);
 
     boundary_free(bound);
     policy_free(pol);
+    //printf("free mca\n");
     mca_free(mm);
+    //printf("free cost\n");
     cost_free(cost);
+    //printf("free dpih\n");
     dpih_free(dp);
     
     return 0;

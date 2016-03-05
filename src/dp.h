@@ -20,6 +20,6 @@ void dpih_attach_mca(struct DPih *, struct MCA *);
 void dpih_attach_cost(struct DPih *, struct Cost *);
 void dpih_attach_policy(struct DPih *, struct Policy *);
 
-double dpih_rhs(struct DPih *,double *,double *);
+double dpih_rhs(struct DPih *,double *,double *,double *);
 struct Cost * dpih_iter_pol(struct DPih *,int);
 #endif

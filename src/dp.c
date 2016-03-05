@@ -113,14 +113,26 @@ void dpih_attach_policy(struct DPih * dp, struct Policy * pol)
    Evaluate right hand side of Bellman equation at a given node *x*
    and for a given control *u*
 **************************************************************/
-double dpih_rhs(struct DPih * dp,double * x,double * u)
+double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
 {
     double dt;
+    double * gdt = NULL;
     double t = 0.0;
     int absorb = 0;
-    double val = mca_expectation(dp->mm,t,x,u,&dt,
-                                 cost_eval_bb,dp->cost,
-                                 &absorb,NULL);
+    double val;
+    size_t du;
+    if (grad == NULL){
+        val = mca_expectation(dp->mm,t,x,u,&dt,NULL,
+                              cost_eval_bb,dp->cost,
+                              &absorb,grad);
+    }
+    else{
+        du = mca_du(dp->mm);
+        gdt = calloc_double(du);
+        val = mca_expectation(dp->mm,t,x,u,&dt,gdt,
+                              cost_eval_bb,dp->cost,
+                              &absorb,grad);
+    }
 
     double out;
     if (absorb == 1){
@@ -129,9 +141,29 @@ double dpih_rhs(struct DPih * dp,double * x,double * u)
     }
     else{
         double sc;
-        int res = dp->stagecost(t,x,u,&sc,NULL);
-        assert (res == 0);
-        out = exp(-dp->beta*dt)*val + dt*sc;
+
+        if (grad == NULL){
+            int res = dp->stagecost(t,x,u,&sc,NULL);
+            assert (res == 0);
+            out = exp(-dp->beta*dt)*val + dt*sc;
+        }
+        else{
+            du = mca_du(dp->mm);
+            double * gtemp = calloc_double(du);
+            int res = dp->stagecost(t,x,u,&sc,gtemp);
+            assert (res == 0);
+            double ebt = exp(-dp->beta*dt);
+            
+            out = ebt*val + dt*sc;
+            
+            for (size_t jj = 0; jj < du; jj++){
+                grad[jj] = -dp->beta*ebt*gdt[jj]*val +
+                    ebt*grad[jj] + dt*gtemp[jj] + gdt[jj]*sc;
+            }
+            free(gtemp); gtemp = NULL;
+            free(gdt); gdt = NULL;
+        }
+
     }
 
     return out;
@@ -148,7 +180,7 @@ double dpih_rhs_pol(struct DPih * dp, double * x)
     assert (res == 0);
 
     double * uu = control_getu_ref(u);
-    double val = dpih_rhs(dp,x,uu);
+    double val = dpih_rhs(dp,x,uu,NULL);
     
     control_free(u); u = NULL;
     return val;    

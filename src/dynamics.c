@@ -27,6 +27,12 @@ size_t drift_getdx(struct Drift * b)
     return b->dx;
 }
 
+size_t drift_getdu(struct Drift * b)
+{
+    assert (b != NULL);
+    return b->du;
+}
+
 int drift_eval(struct Drift * b,double time,double * x,
                double * u, double * out, double * jac)
 {
@@ -93,6 +99,12 @@ size_t dyn_getdw(struct Dyn * dyn)
 {
     assert (dyn != NULL);
     return diff_getdw(dyn->diff);
+}
+
+size_t dyn_getdu(struct Dyn * dyn)
+{
+    assert (dyn != NULL);
+    return drift_getdu(dyn->drift);
 }
 
 int dyn_eval(struct Dyn * dyn,double time,

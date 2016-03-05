@@ -20,6 +20,9 @@ double * mcnode_getx_ref(struct MCNode *);
 void mcnode_add_neighbors_hspace(struct MCNode *, 
                                  double *, double,
                                  double *);
+void mcnode_add_gradients(struct MCNode *, size_t,
+                          size_t, double *,
+                          double **);
 double mcnode_expectation(
     struct MCNode *,
     void (*)(size_t,double*,double**x,double*,void*),
@@ -30,23 +33,27 @@ void mcnode_print(struct MCNode *, FILE *, int);
 
 /////////////////////////////////////////////////
 struct MCA;
-struct MCA * mca_alloc(size_t, size_t, double *);
+struct MCA * mca_alloc(size_t, size_t, size_t,double *);
 void mca_free(struct MCA *);
 void mca_attach_dyn(struct MCA *, struct Dyn *);
 void mca_attach_bound(struct MCA *, struct Boundary *);
+size_t mca_du(struct MCA *);
 enum NodeType mca_node_type(struct MCA *, double, double *);
 double
-mca_expectation(struct MCA *,double,double *, double *, double *,
-                void (*)(size_t,double *,double **,double *,void *),
-                void *, int*,double*);
+mca_expectation(struct MCA *,double,double *,double *,double *,
+                double *,
+                void(*)(size_t,double*,double**,double*,void*),
+                void *,int*,double*);
 
 struct MCNode *
-mca_inbound_node(struct MCA*,double,double*,double*,double*,double*);
+mca_inbound_node(struct MCA*,double,double*,
+                 double*,double*,double*,double*);
 struct MCNode *
 mca_outbound_node(struct MCA *, double, double *);
 struct MCNode *
 mca_get_node(struct MCA *,double,double *,
-             double *,double *, enum NodeType *,double*);
+             double *,double *,double*,
+             enum NodeType *,double*);
 
 void mca_step(struct MCA *, double, double *, double *,double,
               double *, double *);
