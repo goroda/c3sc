@@ -43,6 +43,30 @@ void cost_free(struct Cost * c)
 }
 
 /**********************************************************//**
+    Return a reference to cost funciton lower bounds
+**************************************************************/
+double * cost_get_lb(struct Cost * c)
+{
+    assert (c != NULL);
+    if (c->bds == NULL){
+        return NULL;
+    }
+    return bounding_box_get_lb(c->bds);
+}
+
+/**********************************************************//**
+    Return a reference to cost funciton upper
+**************************************************************/
+double * cost_get_ub(struct Cost * c)
+{
+    assert (c != NULL);
+    if (c->bds == NULL){
+        return NULL;
+    }
+    return bounding_box_get_ub(c->bds);
+}
+
+/**********************************************************//**
     Initialize the cost of a discrete cost function
 
     \param[in,out] cost - allocated cost

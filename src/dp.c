@@ -38,6 +38,7 @@ struct DPih
     double beta; // discount factor
     int (*stagecost)(double,double*,double*,double*,double*);
     int (*boundcost)(double,double*,double*);
+
 };
 
 ///////////////////////////////////////////////////////////////
@@ -205,5 +206,77 @@ struct Cost * dpih_iter_pol(struct DPih * dp,int verbose)
     struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
     cost_init_discrete(cost,oc->N,oc->x);
     cost_approx(cost,dpih_rhs_bb,dp,verbose);
+    return cost;
+}
+
+
+
+struct DPX
+{
+    struct DPih * dp;
+    double * x;
+};
+    
+/**********************************************************//**
+   Helper function for obtaining new cost by minimizing 
+   Bellman Equation
+**************************************************************/
+double dpih_rhs_opt_bb(size_t du, double * u, double * grad, void * arg)
+{
+    (void)(du);
+    struct DPX * dpx = arg;
+    double val = dpih_rhs(dpx->dp,dpx->x,u,grad);
+    return val;    
+}
+
+/**********************************************************//**
+      Run optimizer and return optimal cost
+**************************************************************/
+double dpih_rhs_opt_cost(double * x,void * dp)
+{
+
+    struct DPX dpx;
+    dpx.dp = dp;
+    dpx.x = x;
+    
+    size_t du = mca_du(dpx.dp->mm);
+    double * ustart = calloc_double(du);
+    // need to include boundaries
+    /* double * lb = cost_get_lb(dpx.dp->cost); */
+    /* double * ub = cost_get_ub(dpx.dp->cost); */
+    
+    double val = 0.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    /* c3opt_add_lb(opt,lb); */
+    /* c3opt_add_ub(opt,ub); */
+    c3opt_set_verbose(opt,0);
+    c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+    
+
+
+    int res = c3opt_minimize(opt,ustart,&val);
+    /* if (res != 0){ */
+    /*     dprint(2,x); */
+    /*     dprint(1,ustart); */
+    /*     printf("cost = %G\n",val); */
+    /* } */
+    /* assert (res == 0); */
+    //double val = OPTIMIZE(du,ustart,dpih_rhs_opt_bb,&dpx);
+    
+    free(ustart); ustart = NULL;
+    c3opt_free(opt); opt = NULL;
+    return val;
+}
+
+/**********************************************************//**
+   Generate a new cost function by iterating Bellman equation
+   with an *optimal* policy
+**************************************************************/
+struct Cost * dpih_iter_vi(struct DPih * dp,int verbose)
+{
+    struct Cost * oc = dp->cost;
+    struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
+    cost_init_discrete(cost,oc->N,oc->x);
+    cost_approx(cost,dpih_rhs_opt_cost,dp,verbose);
     return cost;
 }

@@ -30,7 +30,6 @@ double mcnode_expectation(
 void mcnode_sample_neighbor(struct MCNode *, double, double *);
 void mcnode_print(struct MCNode *, FILE *, int);
 
-
 /////////////////////////////////////////////////
 struct MCA;
 struct MCA * mca_alloc(size_t, size_t, size_t,double *);

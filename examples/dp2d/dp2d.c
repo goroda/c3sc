@@ -27,13 +27,35 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
+void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * lb, double * ub)
+{
+
+    fprintf(fp2,"x y f\n");
+    double * xtest = linspace(lb[0],ub[0],N1);
+    double * ytest = linspace(lb[1],ub[1],N2);
+
+    double pt3[2];
+    double v2;
+    for (size_t zz = 0; zz < N1; zz++){
+        for (size_t jj = 0; jj < N2; jj++){
+            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
+            cost_eval(cost,0.0,pt3,&v2);
+            fprintf(fp2, "%3.5f %3.5f %3.5f \n",
+                    xtest[zz],ytest[jj],v2);
+        }
+        fprintf(fp2,"\n");
+    }
+    free(xtest); xtest = NULL;
+    free(ytest); ytest = NULL;
+}
+
 int f1(double t, double * x, double * u, double * out, double * jac,
        void * args)
 {
     (void)(t);
     (void)(args);
     
-    out[0] = x[1];// + sin(4.0*x[0]);
+    out[0] = x[1] + sin(4.0*x[0]);
     out[1] = u[0];
 
     if (jac != NULL){
@@ -53,17 +75,16 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     (void)(u);
     (void)(args);
     
-    out[0] = 1.0;//sin(3.0*x[0]);
+    out[0] = sin(3.0*x[0]);
     out[1] = 0.0;
     out[2] = 0.0;
-    out[3] = 1.0;//cos(8.0*x[1]);
-
+    out[3] = cos(8.0*x[1]);
 
     if (grad != NULL){
         grad[0] = 0.0;
         grad[1] = 0.0;
         grad[2] = 0.0;
-        grad[3] = 0.0;
+        grad[3] = 0.0;//cos(8.0*x[1]);
     }
     return 0;
 }
@@ -171,6 +192,7 @@ double startcost(double * x, void * args)
         return 0.2;
     }
 }
+
 
 int main(int argc, char * argv[])
 {
@@ -286,6 +308,7 @@ int main(int argc, char * argv[])
 
 
     //double delta;
+    size_t N1 = 50, N2 = 50;
     for (size_t ii = 0; ii < niter+1; ii++){
 
         FILE *fp2;
@@ -297,28 +320,12 @@ int main(int argc, char * argv[])
             return 0;
         }
 
-        fprintf(fp2,"x y f\n");
-        size_t N1 = 50;
-        size_t N2 = 50;
-        double * xtest = linspace(lb[0],ub[0],N1);
-        double * ytest = linspace(lb[1],ub[1],N2);
 
-        double pt3[2];
-        double v2;
-        for (size_t zz = 0; zz < N1; zz++){
-            for (size_t jj = 0; jj < N2; jj++){
-                pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
-                cost_eval(cost,0.0,pt3,&v2);
-                fprintf(fp2, "%3.5f %3.5f %3.5f \n",
-                        xtest[zz],ytest[jj],v2);
-            }
-            fprintf(fp2,"\n");
-        }
-        free(xtest); xtest = NULL;
-        free(ytest); ytest = NULL;
+        print_cost(fp2,cost,N1,N2,lb,ub);
         fclose(fp2);
         
-        struct Cost * newcost = dpih_iter_pol(dp,verbose-1);
+        //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
+        struct Cost * newcost = dpih_iter_vi(dp,verbose-1);
         cost_free(cost);
         cost = newcost;
         dpih_attach_cost(dp,cost);
@@ -343,7 +350,9 @@ int main(int argc, char * argv[])
     u[0] = 0.5;
     val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad);
     printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]);
+
     double dhu = 1e-4;
+
     u[0] = 0.5+dhu;
     double val2;
     double dt2;
@@ -352,6 +361,18 @@ int main(int argc, char * argv[])
     printf("grad should be about %3.15G\n",(val2-val)/dhu);
     printf("gdt should be about %3.15G\n",(dt2-dt)/dhu);
 
+    double rhs,rhs2;
+    u[0] = 0.5;
+    rhs = dpih_rhs(dp,pt2,u,grad);
+    printf("grad of bellman = %3.15G\n",grad[0]);
+    u[0] = 0.5+dhu;
+    rhs2 = dpih_rhs(dp,pt2,u,grad);
+    double gshould = (rhs2-rhs)/dhu;
+    printf("grad should be approx = %3.15G\n",gshould);
+
+
+//    struct Cost * newcost = dpih_iter_vi(dp,verbose);
+    
     boundary_free(bound);
     policy_free(pol);
     //printf("free mca\n");

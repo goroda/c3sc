@@ -578,12 +578,15 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
         if (gprob != NULL){
             gprob[2*ii] = calloc_double(du);
             gprob[2*ii+1] = calloc_double(du);
+            //printf("blah t = %G ii =%zu\n",t,ii);
+            //dprint2d_col(2,2,mca->gdiff);
             cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
 
             cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                         gprob[2*ii],1);
             cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                         gprob[2*ii+1],1);
+            //dprint(mca->du,gprob[2*ii]);
 //            printf("grad after diff = "); dprint(mca->du,gprob[2*ii]);
         }
         
@@ -623,7 +626,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
                 gprob[2*ii+1][jj]=(Qh * gprob[2*ii+1][jj] - dQ[jj]*probs[ii*2+1])/Qh2;
             }
         }
-        gpself = calloc_double(du);
+
     }
 
     double pself = 1.0;
@@ -639,6 +642,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
     struct MCNode * mcn = mcnode_init(mca->d,x);
     mcnode_add_neighbors_hspace(mcn,mca->h,pself,probs);
     if (gprob!= NULL){
+        gpself = calloc_double(du);
         for (size_t ii = 0; ii < mca->d; ii++){
             cblas_daxpy(du,-1.0,gprob[2*ii],1,gpself,1);
             cblas_daxpy(du,-1.0,gprob[2*ii+1],1,gpself,1);

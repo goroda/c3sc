@@ -22,4 +22,5 @@ void dpih_attach_policy(struct DPih *, struct Policy *);
 
 double dpih_rhs(struct DPih *,double *,double *,double *);
 struct Cost * dpih_iter_pol(struct DPih *,int);
+struct Cost * dpih_iter_vi(struct DPih *,int);
 #endif
