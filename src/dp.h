@@ -47,10 +47,12 @@ void dpih_attach_policy(struct DPih *, struct Policy *);
 void dpih_attach_opt(struct DPih *, struct c3Opt *);
 
 struct Cost * dpih_get_cost(struct DPih *);
+struct Dyn * dpih_get_dyn(struct DPih *);
 
 double dpih_rhs(struct DPih *,double *,double *,double *);
 struct Cost * dpih_iter_pol(struct DPih *,int);
 struct Cost * dpih_iter_vi(struct DPih *,int);
+struct Policy * dpih_iter_vi_pol(struct DPih *,int);
 
 struct DPfh;
 #endif

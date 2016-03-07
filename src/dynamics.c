@@ -208,6 +208,25 @@ size_t diff_get_dw(struct Diff * b){
 }
 
 /////////////////////////////////////////////////////////
+
+/** \struct Dyn
+ *  \brief Stochastic Differential Equation Dynamics
+ *  \var Dyn::drift
+ *  drift dynamics
+ *  \var Dyn::diff
+ *  diffusion dynamics
+ *  \var Dyn::s
+ *  RHS of diffusion term of stochastic differential equation
+ *  \var Dyn::sargs
+ *  Additional arguments to dynamics
+ */
+struct Dyn
+{
+    struct Drift * drift;
+    struct Diff  * diff;
+};
+
+
 struct Dyn * dyn_alloc(struct Drift * drift, struct Diff * diff)
 {
     struct Dyn * dyn = malloc(sizeof(struct Dyn));

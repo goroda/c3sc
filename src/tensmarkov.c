@@ -460,6 +460,15 @@ void mca_attach_dyn(struct MCA * mca, struct Dyn * dyn)
 }
 
 /**********************************************************//**
+    Get a reference to dynamics to the MCA 
+**************************************************************/
+struct Dyn * mca_get_dyn(struct MCA * mca)
+{
+    assert (mca != NULL);
+    return mca->dyn;
+}
+
+/**********************************************************//**
     Add a reference to Boundary to the MCA 
 **************************************************************/
 void mca_attach_bound(struct MCA * mca,struct Boundary * bound)
@@ -469,9 +478,17 @@ void mca_attach_bound(struct MCA * mca,struct Boundary * bound)
 }
 
 /**********************************************************//**
+    Get size of state
+**************************************************************/
+size_t mca_get_dx(struct MCA * mca)
+{
+    return mca->d;
+}
+
+/**********************************************************//**
     Get size of control
 **************************************************************/
-size_t mca_du(struct MCA * mca)
+size_t mca_get_du(struct MCA * mca)
 {
     return mca->du;
 }

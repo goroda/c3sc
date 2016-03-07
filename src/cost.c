@@ -67,6 +67,15 @@ double * cost_get_ub(struct Cost * c)
 }
 
 /**********************************************************//**
+    Get cost function ranks
+**************************************************************/
+size_t * cost_get_ranks(struct Cost * c)
+{
+    assert (c != NULL);
+    return c->cost->ranks;
+}
+
+/**********************************************************//**
     Initialize the cost of a discrete cost function
 
     \param[in,out] cost - allocated cost
@@ -147,7 +156,6 @@ void cost_approx(struct Cost * c,
 
     double ** start = malloc_dd(c->d);
 
-    
     for (size_t ii = 0; ii < c->d; ii++){
         assert (c->N[ii] > 5);
         size_t mid = c->N[ii]/2;
@@ -203,6 +211,7 @@ int cost_eval(struct Cost * cost,
 //    printf("res = %d\n",res);
 
     if (res != 0){
+        dprint(cost->bds->dim,x);
         return res;
     }
 

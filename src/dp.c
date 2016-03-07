@@ -394,6 +394,15 @@ struct Cost * dpih_get_cost(struct DPih * dp)
 }
 
 /**********************************************************//**
+   Get the dynamics
+**************************************************************/
+struct Dyn * dpih_get_dyn(struct DPih * dp)
+{
+    assert (dp != NULL);
+    return mca_get_dyn(dp->mm);
+}
+
+/**********************************************************//**
    Evaluate right hand side of Bellman equation at a given node *x*
    and for a given control *u*
 **************************************************************/
@@ -411,7 +420,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
                               &absorb,grad);
     }
     else{
-        du = mca_du(dp->mm);
+        du = mca_get_du(dp->mm);
         gdt = calloc_double(du);
         val = mca_expectation(dp->mm,t,x,u,&dt,gdt,
                               cost_eval_bb,dp->cost,
@@ -432,7 +441,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
             out = exp(-dp->beta*dt)*val + dt*sc;
         }
         else{
-            du = mca_du(dp->mm);
+            du = mca_get_du(dp->mm);
             double * gtemp = calloc_double(du);
             int res = dp->stagecost(t,x,u,&sc,gtemp);
             assert (res == 0);
@@ -521,11 +530,8 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     
     assert (dpx.dp->opt != NULL);
 
-    size_t du = mca_du(dpx.dp->mm);
+    size_t du = mca_get_du(dpx.dp->mm);
     double * ustart = calloc_double(du);
-    // need to include boundaries
-    /* double * lb = cost_get_lb(dpx.dp->cost); */
-    /* double * ub = cost_get_ub(dpx.dp->cost); */
     
     double val = 0.0;
     struct c3Opt * opt = dpx.dp->opt;
@@ -533,14 +539,7 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     
     int res = c3opt_minimize(opt,ustart,&val);
     assert (res > -1);
-    /* if (res != 0){ */
-    /*     dprint(2,x); */
-    /*     dprint(1,ustart); */
-    /*     printf("cost = %G\n",val); */
-    /* } */
-    /* assert (res == 0); */
-    //double val = OPTIMIZE(du,ustart,dpih_rhs_opt_bb,&dpx);
-    
+     
     free(ustart); ustart = NULL;
     return val;
 }
@@ -556,4 +555,52 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose)
     cost_init_discrete(cost,oc->N,oc->x);
     cost_approx(cost,dpih_rhs_opt_cost,dp,verbose);
     return cost;
+}
+
+/**********************************************************//**
+   For computing a policy
+**************************************************************/
+double dpih_rhs_opt_pol(double * x,size_t ind,void * dpin)
+{
+    struct DPX dpx;
+    dpx.dp = dpin;
+    dpx.x = x;
+    
+    assert (dpx.dp->opt != NULL);
+
+    size_t du = mca_get_du(dpx.dp->mm);
+    double * ustart = calloc_double(du);
+
+    double val = 0.0;
+    struct c3Opt * opt = dpx.dp->opt;
+    c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+    
+    int res = c3opt_minimize(opt,ustart,&val);
+    assert (res > -1);
+     
+    val = ustart[ind];
+    free(ustart); ustart = NULL;
+    return val;
+}
+
+
+/**********************************************************//**
+   Generate a new policy by iterating optimal Bellman equation
+**************************************************************/
+struct Policy * dpih_iter_vi_pol(struct DPih * dp,int verbose)
+{
+    assert (dp != NULL);
+    assert (dp->cost != NULL);
+
+    struct Cost * oc = dp->cost;
+    double * lb = cost_get_lb(oc);
+    double * ub = cost_get_ub(oc);
+    size_t dx = mca_get_dx(dp->mm);
+    size_t du = mca_get_du(dp->mm);
+
+    struct Policy * pol = policy_alloc(dx,du);
+    policy_set_bounds(pol,lb,ub);
+    policy_init_discrete(pol,oc->N,oc->x);
+    policy_approx(pol,dpih_rhs_opt_pol,dp,verbose);
+    return pol;
 }

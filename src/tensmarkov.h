@@ -36,8 +36,10 @@ struct MCA * mca_alloc(size_t, size_t, size_t,double *);
 void mca_free(struct MCA *);
 void mca_free_deep(struct MCA *);
 void mca_attach_dyn(struct MCA *, struct Dyn *);
+struct Dyn * mca_get_dyn(struct MCA *);
 void mca_attach_bound(struct MCA *, struct Boundary *);
-size_t mca_du(struct MCA *);
+size_t mca_get_dx(struct MCA *);
+size_t mca_get_du(struct MCA *);
 enum NodeType mca_node_type(struct MCA *, double, double *);
 double
 mca_expectation(struct MCA *,double,double *,double *,double *,

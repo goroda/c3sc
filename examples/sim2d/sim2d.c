@@ -127,8 +127,7 @@ int main(int argc, char * argv[])
     struct Trajectory * traj = NULL;
     trajectory_add(&traj,state,control);
 
-    struct Policy * pol = policy_alloc();
-    policy_init(pol,dx,du,NULL,NULL);
+    struct Policy * pol = policy_alloc(dx,du);
 
     size_t nsteps = 100;
     double space[2 + 4];

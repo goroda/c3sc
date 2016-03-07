@@ -50,50 +50,9 @@ struct Trajectory
 };
 
 
-/** \struct Policy
- *  \brief Policy
- *  \var Policy::dx
- *  dimension of state space
- *  \var Policy::du
- *  dimension of control
- *  \var Policy::lbx
- *  Lower bounds for state space
- *  \var Policy::ubx
- *  Upper bounds for state space
- *  \var Policy::feedback
- *  Function mapping time,state to control
- */
-struct Policy
-{
-    size_t dx;
-    size_t du;
-    double * lbx;
-    double * ubx;
-    int (*feedback)(double, double *, double *);
-};
-
-
 struct Drift;
 struct Diff;
-
-/** \struct Dyn
- *  \brief Stochastic Differential Equation Dynamics
- *  \var Dyn::drift
- *  drift dynamics
- *  \var Dyn::diff
- *  diffusion dynamics
- *  \var Dyn::s
- *  RHS of diffusion term of stochastic differential equation
- *  \var Dyn::sargs
- *  Additional arguments to dynamics
- */
-struct Dyn
-{
-    struct Drift * drift;
-    struct Diff  * diff;
-};
-
-
+struct Dyn;
 
 
 #endif

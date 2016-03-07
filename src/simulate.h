@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "c3sc_elements.h"
+#include "control.h"
 
 struct State * state_alloc();
 void state_free(struct State *);

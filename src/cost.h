@@ -31,6 +31,7 @@ struct Cost * cost_alloc(size_t, double *, double *);
 void cost_free(struct Cost *);
 double * cost_get_lb(struct Cost *);
 double * cost_get_ub(struct Cost *);
+size_t * cost_get_ranks(struct Cost *);
 
 void cost_init_discrete(struct Cost *,size_t *,double **);
 void cost_approx(struct Cost *,

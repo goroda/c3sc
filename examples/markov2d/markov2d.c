@@ -50,9 +50,10 @@ int s1(double t,double * x,double * u,double * out,double* jac,void * args)
     return 0;
 }
 
-int polfunc(double t, double * x, double * u)
+int polfunc(double t, double * x, double * u,void*arg)
 {
     (void)(t);
+    (void)(arg);
     if (x[1] > 0){
         u[0] = -1.0;
     }
@@ -131,9 +132,8 @@ int main(int argc, char * argv[])
     struct Trajectory * traj = NULL;
     trajectory_add(&traj,state,control);
 
-    struct Policy * pol = policy_alloc();
-    policy_init(pol,dx,du,NULL,NULL);
-    policy_add_feedback(pol,polfunc);
+    struct Policy * pol = policy_alloc(dx,du);
+    policy_add_feedback(pol,polfunc,NULL);
 
     size_t nsteps = 10000;
     double space[2 + 4];
