@@ -83,22 +83,15 @@ int f1(double t, double * x, double * u, double * out, double * jac,
 {
     (void)(t);
     (void)(args);
+    (void)(x);
     
-    /* out[0] = x[1]; */
-    /* out[1] = u[0];// + u[1]; */
+    out[0] = cos(u[0]);
+    out[1] = sin(u[1]);
 
-    /* if (jac != NULL){ */
-    /*     //df1/du */
-    /*     jac[0] = 0.0;// jac[2] = 0.0; */
-    /*     jac[1] = 1.0;// jac[3] = 1.0; */
-    /* } */
-
-    out[0] = 3*x[1] + u[1];
-    out[1] = u[0];
-
+    
     if (jac != NULL){
-        jac[0] = 0.0; jac[2] = 1.0;
-        jac[1] = 1.0; jac[3] = 0.0;
+        jac[0] = -sin(u[0]);
+        jac[1] = cos(u[0]);
     }
     
     return 0;
@@ -112,37 +105,14 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     (void)(u);
     (void)(args);
     
-    out[0] = 1e0;
-    out[1] = 0.0;
-    out[2] = 0.0;
-    out[3] = 1e0;
+    out[0] = 1e0; out[2] = 0e0;
+    out[1] = 0.0; out[3] = 1e0;
 
     if (grad != NULL){
-        for (size_t ii = 0; ii < 2*2*2;ii++){
+        for (size_t ii = 0; ii < 2*2; ii++){
             grad[ii] = 0.0;
         }
-        /* grad[0] = 0.0; */
-        /* grad[1] = 0.0; */
-        /* grad[2] = 0.0; */
-        /* grad[3] = 0.0;//cos(8.0*x[1]); */
     }
-    return 0;
-}
-
-int polfunc(double t, double * x, double * u,void*arg)
-{
-    (void)(t);
-    (void)(arg);
-    if (x[1] > 0){
-        u[0] = -1.0;
-    }
-    else if (x[1] < 0){
-        u[0] = 1.0;
-    }
-    else{
-        u[0] = 0.0;
-    }
-    // u[0] = 0.0;
     return 0;
 }
 
@@ -155,39 +125,24 @@ int outbounds(double time, double * x, void * args, int * dirs)
     (void)(time);
     (void)(args);
     
-    double bound = 2.0;
+    double bound1 = 1.0;
     int out = 0;
     for (size_t ii = 0; ii < 2; ii++){
         dirs[ii] = 0;
-        if (x[ii] > bound){
+        if (x[ii] > bound1){
             return 1;
         }
-        else if (x[ii] < -bound){
+        else if (x[ii] < -bound1){
             return 1;
         }
-        else if (fabs(x[ii] - bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            // dirs[ii] = 1;
-            //out = -1;
-            
+        else if (fabs(x[ii] - bound1) < 1e-15){
             return 1;
         }
-        else if (fabs(x[ii] + bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            //dirs[ii] = -1;
-            //out = -1;
-            
+        else if (fabs(x[ii] + bound1) < 1e-15){
             return 1;
         }
     }
 
-   /* if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){ */
-   /*     // printf("here!!!!! (%G,%G)\n",x[0],x[1]); */
-   /*     return 1; */
-   /* } */
-    
     return out;
 }
 
@@ -199,36 +154,25 @@ int trajboundcheck(double time, double * x, void * args, int * dirs)
     // and the inside box [-0.1,0.1]^2
     (void)(time);
     (void)(args);
-    
-    double bound = 2.0;
+    double bound1 = 1.0;
     int out = 0;
     for (size_t ii = 0; ii < 2; ii++){
         dirs[ii] = 0;
-        if (x[ii] > bound){
+        if (x[ii] > bound1){
             return 1;
         }
-        else if (x[ii] < -bound){
+        else if (x[ii] < -bound1){
             return 1;
         }
-        else if (fabs(x[ii] - bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            // dirs[ii] = 1;
-            //out = -1;
-            
+        else if (fabs(x[ii] - bound1) < 1e-15){
             return 1;
         }
-        else if (fabs(x[ii] + bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            //dirs[ii] = -1;
-            //out = -1;
-            
+        else if (fabs(x[ii] + bound1) < 1e-15){
             return 1;
         }
     }
-
-   if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){
+    
+   if ( (fabs(x[0]) <= 1e-1) && (fabs(x[1]) <= 1e-1)){
        // printf("here!!!!! (%G,%G)\n",x[0],x[1]);
        return 1;
    }

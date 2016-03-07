@@ -1,0 +1,3 @@
+* Ideas for speedup
+- reuse fibers each iteration
+- dont always start at rank 3

@@ -413,14 +413,14 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
     double t = 0.0;
     int absorb = 0;
     double val;
-    size_t du;
+    size_t du = mca_get_du(dp->mm);
     if (grad == NULL){
         val = mca_expectation(dp->mm,t,x,u,&dt,NULL,
                               cost_eval_bb,dp->cost,
                               &absorb,grad);
     }
     else{
-        du = mca_get_du(dp->mm);
+
         gdt = calloc_double(du);
         val = mca_expectation(dp->mm,t,x,u,&dt,gdt,
                               cost_eval_bb,dp->cost,
@@ -430,6 +430,11 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
     double out;
     if (absorb == 1){
         int res = dp->boundcost(t,x,&out);
+        if (grad != NULL){
+            for (size_t ii = 0; ii < du; ii++ ){
+                grad[ii] = 0.0;
+            }
+        }
         assert (res == 0);
     }
     else{
@@ -536,8 +541,21 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     double val = 0.0;
     struct c3Opt * opt = dpx.dp->opt;
     c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+
     
     int res = c3opt_minimize(opt,ustart,&val);
+    if (res < 0){
+        printf("max iter reached in optimization res=%d\n",res);
+        size_t dx = mca_get_dx(dpx.dp->mm);
+        printf("x = ");
+        dprint(dx,x);
+        dprint(du,ustart);
+        for (size_t ii = 0; ii < du; ii++){
+            ustart[ii] = 0.0;
+        }
+        c3opt_set_verbose(opt,1);
+        c3opt_minimize(opt,ustart,&val);
+    }
     assert (res > -1);
      
     free(ustart); ustart = NULL;

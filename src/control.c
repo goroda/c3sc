@@ -181,7 +181,7 @@ void policy_approx(struct Policy * c,
     fca.epsilon = 1e-7;
     fca.maxiter = 10;
     fca.epsround = 1e-10;
-    fca.kickrank = 2;
+    fca.kickrank = 5;
     fca.maxiteradapt = 5;
     fca.verbose = verbose;
     fca.optargs = fopt;
