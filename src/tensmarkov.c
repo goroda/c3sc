@@ -437,6 +437,20 @@ void mca_free(struct MCA * mca)
 }
 
 /**********************************************************//**
+    Free memory allocated to an MCA along with boundary 
+    and dynamics
+**************************************************************/
+void mca_free_deep(struct MCA * mca)
+{
+    if (mca != NULL){
+        boundary_free(mca->bound); mca->bound = NULL;
+        dyn_free_deep(mca->dyn); mca->dyn = NULL;
+        mca_free(mca); mca = NULL;
+        free(mca); mca = NULL;
+    }
+}
+
+/**********************************************************//**
     Add a reference to dynamics to the MCA 
 **************************************************************/
 void mca_attach_dyn(struct MCA * mca, struct Dyn * dyn)
@@ -540,7 +554,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
     double * dQ = NULL;
 
     int res;
-    size_t du = dyn_getdu(mca->dyn);;
+    size_t du = dyn_get_du(mca->dyn);;
     if (grad != NULL){
         gprob = malloc_dd(2*mca->d);
         res = dyn_eval(mca->dyn,time,x,u,mca->drift,

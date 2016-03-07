@@ -106,16 +106,13 @@ int main(int argc, char * argv[])
     size_t dw = 2;
     size_t du = 1;
     
-    struct Drift drift;
-    drift_init(&drift,dx,du,NULL,NULL,NULL,NULL);
-    drift.b = f1;
+    struct Drift * drift = drift_alloc(dx,du);
+    drift_add_func(drift,f1,NULL);
 
-    struct Diff diff;
-    diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
-    diff.s = s1;
+    struct Diff * diff = diff_alloc(dx,du,dw);
+    diff_add_func(diff,s1,NULL);
 
-    struct Dyn dyn;
-    dyn_init_ref(&dyn,&drift,&diff);
+    struct Dyn * dyn = dyn_alloc(drift,diff);
 
     double t0 = 0.0;
     double xs[2] = {0.2,0.5};
@@ -141,10 +138,10 @@ int main(int argc, char * argv[])
     for (size_t ii = 0; ii < nsteps; ii++){
         noise[0] = randn()*sqrt(dt);
         noise[1] = randn()*sqrt(dt);
-        /* res = trajectory_step(traj,pol,&dyn,dt,"euler", */
+        /* res = trajectory_step(traj,pol,dyn,dt,"euler", */
         /*                       space,NULL,NULL); */
         
-        res = trajectory_step(traj,pol,&dyn,dt,
+        res = trajectory_step(traj,pol,dyn,dt,
                               "euler-maruyama",
                               space,noise,NULL);
         if (res != 0){
@@ -166,6 +163,9 @@ int main(int argc, char * argv[])
 
     state_free(state);
     control_free(control);
+    drift_free(drift);
+    diff_free(diff);
+    dyn_free(dyn);
     trajectory_free(traj);
     policy_free(pol);
     

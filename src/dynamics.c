@@ -6,28 +6,88 @@
 
 #include "dynamics.h"
 
-void drift_init(struct Drift * b, size_t dx, size_t du,
-                double * lbx, double * ubx,
-                double * lbu, double * ubu)
+/** \struct Drift
+ *  \brief Drift dynamics
+ *  \var Drift::dx
+ *  dimension of state space
+ *  \var Drift::du
+ *  dimension of control
+ *  \var Drift::lbx
+ *  Lower bounds for state space
+ *  \var Drift::ubx
+ *  Upper bounds for state space
+ *  \var Drift::lbu
+ *  Lower bounds for control space
+ *  \var Drift::ubx
+ *  Upper bounds for control space
+ *  \var Drift::b
+ *  RHS of drift term to stochastic differential equation
+ *  f(time,state,control,out,grad,args)
+ *  \var Drift::bargs
+ *  Additional arguments to dynamics
+ */
+struct Drift
 {
-    assert (b != NULL);
+    size_t dx;
+    size_t du;
+    //these could be null
+    double * lbx;
+    double * ubx;
+    double * lbu;
+    double * ubu;
+
+    int (*b)(double,double *, double *, double *,double*,void *);
+    void * bargs;
+};
+
+struct Drift * drift_alloc(size_t dx, size_t du)
+{
+    struct Drift * b = malloc(sizeof(struct Drift));
+    if (b == NULL){
+        fprintf(stderr,"Error allocating memory for Drift\n");
+        exit(1);
+    }
+
     b->dx = dx;
     b->du = du;
-    b->lbx = lbx;
-    b->ubx = ubx;
-    b->lbu = lbu;
-    b->ubu = ubu;
+    b->lbx = NULL;
+    b->ubx = NULL;
+    b->lbu = NULL;
+    b->ubu = NULL;
     b->b = NULL;
     b->bargs = NULL;
+
+    return b;
 }
 
-size_t drift_getdx(struct Drift * b)
+void drift_free(struct Drift * drift)
+{
+    if (drift != NULL){
+        free(drift->lbx); drift->lbx = NULL;
+        free(drift->ubx); drift->ubx = NULL;
+        free(drift->lbu); drift->lbu = NULL;
+        free(drift->ubu); drift->ubu = NULL;
+        free(drift); drift = NULL;
+    }
+}
+
+void drift_add_func(struct Drift * dr,
+                    int (*b)(double,double*,double*,
+                             double*,double*,void*),
+                    void * bargs)
+{
+    assert (dr != NULL);
+    dr->b = b;
+    dr->bargs = bargs;
+}
+
+size_t drift_get_dx(struct Drift * b)
 {
     assert (b != NULL);
     return b->dx;
 }
 
-size_t drift_getdu(struct Drift * b)
+size_t drift_get_du(struct Drift * b)
 {
     assert (b != NULL);
     return b->du;
@@ -47,21 +107,86 @@ int drift_eval(struct Drift * b,double time,double * x,
     return res;
 }
 
-void diff_init(struct Diff * s, size_t dw,
-               size_t dx, size_t du,
-               double * lbx, double * ubx,
-               double * lbu, double * ubu)
+////////////////////////////////////////////////////////////////////////
+
+/** \struct Diff
+ *  \brief Diffusion dynamics
+ *  \var Diff::dx
+ *  dimension of state space
+ *  \var Diff::du
+ *  dimension of control
+ *  \var Diff::dw
+ *  dimension of random walk
+ *  \var Diff::lbx
+ *  Lower bounds for state space
+ *  \var Diff::ubx
+ *  Upper bounds for state space
+ *  \var Diff::lbu
+ *  Lower bounds for control space
+ *  \var Diff::ubx
+ *  Upper bounds for control space
+ *  \var Diff::s
+ *  RHS of diffusion term of stochastic differential equation
+ *  f(time,state,control,out,grad,args)
+ *  \var Diff::sargs
+ *  Additional arguments to dynamics
+ */
+struct Diff
 {
-    assert (s != NULL);
-    s->dw = dw;
+
+    size_t dx;
+    size_t du;
+    size_t dw;
+    double * lbx;
+    double * ubx;
+    double * lbu;
+    double * ubu;
+
+    int (*s)(double,double*,double*,double*,double*,void*);
+    void * sargs;
+};
+
+
+struct Diff * diff_alloc(size_t dx, size_t du, size_t dw)
+{
+    struct Diff * s = malloc(sizeof(struct Diff));
+    if (s == NULL){
+        fprintf(stderr,"Error allocating memory for Drift\n");
+        exit(1);
+    }
+
     s->dx = dx;
     s->du = du;
-    s->lbx = lbx;
-    s->ubx = ubx;
-    s->lbu = lbu;
-    s->ubu = ubu;
+    s->dw = dw;
+    s->lbx = NULL;
+    s->ubx = NULL;
+    s->lbu = NULL;
+    s->ubu = NULL;
     s->s = NULL;
     s->sargs = NULL;
+
+    return s;
+}
+
+void diff_free(struct Diff * diff)
+{
+    if (diff != NULL){
+        free(diff->lbx); diff->lbx = NULL;
+        free(diff->ubx); diff->ubx = NULL;
+        free(diff->lbu); diff->lbu = NULL;
+        free(diff->ubu); diff->ubu = NULL;
+        free(diff); diff = NULL;
+    }
+}
+
+void diff_add_func(struct Diff * df,
+                   int (*s)(double,double*,double*,
+                            double*,double*,void*),
+                    void * sargs)
+{
+    assert (df != NULL);
+    df->s = s;
+    df->sargs = sargs;
 }
 
 int diff_eval(struct Diff * b, double time, double * x, 
@@ -77,9 +202,39 @@ int diff_eval(struct Diff * b, double time, double * x,
     return res;
 }
 
-size_t diff_getdw(struct Diff * b){
+size_t diff_get_dw(struct Diff * b){
     assert (b != NULL);
     return b->dw;
+}
+
+/////////////////////////////////////////////////////////
+struct Dyn * dyn_alloc(struct Drift * drift, struct Diff * diff)
+{
+    struct Dyn * dyn = malloc(sizeof(struct Dyn));
+    if (dyn == NULL){
+        fprintf(stderr,"Cannot allocate memory for Dynamics\n");
+        exit(1);
+    }
+    dyn->drift = drift;
+    dyn->diff = diff;
+
+    return dyn;
+}
+
+void dyn_free(struct Dyn * dyn)
+{
+    if (dyn != NULL){
+        free(dyn); dyn = NULL;
+    }
+}
+
+void dyn_free_deep(struct Dyn * dyn)
+{
+    if (dyn != NULL){
+        drift_free(dyn->drift); dyn->drift = NULL;
+        diff_free(dyn->diff); dyn->diff = NULL;
+        dyn_free(dyn); dyn = NULL;
+    }
 }
 
 void dyn_init_ref(struct Dyn *dyn, struct Drift *drift, 
@@ -89,22 +244,22 @@ void dyn_init_ref(struct Dyn *dyn, struct Drift *drift,
     dyn->diff = diff;
 }
 
-size_t dyn_getdx(struct Dyn * dyn)
+size_t dyn_get_dx(struct Dyn * dyn)
 {
     assert (dyn != NULL);
-    return drift_getdx(dyn->drift);
+    return drift_get_dx(dyn->drift);
 }
 
-size_t dyn_getdw(struct Dyn * dyn)
+size_t dyn_get_dw(struct Dyn * dyn)
 {
     assert (dyn != NULL);
-    return diff_getdw(dyn->diff);
+    return diff_get_dw(dyn->diff);
 }
 
-size_t dyn_getdu(struct Dyn * dyn)
+size_t dyn_get_du(struct Dyn * dyn)
 {
     assert (dyn != NULL);
-    return drift_getdu(dyn->drift);
+    return drift_get_du(dyn->drift);
 }
 
 int dyn_eval(struct Dyn * dyn,double time,

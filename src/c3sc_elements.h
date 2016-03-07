@@ -73,76 +73,8 @@ struct Policy
 };
 
 
-/** \struct Drift
- *  \brief Drift dynamics
- *  \var Drift::dx
- *  dimension of state space
- *  \var Drift::du
- *  dimension of control
- *  \var Drift::lbx
- *  Lower bounds for state space
- *  \var Drift::ubx
- *  Upper bounds for state space
- *  \var Drift::lbu
- *  Lower bounds for control space
- *  \var Drift::ubx
- *  Upper bounds for control space
- *  \var Drift::b
- *  RHS of drift term to stochastic differential equation
- *  f(time,state,control,out,grad,args)
- *  \var Drift::bargs
- *  Additional arguments to dynamics
- */
-struct Drift
-{
-    size_t dx;
-    size_t du;
-    //these could be null
-    double * lbx;
-    double * ubx;
-    double * lbu;
-    double * ubu;
-
-    int (*b)(double,double *, double *, double *,double*,void *);
-    void * bargs;
-};
-
-/** \struct Diff
- *  \brief Diffusion dynamics
- *  \var Diff::dw
- *  dimension of random walk
- *  \var Diff::dx
- *  dimension of state space
- *  \var Diff::du
- *  dimension of control
- *  \var Diff::lbx
- *  Lower bounds for state space
- *  \var Diff::ubx
- *  Upper bounds for state space
- *  \var Diff::lbu
- *  Lower bounds for control space
- *  \var Diff::ubx
- *  Upper bounds for control space
- *  \var Diff::s
- *  RHS of diffusion term of stochastic differential equation
- *  f(time,state,control,out,grad,args)
- *  \var Diff::sargs
- *  Additional arguments to dynamics
- */
-struct Diff
-{
-    size_t dw;
-    size_t dx;
-    size_t du;
-    double * lbx;
-    double * ubx;
-    double * lbu;
-    double * ubu;
-
-    int (*s)(double,double*,double*,double*,double*,void*);
-    void * sargs;
-};
-
+struct Drift;
+struct Diff;
 
 /** \struct Dyn
  *  \brief Stochastic Differential Equation Dynamics

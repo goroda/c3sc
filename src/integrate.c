@@ -40,7 +40,7 @@ euler_maruyama_step(struct State * s, double * noise,
 {
 
     size_t d = state_getd(s);
-    size_t dw = dyn_getdw(dyn);
+    size_t dw = dyn_get_dw(dyn);
     double time = state_gett(s);
     double * x = state_getx_ref(s);
     double * uu = control_getu_ref(u);

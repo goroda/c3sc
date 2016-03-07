@@ -242,73 +242,92 @@ int main(int argc, char * argv[])
     size_t dx = 2;
     size_t dw = 2;
     size_t du = 1;
-    
-    struct Drift drift;
-    drift_init(&drift,dx,du,NULL,NULL,NULL,NULL);
-    drift.b = f1;
-
-    struct Diff diff;
-    diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
-    diff.s = s1;
-
-    struct Dyn dyn;
-    dyn_init_ref(&dyn,&drift,&diff);
-
-    struct Boundary * bound = boundary_alloc(dx,outbounds,NULL);
-    
-    //double t3[2];
-    struct Policy * pol = policy_alloc();
-    policy_init(pol,dx,du,NULL,NULL);
-    policy_add_feedback(pol,polfunc);
-    //policy_add_transform_ref(pol,&lt,t3);
-
     double lb[2] = {-2.0, -2.0};
     double ub[2] = {2.0, 2.0};
-
     size_t Narr[2] = {N, N};
-    double * x = linspace(lb[0],ub[0],Narr[0]);
-    double * y = linspace(lb[1],ub[1],Narr[1]);
-    if (verbose > 0){
-        printf("x = "); dprint(Narr[0],x);
-        printf("y = "); dprint(Narr[1],y);
-    }
-    double * z[2]; 
-    z[0] = x;
-    z[1] = y;
-    struct Cost * cost = cost_alloc(dx,lb,ub);
-    cost_init_discrete(cost,Narr,z);
-    cost_approx(cost,startcost,NULL,verbose-1);
 
-    double h[2] = {x[1]-x[0],y[1]-y[0]};
-    free(x); x = NULL;
-    free(y); y = NULL;
-    struct MCA * mm = mca_alloc(dx,du,dw,h);
-    mca_attach_dyn(mm,&dyn);
-    mca_attach_bound(mm,bound);
-
-    double pt[2] = {1.0,1.0};
-    double u[1] = {-1.0};
-    double dt;
-    int absorb;
-    double val = mca_expectation(mm,0.0,pt,u,&dt,NULL,cost_eval_bb,cost,&absorb,NULL);
-//    assert (absorb == 0);
-    printf("value is %G\n", val);
-    double grad[1];
-    double gdt[1];
-    val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad);
-    printf("value is %G, grad=%G, dtG=%G\n", val,grad[0],gdt[0]);
-    // below should be true if startcost is constant
-    //assert(fabs(val - startcost(pt,NULL)) < 1e-15);
+    double lbu[1] = {-1.0};
+    double ubu[1] = {1.0};
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbu);
+    c3opt_add_ub(opt,ubu);
     
     double beta = 1.0;
-    struct DPih * dp = dpih_alloc(beta,stagecost,boundcost);
-    dpih_attach_mca(dp, mm);
-    dpih_attach_cost(dp, cost);
-    dpih_attach_policy(dp, pol);
+
+    c3sc sc = c3sc_create(IH,dx,du,dw);
+    c3sc_set_state_bounds(sc,lb,ub);
+    c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
+    c3sc_add_boundary(sc,outbounds,NULL);
+    c3sc_init_mca(sc,Narr);
+    c3sc_attach_opt(sc,opt);
+    c3sc_init_dp(sc,beta,stagecost,boundcost);
 
 
-    //double delta;
+/*     struct Drift * drift = drift_alloc(dx,du); */
+/*     drift_add_func(drift,f1,NULL); */
+
+/*     struct Diff * diff = diff_alloc(dx,du,dw); */
+/*     diff_add_func(diff,s1,NULL); */
+
+/*     struct Dyn * dyn = dyn_alloc(drift,diff); */
+
+/*     struct Boundary * bound = boundary_alloc(dx,outbounds,NULL); */
+    
+/*     //double t3[2]; */
+/*     struct Policy * pol = policy_alloc(); */
+/*     policy_init(pol,dx,du,NULL,NULL); */
+/*     policy_add_feedback(pol,polfunc); */
+/*     //policy_add_transform_ref(pol,&lt,t3); */
+
+
+/*     double * x = linspace(lb[0],ub[0],Narr[0]); */
+/*     double * y = linspace(lb[1],ub[1],Narr[1]); */
+/*     if (verbose > 0){ */
+/*         printf("x = "); dprint(Narr[0],x); */
+/*         printf("y = "); dprint(Narr[1],y); */
+/*     } */
+/*     double * z[2];  */
+/*     z[0] = x; */
+/*     z[1] = y; */
+/*     struct Cost * cost = cost_alloc(dx,lb,ub); */
+/*     cost_init_discrete(cost,Narr,z); */
+/*     cost_approx(cost,startcost,NULL,verbose-1); */
+
+/*     double h[2] = {x[1]-x[0],y[1]-y[0]}; */
+/*     free(x); x = NULL; */
+/*     free(y); y = NULL; */
+/*     struct MCA * mm = mca_alloc(dx,du,dw,h); */
+/*     mca_attach_dyn(mm,dyn); */
+/*     mca_attach_bound(mm,bound); */
+
+/*     double pt[2] = {1.0,1.0}; */
+/*     double u[1] = {-1.0}; */
+/*     double dt; */
+/*     int absorb; */
+/*     double val = mca_expectation(mm,0.0,pt,u,&dt,NULL,cost_eval_bb,cost,&absorb,NULL); */
+/* //    assert (absorb == 0); */
+/*     printf("value is %G\n", val); */
+/*     double grad[1]; */
+/*     double gdt[1]; */
+/*     val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad); */
+/*     printf("value is %G, grad=%G, dtG=%G\n", val,grad[0],gdt[0]); */
+/*     // below should be true if startcost is constant */
+/*     //assert(fabs(val - startcost(pt,NULL)) < 1e-15); */
+    
+    
+/* //    double beta = 1.0; */
+/*     struct DPih * dp = dpih_alloc(beta,stagecost,boundcost); */
+/*     dpih_attach_mca(dp, mm); */
+/*     dpih_attach_cost(dp, cost); */
+/*     dpih_attach_policy(dp, pol); */
+/*     dpih_attach_opt(dp,opt); */
+
+
+/*     //double delta; */
     size_t N1 = 50, N2 = 50;
+    struct DPih * dp = c3sc_get_dp(sc);
+    struct Cost * cost = dpih_get_cost(dp);
+    cost_approx(cost,startcost,NULL,verbose-1);
     for (size_t ii = 0; ii < niter+1; ii++){
 
         FILE *fp2;
@@ -319,7 +338,6 @@ int main(int argc, char * argv[])
             fprintf(stderr, "cat: can't open %s\n", filename);
             return 0;
         }
-
 
         print_cost(fp2,cost,N1,N2,lb,ub);
         fclose(fp2);
@@ -337,50 +355,56 @@ int main(int argc, char * argv[])
         }
     }
 
-    double pt2[2] = {0.00,0.00};
-    double value;
-    cost_eval(cost,0.0,pt2,&value);
-    printf("value = %G -- should be %G\n",value,0.0);
+/*     double pt2[2] = {0.00,0.00}; */
+/*     double value; */
+/*     cost_eval(cost,0.0,pt2,&value); */
+/*     printf("value = %G -- should be %G\n",value,0.0); */
 
-    pt2[0] = 0.6;
-    pt2[1] = -0.4;
-    cost_eval(cost,0.0,pt2,&value);
-    printf("value = %G \n",value);
+/*     pt2[0] = 0.6; */
+/*     pt2[1] = -0.4; */
+/*     cost_eval(cost,0.0,pt2,&value); */
+/*     printf("value = %G \n",value); */
 
-    u[0] = 0.5;
-    val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad);
-    printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]);
+/*     u[0] = 0.5; */
+/*     val = mca_expectation(mm,0.0,pt,u,&dt,gdt,cost_eval_bb,cost,&absorb,grad); */
+/*     printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]); */
 
-    double dhu = 1e-4;
+/*     double dhu = 1e-4; */
 
-    u[0] = 0.5+dhu;
-    double val2;
-    double dt2;
-    val2 = mca_expectation(mm,0.0,pt,u,&dt2,gdt,cost_eval_bb,cost,&absorb,grad);
-    printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]);
-    printf("grad should be about %3.15G\n",(val2-val)/dhu);
-    printf("gdt should be about %3.15G\n",(dt2-dt)/dhu);
+/*     u[0] = 0.5+dhu; */
+/*     double val2; */
+/*     double dt2; */
+/*     val2 = mca_expectation(mm,0.0,pt,u,&dt2,gdt,cost_eval_bb,cost,&absorb,grad); */
+/*     printf("value is %3.15G, grad=%3.15G,gdt=%G\n", val,grad[0],gdt[0]); */
+/*     printf("grad should be about %3.15G\n",(val2-val)/dhu); */
+/*     printf("gdt should be about %3.15G\n",(dt2-dt)/dhu); */
 
-    double rhs,rhs2;
-    u[0] = 0.5;
-    rhs = dpih_rhs(dp,pt2,u,grad);
-    printf("grad of bellman = %3.15G\n",grad[0]);
-    u[0] = 0.5+dhu;
-    rhs2 = dpih_rhs(dp,pt2,u,grad);
-    double gshould = (rhs2-rhs)/dhu;
-    printf("grad should be approx = %3.15G\n",gshould);
+/*     double rhs,rhs2; */
+/*     u[0] = 0.5; */
+/*     rhs = dpih_rhs(dp,pt2,u,grad); */
+/*     printf("grad of bellman = %3.15G\n",grad[0]); */
+/*     u[0] = 0.5+dhu; */
+/*     rhs2 = dpih_rhs(dp,pt2,u,grad); */
+/*     double gshould = (rhs2-rhs)/dhu; */
+/*     printf("grad should be approx = %3.15G\n",gshould); */
 
 
-//    struct Cost * newcost = dpih_iter_vi(dp,verbose);
+/* //    struct Cost * newcost = dpih_iter_vi(dp,verbose); */
     
-    boundary_free(bound);
-    policy_free(pol);
-    //printf("free mca\n");
-    mca_free(mm);
-    //printf("free cost\n");
-    cost_free(cost);
-    //printf("free dpih\n");
-    dpih_free(dp);
-    
+/*     diff_free(diff); */
+/*     drift_free(drift); */
+/*     dyn_free(dyn); */
+/*     boundary_free(bound); */
+/*     policy_free(pol); */
+/*     //printf("free mca\n"); */
+/*     mca_free(mm); */
+/*     //printf("free cost\n"); */
+/*     cost_free(cost); */
+/*     //printf("free dpih\n"); */
+
+/*     c3opt_free(opt);     */
+/*     dpih_free(dp); */
+        
+    c3sc_destroy(sc);
     return 0;
 }

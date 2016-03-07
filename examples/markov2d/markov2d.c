@@ -106,20 +106,17 @@ int main(int argc, char * argv[])
     size_t dw = 2;
     size_t du = 1;
     
-    struct Drift drift;
-    drift_init(&drift,dx,du,NULL,NULL,NULL,NULL);
-    drift.b = f1;
+    struct Drift * drift = drift_alloc(dx,du);
+    drift_add_func(drift,f1,NULL);
 
-    struct Diff diff;
-    diff_init(&diff,dw,dx,du,NULL,NULL,NULL,NULL);
-    diff.s = s1;
+    struct Diff * diff = diff_alloc(dx,du,dw);
+    diff_add_func(diff,s1,NULL);
 
-    struct Dyn dyn;
-    dyn_init_ref(&dyn,&drift,&diff);
+    struct Dyn * dyn = dyn_alloc(drift,diff);
 
     double h[2] = {1e-2, 2e-2};
     struct MCA * mm = mca_alloc(dx,du,dw,h);
-    mca_attach_dyn(mm,&dyn);
+    mca_attach_dyn(mm,dyn);
     
     double t0 = 0.0;
     double xstd[2] = {0.2,0.5};
@@ -148,7 +145,7 @@ int main(int argc, char * argv[])
 
         noise[0] = randu();
         //printf("noise = %G\n",noise[0]);
-        res = trajectory_step(traj,pol,&dyn,dt,
+        res = trajectory_step(traj,pol,dyn,dt,
                               "markov-chain",
                               space,noise,mm);
         if (res != 0){
@@ -170,6 +167,9 @@ int main(int argc, char * argv[])
 
     state_free(state);
     control_free(control);
+    drift_free(drift);
+    diff_free(diff);
+    dyn_free(dyn);
     trajectory_free(traj);
     policy_free(pol);
     mca_free(mm);
