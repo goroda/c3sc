@@ -19,7 +19,7 @@ struct MCNode * mcnode_init(size_t, double *);
 double * mcnode_getx_ref(struct MCNode *);
 void mcnode_add_neighbors_hspace(struct MCNode *, 
                                  double *, double,
-                                 double *);
+                                 double *, struct BoundInfo *);
 void mcnode_add_gradients(struct MCNode *, size_t,
                           size_t, double *,
                           double **);
@@ -40,7 +40,6 @@ struct Dyn * mca_get_dyn(struct MCA *);
 void mca_attach_bound(struct MCA *, struct Boundary *);
 size_t mca_get_dx(struct MCA *);
 size_t mca_get_du(struct MCA *);
-enum NodeType mca_node_type(struct MCA *, double, double *);
 double
 mca_expectation(struct MCA *,double,double *,double *,double *,
                 double *,
@@ -49,7 +48,8 @@ mca_expectation(struct MCA *,double,double *,double *,double *,
 
 struct MCNode *
 mca_inbound_node(struct MCA*,double,double*,
-                 double*,double*,double*,double*);
+                 double*,double*,double*,double*,
+                 struct BoundInfo *);
 struct MCNode *
 mca_outbound_node(struct MCA *, double, double *);
 struct MCNode *

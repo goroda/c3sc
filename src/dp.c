@@ -97,7 +97,7 @@ void c3sc_destroy(struct C3SC * sc)
 }
 
 /**********************************************************//**
-    Add bounds on state
+    Add bounds on state and initialize boundary conditions
 **************************************************************/
 void
 c3sc_set_state_bounds(struct C3SC * sc, double * lb, double * ub)
@@ -111,6 +111,17 @@ c3sc_set_state_bounds(struct C3SC * sc, double * lb, double * ub)
         sc->ubx = calloc_double(sc->dx);
         memmove(sc->ubx,ub,sc->dx * sizeof(double));
     }
+
+    sc->bound = boundary_alloc(sc->dx,sc->lbx,sc->ubx);
+}
+
+/**********************************************************//**
+    Set the external boundary type of a particular dimension
+**************************************************************/
+void c3sc_set_external_boundary(struct C3SC * sc, size_t dim,
+                                char * type)
+{
+    boundary_external_set_type(sc->bound,dim,type);
 }
 
 /**********************************************************//**
@@ -136,21 +147,6 @@ void c3sc_add_dynamics(struct C3SC * sc,
     struct Diff * diff = diff_alloc(sc->dx,sc->du,sc->dw);
     diff_add_func(diff,s,sargs);
     sc->dyn = dyn_alloc(drift,diff);
-}
-
-/**********************************************************//**
-    Add boundary to sc problem
-
-    \param[in,out] sc    - stochastic control problem
-    \param[in]     f     - boundary evaluation function
-    \param[in]     farg  - additional boundary arguments
-**************************************************************/
-void c3sc_add_boundary(struct C3SC * sc,
-                       int (*f)(double,double *,void *,int*), 
-                       void *farg)
-{
-    assert (sc != NULL);
-    sc->bound = boundary_alloc(sc->dx,f,farg);
 }
 
 /**********************************************************//**

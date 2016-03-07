@@ -157,10 +157,11 @@ double * mcnode_getx_ref(struct MCNode * mcn)
     \param[in]     h     - spacing of nodes in each direction
     \param[in]     pself - new probability of self transition
     \param[in]     probs - transition probs to neighbors
+    \param[in]     bi    - boundary info
 **************************************************************/
 void mcnode_add_neighbors_hspace(struct MCNode * mcn, 
                                  double * h, double pself,
-                                 double * probs)
+                                 double * probs, struct BoundInfo * bi)
 {
     assert (mcn != NULL);
     assert (mcn->N == 0);
@@ -169,8 +170,35 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
     for (size_t ii = 0; ii < mcn->d; ii++ ){
         mcn->neighbors[2*ii] = mcnode_init(mcn->d,mcn->x);
         mcn->neighbors[2*ii+1] = mcnode_init(mcn->d,mcn->x);
-        mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
-        mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
+        if (bi == NULL){
+            mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
+            mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
+        }
+        else{
+            int period_dir = bound_info_period_dim_dir(bi,ii);
+            if (period_dir == 1){ // to the right is periodic
+
+                printf("periodic right"); 
+                dprint(mcn->d,mcn->x);
+                double xmap = bound_info_period_xmap(bi,ii);
+
+                printf("xmap = %G\n",xmap);
+                mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
+                mcn->neighbors[2*ii+1]->x[ii] = xmap+h[ii];
+            }
+            else if (period_dir == -1){
+                printf("periodic left "); 
+                dprint(mcn->d,mcn->x);
+                double xmap = bound_info_period_xmap(bi,ii);
+                printf("xmap = %G\n",xmap);
+                mcn->neighbors[2*ii]->x[ii] = xmap-h[ii];
+                mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
+            }
+            else{
+                mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
+                mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
+            }
+        }
     }
 
     mcn->pself = pself;
@@ -493,39 +521,6 @@ size_t mca_get_du(struct MCA * mca)
     return mca->du;
 }
 
-/**********************************************************//**
-    Determine type of node for a given state and tie
-**************************************************************/
-enum NodeType
-mca_node_type(struct MCA * mca, double time, double * x)
-{
-    assert (mca->bound != NULL);
-    assert (mca->dyn   != NULL);
-    
-    int location = boundary_type(mca->bound,time,x);
-    enum NodeType ntype;
-    if (location == 0){
-        ntype = INBOUNDS;
-    }
-    else if (location == 1){
-        ntype = OUTBOUNDS;
-    }
-    else if (location == -1){
-        ntype = ONBOUNDS;
-    }
-    else{
-        fprintf(stderr,"Cannot determine node type\n");
-        fprintf(stderr,"Check to make sure boundary checking function\n");
-        fprintf(stderr,"Checks for all possibilities.\nNode is \n");
-        for (size_t ii = 0; ii < mca->d; ii++)
-        {
-            fprintf(stderr,"%G ",x[ii]);
-        }
-        fprintf(stderr,"\ntime = %G\n",time);
-        exit(1);
-    }
-    return ntype;
-}
 
 /**********************************************************//**
     Generate a node that is outside the boundays
@@ -561,7 +556,8 @@ mca_outbound_node(struct MCA * mca, double time, double * x)
 **************************************************************/
 struct MCNode *
 mca_inbound_node(struct MCA * mca, double time, double * x,
-                 double * u, double *dt,double * gdt, double *grad)
+                 double * u, double *dt,double * gdt, double *grad,
+                 struct BoundInfo * bi)
 {
 
     assert(mca->dyn != NULL);
@@ -671,7 +667,8 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
 
     
     struct MCNode * mcn = mcnode_init(mca->d,x);
-    mcnode_add_neighbors_hspace(mcn,mca->h,pself,probs);
+    mcnode_add_neighbors_hspace(mcn,mca->h,pself,probs,bi);
+
     if (gprob!= NULL){
         gpself = calloc_double(du);
         for (size_t ii = 0; ii < mca->d; ii++){
@@ -710,20 +707,39 @@ mca_get_node(struct MCA * mca, double time, double * x,
              enum NodeType * ntype,
              double *grad)
 {
-    *ntype = mca_node_type(mca,time,x);
-    struct MCNode * mcn = NULL;
-    if (*ntype == INBOUNDS){
-        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad);
-    }
-    else if (*ntype == OUTBOUNDS){
-        *dt = 0;
-        mcn = mca_outbound_node(mca,time,x);
-    }
-    else if (*ntype == ONBOUNDS){
-        fprintf(stderr,"Not sure what to do with ONBOUND nodes yet\n");
-        exit(1);
-    }
 
+    struct BoundInfo * bi = boundary_type(mca->bound,time,x);
+    struct MCNode * mcn = NULL;
+
+    //printf("get node\n");
+    int onbound = bound_info_onbound(bi);
+    if (onbound == 0){
+        *ntype = INBOUNDS;
+        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,NULL);
+    }
+    else{
+        int absorb = bound_info_absorb(bi);
+        if (absorb == 1){
+            *ntype = OUTBOUNDS;
+            *dt = 0;
+            mcn = mca_outbound_node(mca,time,x);            
+        }
+        else{
+            int period = bound_info_period(bi);
+            if (period != 0){
+                *ntype = INBOUNDS;
+                mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,bi);
+            }
+            else{
+                fprintf(stderr,"Not sure what to do with this node\n");
+                printf("onbound = %d\n",onbound);
+                dprint(mca->d,x);
+                exit(1);                
+            }
+        }
+    }
+    // printf("got node\n");
+    bound_info_free(bi); bi = NULL;
     return mcn;
 }
 
@@ -796,72 +812,12 @@ mca_expectation(struct MCA * mca, double time,
     \param[in,out] dt    - output transition time
     \param[in,out] newx  - space for new state
 **************************************************************/
-void
-mca_step(struct MCA * mca, double time, double * x, double * u,
+void mca_step(struct MCA * mca, double time, double * x, double * u,
          double noise, double * dt, double * newx)
 {
 
-    struct MCNode * node = mca_inbound_node(mca,time,x,u,dt,NULL,NULL);
+    struct MCNode * node = mca_inbound_node(mca,time,x,u,dt,NULL,NULL,NULL);
     
-    //mcnode_print(node,stdout,5);
-    //fprintf(stdout,"\n");
-    
-    //printf("begin sample\n");
     mcnode_sample_neighbor(node,noise,newx);
-    //printf("ended sample\n");
-    //dprint(node->d,newx);
     mcnode_free(node); node = NULL;
-    //printf("freed node out out \n");
 }
-
-
-// assumes only transitions to neighbors
-/* double tensor_mm_cost(struct TensorMM * mm, */
-/*                       double t, double * x, */
-/*                       double * uu, */
-/*                       struct Cost * cost, */
-/*                       double * dt, */
-/*                       double * probs) */
-/* { */
-    
-/*     int res = tensor_mm_tprob(mm,t,x,uu,probs,dt); */
-/*     assert (res == 0); */
-/*     double evals[2]; */
-/*     double pt[2]; */
-/*     double out = 0.0; */
-
-/*     //evaluate transition to oneself */
-/*     res = cost_eval(cost,t,x,&out); */
-/*     if (res != 0){ */
-/*         fprintf(stderr, "point x is out of bounds\n \t x = "); */
-/*         for (size_t jj = 0; jj < mm->d; jj++){ */
-/*             fprintf(stderr,"%G ", x[jj]); */
-/*         } */
-/*         fprintf(stderr,"\n"); */
-/*         exit(1); */
-/*     } */
-/* //    assert (res == 0); */
-
-/*     //printf("probs are "); */
-/*     //dprint(2*mm->d+1,probs); */
-/*     out *= probs[2*mm->d]; */
-
-/*     for (size_t ii = 0; ii < mm->d; ii++){ */
-/*         pt[0] = x[ii]-mm->h; */
-/*         pt[1] = x[ii]+mm->h; */
-/*         res = cost_eval_neigh(cost,t,x,ii,pt,evals); */
-/*         if (res != 0){ */
-/*             fprintf(stderr, "point x is out of bounds\n\t x="); */
-/*             for (size_t jj = 0; jj < mm->d; jj++){ */
-/*                 fprintf(stderr,"%G ", x[ii]); */
-/*             } */
-/*             fprintf(stderr,"\n"); */
-/*             exit(1); */
-/*         } */
-/*         //      assert (res == 0); */
-/*         out += probs[ii*mm->d]*evals[0]; */
-/*         out += probs[ii*mm->d+1]*evals[1]; */
-/*     } */
-
-/*     return out; */
-/* } */

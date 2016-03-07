@@ -8,13 +8,186 @@
 
 #include "boundary.h"
 
+enum EBTYPE {
+    ABSORB=1, 
+    PERIODIC=2
+};
+
+/** \struct ExternalBoundary
+ *  \brief Structure to handle external boundary conditions
+  *  \var ExternalBoundary::left
+ *  left boundary
+ *  \var ExternalBoundary::right
+ *  right boundary
+ *  \var ExternalBoundary::type
+ *  type of boundary
+ */
+struct ExternalBoundary
+{
+    double left;
+    double right;
+    enum EBTYPE type;
+};
+
+/**********************************************************//**
+    Allocate External boundary
+
+    \param[in] left  - left edge
+    \param[in] right - right edge
+    \param[in] type  - "absorb" or "periodic"
+
+    \return boundary
+**************************************************************/
+struct ExternalBoundary * 
+external_boundary_alloc(double left, double right, char * type)
+{
+    struct ExternalBoundary * db = malloc(sizeof(struct ExternalBoundary));
+    if (db == NULL){
+        fprintf(stderr,"Mem error allocating ExternalBoundary\n");
+        exit(1);
+    }
+    db->left = left;
+    db->right = right;
+    if (strcmp(type,"absorb") == 0){
+        db->type = ABSORB;
+    }
+    else if (strcmp(type,"periodic") == 0){
+        db->type = PERIODIC;
+    }
+    else{
+        fprintf(stderr, "External boundary of type %s is unknown\n",type);
+        exit(1);
+    }
+    return db;
+}
+
+/**********************************************************//**
+    Free External boundary
+**************************************************************/
+void external_boundary_free(struct ExternalBoundary * db)
+{
+    if (db != NULL){
+        free(db); db = NULL;
+    }
+}
+
+/**********************************************************//**
+    Allocate an array of external boundaries
+
+    \param[in] N - number of arrays
+
+    \return array with each element set to NULL
+**************************************************************/
+struct ExternalBoundary ** 
+external_boundary_alloc_array(size_t N)
+{
+    struct ExternalBoundary ** db = malloc(N*sizeof(struct ExternalBoundary *));
+    if (db == NULL){
+        fprintf(stderr,"Mem error allocating ExternalBoundary array\n");
+        exit(1);
+    }
+    for (size_t ii = 0; ii < N; ii++){
+        db[ii] = NULL;
+    }
+    return db;
+}
+
+
+/**********************************************************//**
+    Free external boundary array
+**************************************************************/
+void external_boundary_free_array(struct ExternalBoundary ** db, size_t N)
+{
+    if (db != NULL){
+        for (size_t ii = 0; ii < N; ii++){
+            external_boundary_free(db[ii]); db[ii] = NULL;
+        }
+        free(db); db = NULL;
+    }
+}
+
+/**********************************************************//**
+    Set type of external boundary
+**************************************************************/
+void external_boundary_set_type(struct ExternalBoundary * db, char * type)
+{
+    if (strcmp(type,"absorb") == 0){
+        db->type = ABSORB;
+    }
+    else if (strcmp(type,"periodic") == 0){
+
+        db->type = PERIODIC;
+    }
+    else{
+        fprintf(stderr, "External boundary of type %s is unknown\n",type);
+        exit(1);
+    }
+}
+
+/**********************************************************//**
+    Get type of external boundary
+**************************************************************/
+enum EBTYPE external_boundary_get_type(struct ExternalBoundary *bd)
+{
+    assert (bd != NULL);
+    return bd->type;
+}
+
+/**********************************************************//**
+    Get left boundary
+**************************************************************/
+double external_boundary_get_left(struct ExternalBoundary *bd)
+{
+    assert (bd != NULL);
+    return bd->left;
+}
+
+/**********************************************************//**
+    Get right boundary
+**************************************************************/
+double external_boundary_get_right(struct ExternalBoundary *bd)
+{
+    assert (bd != NULL);
+    return bd->right;
+}
+
+/**********************************************************//**
+    Check if point violates left boundary 
+
+    \return 1 - violates
+            0 - doesn\t
+**************************************************************/
+int external_boundary_check_left(struct ExternalBoundary * bd, double x)
+{
+    assert (bd != NULL);
+    if (x <= bd->left){
+        return 1;
+    }
+    return 0;
+}
+
+/**********************************************************//**
+    Check if point violates right
+
+    \return 1 - violates
+            0 - doesn\t
+**************************************************************/
+int external_boundary_check_right(struct ExternalBoundary * bd, double x)
+{
+    assert (bd != NULL);
+    if (x >= bd->right){
+        return 1;
+    }
+    return 0;
+}
+
+
 /** \struct Boundary
  *  \brief Structure to handle any boundary conditions
  *  \var Boundary::d
  *  dimension of state space
- *  \var Boundary::dirs
- *  (d) sized array with locations on 
- *  boundaries (-1->left,1->right)
+ *  \var Boundary::eb
+ *  external boundaries
  *  \var Boundary::bcheck
  *  user supplied function for checking
  *  \var Boundary::args
@@ -23,54 +196,223 @@
 struct Boundary
 {
     size_t d;
-    int * dirs;
-    int clean;
-    
+
+    struct ExternalBoundary ** eb;
+
     int (*bcheck)(double,double *, void *, int *);
     void * args;
 
 };
 
 /**********************************************************//**
-    Allocate Boundary
+    Allocate Boundary and initialize each dimension to absorbing
 
-    \param[in] d    - dimension of state space
-    \param[in] b    - function(time,x,args,dirs)
-    \param[in] arg  - function arguments
+    \param[in] d  - dimension of state space
+    \param[in] lb - lower bounds of state space
+    \param[in] ub - upper bounds of state space
 
     \return boundary
 **************************************************************/
 struct Boundary *
-boundary_alloc(size_t d, int (*b)(double, double *,void *,int*), void *arg)
+boundary_alloc(size_t d,double * lb, double * ub)
 {
     struct Boundary * bound;
     bound = malloc(sizeof(struct Boundary));
     assert (bound != NULL);
 
-    bound->d = d;
-    bound->dirs = calloc_int(d);
-    bound->clean = 1;
-    
-    bound->bcheck = b;
-    bound->args = arg;
+    bound->d = d;    
+    bound->eb = external_boundary_alloc_array(d);
+    printf("bounds = \n"); 
+    dprint(d,lb);
+    dprint(d,ub);
+    for (size_t ii = 0; ii < d; ii++){
+
+        bound->eb[ii] = external_boundary_alloc(lb[ii],ub[ii],"absorb");
+        printf("%G,%G\n",external_boundary_get_left(bound->eb[ii]),
+               external_boundary_get_right(bound->eb[ii]));
+    }
+
+    bound->bcheck = NULL;
+    bound->args = NULL;
     return bound;
 }
 
+/**********************************************************//**
+    Free memory allocated to boundary
+**************************************************************/
 void boundary_free(struct Boundary * bound)
 {
     if (bound != NULL){
-        free(bound->dirs); bound->dirs = NULL;
+        external_boundary_free_array(bound->eb, bound->d);
+        bound->eb = NULL;
         free(bound); bound = NULL;
     }
 }
 
-int boundary_type(struct Boundary * bound, double time,
-                  double * x)
+/**********************************************************//**
+    Set external boundary type for the specified dimension
+**************************************************************/
+void boundary_external_set_type(struct Boundary * b,size_t dim,char * type)
 {
-    bound->clean = 1;
-    int outbounds = bound->bcheck(time,x,bound->args,
-                                  bound->dirs);
-    bound->clean = 0;
-    return outbounds;
+
+    external_boundary_set_type(b->eb[dim],type);
 }
 
+struct BoundInfo
+{
+    size_t d;
+    enum BOUNDRESULT * br;
+    enum EBTYPE * type;
+    double * xmap; // equivalence mappigns for periodic boundaries
+    int absorb_overall; // if shared edge
+
+};
+
+/**********************************************************//**
+    Allocate boundary info of a certain dimension
+**************************************************************/
+struct BoundInfo * bound_info_alloc(size_t d)
+{
+    struct BoundInfo * bi = malloc(sizeof(struct BoundInfo));
+    if (bi == NULL){
+        fprintf(stderr,"Mem Error allocating boundary info\n");
+        exit(1);
+    }
+    bi->d = d;
+    bi->br = malloc(d * sizeof(enum BOUNDRESULT));
+    if (bi->br == NULL){
+        fprintf(stderr,"Mem Error allocating boundary info\n");
+        exit(1);
+    }
+
+    bi->xmap = calloc_double(d);
+    bi->type = malloc(d * sizeof(enum EBTYPE));
+    if (bi->type == NULL){
+        fprintf(stderr,"Mem Error allocating boundary info\n");
+        exit(1);
+    }
+    bi->absorb_overall = 0;
+
+    return bi;
+}
+
+/**********************************************************//**
+    Free boundary info 
+**************************************************************/
+void bound_info_free(struct BoundInfo * bi)
+{
+    if (bi != NULL){
+        free(bi->br); bi->br = NULL;
+        free(bi->type); bi->type = NULL;
+        free(bi->xmap); bi->xmap = NULL;
+        free(bi); bi = NULL;
+    }
+}
+
+/**********************************************************//**
+    Return boundary type
+**************************************************************/
+struct BoundInfo * boundary_type(struct Boundary * bound,double time,double * x)
+{
+    (void)(time);
+
+    struct BoundInfo * bi = bound_info_alloc(bound->d);
+    for (size_t ii = 0; ii < bound->d; ii++){
+        bi->br[ii] = IN;
+        if (external_boundary_check_left(bound->eb[ii],x[ii])){
+            bi->br[ii] = LEFT;
+            bi->type[ii] = external_boundary_get_type(bound->eb[ii]);
+            if (bi->type[ii] == ABSORB){
+                bi->absorb_overall = 1;
+                bi->xmap[ii] = x[ii];
+            }
+            else if (bi->type[ii] == PERIODIC){
+                bi->xmap[ii] = external_boundary_get_right(bound->eb[ii]);
+            }
+            else{
+                assert (1 == 0);
+            }
+        }
+        else if (external_boundary_check_right(bound->eb[ii],x[ii])){
+            bi->br[ii] = RIGHT;
+            bi->type[ii] = external_boundary_get_type(bound->eb[ii]);
+            if (bi->type[ii] == ABSORB){
+                bi->xmap[ii] = x[ii];
+                bi->absorb_overall = 1;
+            }
+            else if (bi->type[ii] == PERIODIC){
+                bi->xmap[ii] = external_boundary_get_left(bound->eb[ii]);
+                //printf("xmap[%zu] = %G\n",ii,bi->xmap[ii]);
+            }
+            else{
+                assert (1 == 0);
+            }
+        }
+        //printf("ii = %zu\n,br=%d\n",ii,bi->br[ii]);
+    }
+ 
+    return bi;
+}
+
+/**********************************************************//**
+    Return 0 if not on boundary
+**************************************************************/
+int bound_info_onbound(struct BoundInfo * bi)
+{
+    for (size_t ii = 0; ii < bi->d; ii++){
+        if (bi->br[ii] != IN){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**********************************************************//**
+    Return 0 if not on boundary
+**************************************************************/
+int bound_info_absorb(struct BoundInfo * bi)
+{
+    if (bi->absorb_overall == 1){
+        return 1;
+    }
+    return 0;
+}
+
+/**********************************************************//**
+    Return 0 if not on boundary
+**************************************************************/
+int bound_info_period(struct BoundInfo * bi)
+{
+    for (size_t ii = 0; ii < bi->d; ii++){
+        if (bi->br[ii] != IN){
+            if (bi->type[ii] == PERIODIC){
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/**********************************************************//**
+    Return 0 if not on boundary, -1 if on left boundary, 1 if on right
+**************************************************************/
+int bound_info_period_dim_dir(struct BoundInfo * bi,size_t dim)
+{
+    if (bi->type[dim] == PERIODIC){
+        if (bi->br[dim] == LEFT){
+            return -1;
+        }
+        else{
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/**********************************************************//**
+    Return mapping for periodic boundary conditions
+**************************************************************/
+double bound_info_period_xmap(struct BoundInfo * bi, size_t dim)
+{
+    return bi->xmap[dim];
+}

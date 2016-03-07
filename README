@@ -1,3 +1,6 @@
 * Ideas for speedup
 - reuse fibers each iteration
 - dont always start at rank 3
+
+* Problems
+- control is not low rank in unreachable regions and so simulations can be off. Should try reflecting conditions to try and force the optimal control

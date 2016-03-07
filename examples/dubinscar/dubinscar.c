@@ -27,43 +27,23 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
-void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * lb, double * ub)
-{
-
-    fprintf(fp2,"x y f\n");
-    double * xtest = linspace(lb[0],ub[0],N1);
-    double * ytest = linspace(lb[1],ub[1],N2);
-
-    double pt3[2];
-    double v2;
-    for (size_t zz = 0; zz < N1; zz++){
-        for (size_t jj = 0; jj < N2; jj++){
-            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
-            cost_eval(cost,0.0,pt3,&v2);
-            fprintf(fp2, "%3.5f %3.5f %3.5f \n",
-                    xtest[zz],ytest[jj],v2);
-        }
-        fprintf(fp2,"\n");
-    }
-    free(xtest); xtest = NULL;
-    free(ytest); ytest = NULL;
-}
-
 int f1(double t, double * x, double * u, double * out, double * jac,
        void * args)
 {
     (void)(t);
     (void)(args);
+    (void)(x);
     
-    out[0] = x[1] + sin(4.0*x[0]);
-    out[1] = u[0];
-
+    out[0] = cos(x[2]);
+    out[1] = sin(x[2]);
+    out[2] = u[0];
+    
     if (jac != NULL){
-        //df1/du
         jac[0] = 0.0;
-        jac[1] = 1.0;
+        jac[1] = 0.0;
+        jac[2] = 1.0;
     }
-
+    
     return 0;
 }
 
@@ -75,38 +55,19 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     (void)(u);
     (void)(args);
     
-    out[0] = sin(3.0*x[0]);
-    out[1] = 0.0;
-    out[2] = 0.0;
-    out[3] = cos(8.0*x[1]);
+    out[0] = 1e0; out[3] = 0e0; out[6] = 0.0;
+    out[1] = 0.0; out[4] = 1e0; out[7] = 0.0;
+    out[2] = 0.0; out[5] = 0e0; out[8] = 1e0;
 
     if (grad != NULL){
-        grad[0] = 0.0;
-        grad[1] = 0.0;
-        grad[2] = 0.0;
-        grad[3] = 0.0;//cos(8.0*x[1]);
+        for (size_t ii = 0; ii < 3*3; ii++){
+            grad[ii] = 0.0;
+        }
     }
     return 0;
 }
 
-int polfunc(double t, double * x, double * u, void * arg)
-{
-    (void)(t);
-    (void)(arg);
-    if (x[1] > 0){
-        u[0] = -1.0;
-    }
-    else if (x[1] < 0){
-        u[0] = 1.0;
-    }
-    else{
-        u[0] = 0.0;
-    }
-    // u[0] = 0.0;
-    return 0;
-}
-
-int outbounds(double time, double * x, void * args, int * dirs)
+int trajboundcheck(double time, double * x, void * args, int * dirs)
 {
     
     // two boundaries
@@ -114,39 +75,25 @@ int outbounds(double time, double * x, void * args, int * dirs)
     // and the inside box [-0.1,0.1]^2
     (void)(time);
     (void)(args);
-    
-    double bound = 2.0;
+    double bound1 = 2.0;
     int out = 0;
     for (size_t ii = 0; ii < 2; ii++){
         dirs[ii] = 0;
-        if (x[ii] > bound){
+        if (x[ii] > bound1){
             return 1;
         }
-        else if (x[ii] < -bound){
+        else if (x[ii] < -bound1){
             return 1;
         }
-        else if (fabs(x[ii] - bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            // dirs[ii] = 1;
-            //out = -1;
-            
+        else if (fabs(x[ii] - bound1) < 1e-15){
             return 1;
         }
-        else if (fabs(x[ii] + bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            //dirs[ii] = -1;
-            //out = -1;
-            
+        else if (fabs(x[ii] + bound1) < 1e-15){
             return 1;
         }
     }
-
-    if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){
-//        printf("here!!!!! (%G,%G)\n",x[0],x[1]);
-        return 1;
-    }
+    
+    
     
     return out;
 }
@@ -156,10 +103,10 @@ int stagecost(double t, double * x, double * u, double * out,
 {
     (void)(t);
     *out = 0.0;
-    *out += pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
+    *out += pow(x[0],2) + pow(x[1],2);
 
     if (grad!= NULL){
-        grad[0] = 2 * u[0];
+        grad[0] = 0.0; 
     }
 
     return 0;
@@ -169,16 +116,9 @@ int boundcost(double t, double * x, double * out)
 {
 
     (void)(t);
+    (void)(x);
     *out = 0.0;
-
-    if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){
-        //printf("here !\n");
-        *out = 0.0;
-    }
-    else{
-        *out = 5.0;
-    }
-
+    *out = 3.0;
     return 0;
 }
 
@@ -186,12 +126,8 @@ double startcost(double * x, void * args)
 {
     (void)(args);
     (void)(x);
-    if ((fabs(x[0]) <= 2e-1) && (fabs(x[1]) < 2e-1)){
-        return 0.2;
-    }
-    else{
-        return 0.2;
-    }
+    return 0.2;
+
 }
 
 
@@ -240,24 +176,29 @@ int main(int argc, char * argv[])
         }
     } while (next_option != -1);
 
-    size_t dx = 2;
-    size_t dw = 2;
+    size_t dx = 3;
+    size_t dw = 3;
     size_t du = 1;
-    double lb[2] = {-2.0, -2.0};
-    double ub[2] = {2.0, 2.0};
-    size_t Narr[2] = {N, N};
+    double lb[3] = {-2.0, -2.0,-3.14159};
+    double ub[3] = {2.0, 2.0, 3.14159};
+    size_t Narr[3] = {N, N, N};
 
+    /* double lbu[1] = {-1.0};//,-1.0}; */
+    /* double ubu[1] = {1.0};//,1.0}; */
     double lbu[1] = {-1.0};
     double ubu[1] = {1.0};
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
+    c3opt_set_relftol(opt,1e-4);
+    c3opt_set_verbose(opt,0);
     
     double beta = 1.0;
 
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
+    c3sc_set_external_boundary(sc,2,"periodic");
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
@@ -268,31 +209,88 @@ int main(int argc, char * argv[])
     struct Cost * cost = dpih_get_cost(dp);
     cost_approx(cost,startcost,NULL,verbose-1);
     for (size_t ii = 0; ii < niter+1; ii++){
-
-        FILE *fp2;
-        char filename[256];
-        sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii);
-        fp2 =  fopen(filename, "w");
-        if (fp2 == NULL){
-            fprintf(stderr, "cat: can't open %s\n", filename);
-            return 0;
-        }
-
-        print_cost(fp2,cost,N1,N2,lb,ub);
-        fclose(fp2);
-        
-        //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
         struct Cost * newcost = dpih_iter_vi(dp,verbose-1);
         cost_free(cost);
         cost = newcost;
         dpih_attach_cost(dp,cost);
-
-
-    /*     delta = dpih_pi_iter_approx(&prob,verbose); */
         if (verbose != 0){
             printf("ii=%zu\n",ii);
         }
     }
+
+    struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1);
+
+    /* double t0 = 0.0; */
+/*     double xs[2] = {0.5,0.8}; */
+/*     double us[2] = {0.0,0.0}; */
+
+/*     struct State * state = state_alloc(); */
+/*     state_init(state,dx,t0,xs); */
+
+/*     struct Control * control = control_alloc(); */
+/*     control_init(control,du,us); */
+
+/*     struct Trajectory * traj = NULL; */
+/*     trajectory_add(&traj,state,control); */
+
+/*     struct Dyn * dyn = dpih_get_dyn(dp); */
+
+/*     size_t nsteps = 1000; */
+/*     double space[2 + 4]; */
+/*     double dt = 1e-2; */
+/*     double noise[2]; */
+/*     int dirs[2]; */
+/*     int res; */
+/*     for (size_t ii = 0; ii < nsteps; ii++){ */
+/*         noise[0] = randn()*sqrt(dt); */
+/*         noise[1] = randn()*sqrt(dt); */
+/*         res = trajectory_step(traj,pol,dyn,dt,"euler", */
+/*                                space,NULL,NULL); */
+/*         if (res != 0){ */
+/*             break; */
+/*         } */
+/*         struct State * scheck = trajectory_last_state(traj); */
+/*         double * xcheck = state_getx_ref(scheck); */
+/*         double tcheck = state_gett(scheck); */
+
+/*         res = trajboundcheck(tcheck,xcheck,NULL,dirs); */
+/*         /\* res = trajectory_step(traj,pol,dyn,dt, *\/ */
+/*         /\*                       "euler-maruyama", *\/ */
+/*         /\*                       space,noise,NULL); *\/ */
+/*         if (res != 0){ */
+/*             break; */
+/*         } */
+/*     } */
+
+/*     if (verbose == 1){ */
+/*         trajectory_print(traj,stdout,4); */
+/*     } */
+
+/* //    char filename[256]; */
+/*     sprintf(filename,"%s/%s.dat",dirout,"traj"); */
+/*     FILE * fp = fopen(filename,"w"); */
+/*     assert (fp != NULL); */
+/*     trajectory_print(traj,fp,4); */
+/*     fclose(fp); */
+
+    
+/*     printf("cost ranks are "); */
+/*     size_t * ranks = cost_get_ranks(cost); */
+/*     iprint_sz(dx+1,ranks); */
+
+/*     printf("policy ranks are \n"); */
+/*     for (size_t ii = 0; ii < du; ii++){ */
+/*         ranks = policy_get_ranks(pol,ii); */
+/*         iprint_sz(dx+1,ranks); */
+
+/*     } */
+
+/*     state_free(state); state = NULL; */
+/*     control_free(control); control = NULL; */
+/*     trajectory_free(traj); traj = NULL; */
+
+    policy_free(pol); 
+
     
     c3sc_destroy(sc);
     return 0;

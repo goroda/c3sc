@@ -15,15 +15,13 @@ typedef struct C3SC* c3sc;
 struct C3SC * c3sc_create(enum SCTYPE, size_t, size_t, size_t);
 void c3sc_destroy(struct C3SC *);
 void c3sc_set_state_bounds(struct C3SC *,double *,double *);
+void c3sc_set_external_boundary(struct C3SC *,size_t,char *);
 void c3sc_add_dynamics(struct C3SC *,  
                        int (*)(double,double*,double*,
                                 double*,double*,void*),
                        void *,
                        int (*)(double,double*,double*,
                                 double*,double*,void*),
-                       void *);
-void c3sc_add_boundary(struct C3SC *,
-                       int (*)(double,double *,void *,int*), 
                        void *);
 void c3sc_init_mca(struct C3SC *, size_t *);
 void c3sc_attach_opt(struct C3SC *, struct c3Opt *);

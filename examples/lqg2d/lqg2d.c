@@ -146,51 +146,6 @@ int polfunc(double t, double * x, double * u,void*arg)
     return 0;
 }
 
-int outbounds(double time, double * x, void * args, int * dirs)
-{
-    
-    // two boundaries
-    // outside of the box([-2,2]^2)
-    // and the inside box [-0.1,0.1]^2
-    (void)(time);
-    (void)(args);
-    
-    double bound = 2.0;
-    int out = 0;
-    for (size_t ii = 0; ii < 2; ii++){
-        dirs[ii] = 0;
-        if (x[ii] > bound){
-            return 1;
-        }
-        else if (x[ii] < -bound){
-            return 1;
-        }
-        else if (fabs(x[ii] - bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            // dirs[ii] = 1;
-            //out = -1;
-            
-            return 1;
-        }
-        else if (fabs(x[ii] + bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            //dirs[ii] = -1;
-            //out = -1;
-            
-            return 1;
-        }
-    }
-
-   /* if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){ */
-   /*     // printf("here!!!!! (%G,%G)\n",x[0],x[1]); */
-   /*     return 1; */
-   /* } */
-    
-    return out;
-}
-
 int trajboundcheck(double time, double * x, void * args, int * dirs)
 {
     
@@ -341,7 +296,8 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_relftol(opt,1e-4);
+    c3opt_set_relftol(opt,1e-2);
+    c3opt_set_gtol(opt,1e-4);
     c3opt_set_verbose(opt,0);
     
     double beta = 1.0;
@@ -350,7 +306,6 @@ int main(int argc, char * argv[])
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
-    c3sc_add_boundary(sc,outbounds,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost);
@@ -403,7 +358,7 @@ int main(int argc, char * argv[])
     fclose(fp2);
 
     double t0 = 0.0;
-    double xs[2] = {0.5,0.8};
+    double xs[2] = {0.5,0.7};
     double us[2] = {0.0,0.0};
 
     struct State * state = state_alloc();

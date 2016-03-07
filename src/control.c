@@ -187,7 +187,8 @@ void policy_approx(struct Policy * c,
     fca.optargs = fopt;
 
     double ** start = malloc_dd(c->dx);
-
+    
+    //printf("c->dx = %zu, c->du = \n",c->dx,c->du);
     for (size_t ii = 0; ii < c->dx; ii++){
         assert (c->N[ii] > 5);
         size_t mid = c->N[ii]/2;
@@ -198,10 +199,11 @@ void policy_approx(struct Policy * c,
         start[ii][2] = c->x[ii][c->N[ii]-2];
         //printf("start is "); dprint(3,start[ii]);
     }
-
+    
     c->ftc = ft1d_array_cross(f,args,c->du,c->bds,
                               start,&fca,fapp);
-    
+
+    //exit(1);    
     for (size_t ii = 0; ii < c->dx; ii++){
         lin_elem_exp_aopts_free(aopts[ii]); aopts[ii] = NULL;
     }

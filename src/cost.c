@@ -211,6 +211,7 @@ int cost_eval(struct Cost * cost,
 //    printf("res = %d\n",res);
 
     if (res != 0){
+        printf("point is not in bounds for cost evaluation \n");
         dprint(cost->bds->dim,x);
         return res;
     }
