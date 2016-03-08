@@ -132,8 +132,13 @@ void cost_approx(struct Cost * c,
     fapp = ft_approx_args_create_le2(c->d,aopts); 
     
     struct c3Vector ** c3v = c3vector_alloc_array(c->d);
+    size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->d; ii++){
         c3v[ii] = c3vector_alloc(c->N[ii],c->x[ii]);
+        if (c->N[ii] < minN){
+            minN = c->N[ii];
+        }
+        //       dprint(c->N[ii],c->x[ii]);
     }
     fopt = fiber_opt_args_bf(c->d,c3v);
 
@@ -150,7 +155,8 @@ void cost_approx(struct Cost * c,
     fca.maxiter = 10;
     fca.epsround = 1e-10;
     fca.kickrank = 2;
-    fca.maxiteradapt = 5;
+    fca.maxiteradapt = (minN-3)/(fca.kickrank);
+    assert( (3 + fca.kickrank*fca.maxiteradapt) <= minN);
     fca.verbose = verbose;
     fca.optargs = fopt;
 

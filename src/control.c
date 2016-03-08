@@ -164,8 +164,12 @@ void policy_approx(struct Policy * c,
     fapp = ft_approx_args_create_le2(c->dx,aopts); 
     
     struct c3Vector ** c3v = c3vector_alloc_array(c->dx);
+    size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->dx; ii++){
         c3v[ii] = c3vector_alloc(c->N[ii],c->x[ii]);
+        if (c->N[ii] < minN){
+            minN = c->N[ii];
+        }
     }
     fopt = fiber_opt_args_bf(c->dx,c3v);
 
@@ -182,7 +186,8 @@ void policy_approx(struct Policy * c,
     fca.maxiter = 10;
     fca.epsround = 1e-10;
     fca.kickrank = 5;
-    fca.maxiteradapt = 5;
+    fca.maxiteradapt = (minN-3)/(fca.kickrank);
+    assert( (3 + fca.kickrank*fca.maxiteradapt) <= minN);
     fca.verbose = verbose;
     fca.optargs = fopt;
 

@@ -170,27 +170,31 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
     for (size_t ii = 0; ii < mcn->d; ii++ ){
         mcn->neighbors[2*ii] = mcnode_init(mcn->d,mcn->x);
         mcn->neighbors[2*ii+1] = mcnode_init(mcn->d,mcn->x);
+
+        int period_dir = 0;
+        int bigood = 0;
         if (bi == NULL){
             mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
             mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
         }
         else{
-            int period_dir = bound_info_period_dim_dir(bi,ii);
+            bigood = 1;
+            period_dir = bound_info_period_dim_dir(bi,ii);
             if (period_dir == 1){ // to the right is periodic
 
-                printf("periodic right"); 
-                dprint(mcn->d,mcn->x);
+                //printf("periodic right"); 
+                //dprint(mcn->d,mcn->x);
                 double xmap = bound_info_period_xmap(bi,ii);
 
-                printf("xmap = %G\n",xmap);
+                //printf("xmap = %G\n",xmap);
                 mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
                 mcn->neighbors[2*ii+1]->x[ii] = xmap+h[ii];
             }
             else if (period_dir == -1){
-                printf("periodic left "); 
-                dprint(mcn->d,mcn->x);
+                //printf("periodic left "); 
+                //dprint(mcn->d,mcn->x);
                 double xmap = bound_info_period_xmap(bi,ii);
-                printf("xmap = %G\n",xmap);
+                //printf("xmap = %G\n",xmap);
                 mcn->neighbors[2*ii]->x[ii] = xmap-h[ii];
                 mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
             }
@@ -199,6 +203,20 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
                 mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
             }
         }
+        /* double bound = 2.0; */
+        /* if (fabs(mcn->neighbors[2*ii]->x[2]) > 2.0){ */
+        /*     printf("going left ii=%zu\n",ii); */
+        /*     printf("period dir = %d\n",period_dir); */
+        /*     printf("bigood =%d\n",bigood); */
+        /*     printf("absorb=%d\n",bound_info_absorb(bi)); */
+        /*     printf("period=%d\n",bound_info_period(bi)); */
+        /*     printf("onbound=%d\n",bound_info_onbound(bi)); */
+        /*     mcnode_print(mcn,stdout,5); */
+        /* } */
+        /* if (fabs(mcn->neighbors[2*ii+1]->x[2]) > 2.0){ */
+        /*     printf("going right=%zu\n",ii); */
+        /*     mcnode_print(mcn,stdout,5); */
+        /* } */
     }
 
     mcn->pself = pself;
@@ -271,7 +289,11 @@ double mcnode_expectation(
         for (size_t ii = 1; ii < mc->N+1; ii++)
         {
             x[ii] = mcnode_getx_ref(mc->neighbors[ii-1]);
+            /* if (fabs(x[ii][2]) > M_PI){ */
+            /*     mcnode_print(mc,stdout,3); */
+            /* } */
         }
+
         f(mc->N+1,t,x,evals,arg);
         avg = cblas_ddot(mc->N,mc->p,1,evals+1,1);
         avg += mc->pself*evals[0];
@@ -711,11 +733,20 @@ mca_get_node(struct MCA * mca, double time, double * x,
     struct BoundInfo * bi = boundary_type(mca->bound,time,x);
     struct MCNode * mcn = NULL;
 
+    
     //printf("get node\n");
     int onbound = bound_info_onbound(bi);
+    if (fabs(x[2])>=(M_PI-0.1)){
+        if (onbound == 0){
+            printf("bound check is wrong ");
+            dprint(3,x);
+            printf("mca->h[2]=%G\n",mca->h[2]);
+            exit(1);
+        }
+    }
     if (onbound == 0){
         *ntype = INBOUNDS;
-        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,NULL);
+        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,bi);
     }
     else{
         int absorb = bound_info_absorb(bi);
@@ -764,6 +795,14 @@ mca_expectation(struct MCA * mca, double time,
 {
     enum NodeType ntype;
 
+
+    /* if (x[2] < -1.6){ */
+    /*     if (x[2] > -2.0){ */
+    /*         dprint(3,x); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
+//    dprint(3,x);
     struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,&ntype,grad);
 
     /* if (grad){ */

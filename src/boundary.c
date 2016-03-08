@@ -155,7 +155,7 @@ double external_boundary_get_right(struct ExternalBoundary *bd)
     Check if point violates left boundary 
 
     \return 1 - violates
-            0 - doesn\t
+            0 - doesnt
 **************************************************************/
 int external_boundary_check_left(struct ExternalBoundary * bd, double x)
 {
@@ -170,7 +170,7 @@ int external_boundary_check_left(struct ExternalBoundary * bd, double x)
     Check if point violates right
 
     \return 1 - violates
-            0 - doesn\t
+            0 - doesnt
 **************************************************************/
 int external_boundary_check_right(struct ExternalBoundary * bd, double x)
 {
@@ -222,14 +222,14 @@ boundary_alloc(size_t d,double * lb, double * ub)
 
     bound->d = d;    
     bound->eb = external_boundary_alloc_array(d);
-    printf("bounds = \n"); 
-    dprint(d,lb);
-    dprint(d,ub);
+    /* printf("bounds = \n");  */
+    /* dprint(d,lb); */
+    /* dprint(d,ub); */
     for (size_t ii = 0; ii < d; ii++){
 
         bound->eb[ii] = external_boundary_alloc(lb[ii],ub[ii],"absorb");
-        printf("%G,%G\n",external_boundary_get_left(bound->eb[ii]),
-               external_boundary_get_right(bound->eb[ii]));
+        /* printf("%G,%G\n",external_boundary_get_left(bound->eb[ii]), */
+        /*        external_boundary_get_right(bound->eb[ii])); */
     }
 
     bound->bcheck = NULL;
@@ -317,9 +317,19 @@ struct BoundInfo * boundary_type(struct Boundary * bound,double time,double * x)
     (void)(time);
 
     struct BoundInfo * bi = bound_info_alloc(bound->d);
+    /* if (fabs(x[2])>=3.14159){ */
+    /*     printf("bound check above, x= "); */
+    /*     dprint(3,x); */
+    /*}*/
     for (size_t ii = 0; ii < bound->d; ii++){
         bi->br[ii] = IN;
         if (external_boundary_check_left(bound->eb[ii],x[ii])){
+            /* if (ii == 2){ */
+            /*     if (fabs(x[ii])>=3.14159){ */
+            /*         printf("bound check is left, x=%G\n",x[ii]); */
+            /*         dprint(3,x); */
+            /*     } */
+            /* } */
             bi->br[ii] = LEFT;
             bi->type[ii] = external_boundary_get_type(bound->eb[ii]);
             if (bi->type[ii] == ABSORB){
@@ -334,6 +344,12 @@ struct BoundInfo * boundary_type(struct Boundary * bound,double time,double * x)
             }
         }
         else if (external_boundary_check_right(bound->eb[ii],x[ii])){
+            /* if (ii == 2){ */
+            /*     if (fabs(x[ii])>=3.14159){ */
+            /*         printf("bound check is right, x=%G\n",x[ii]); */
+            /*         dprint(3,x); */
+            /*     } */
+            /* } */
             bi->br[ii] = RIGHT;
             bi->type[ii] = external_boundary_get_type(bound->eb[ii]);
             if (bi->type[ii] == ABSORB){

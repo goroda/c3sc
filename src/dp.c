@@ -484,6 +484,7 @@ double dpih_rhs_pol(struct DPih * dp, double * x)
 **************************************************************/
 double dpih_rhs_bb(double * x, void * dp)
 {
+
     double ret = dpih_rhs_pol(dp,x);
     return ret;
 }
@@ -525,6 +526,13 @@ double dpih_rhs_opt_bb(size_t du, double * u, double * grad, void * arg)
 double dpih_rhs_opt_cost(double * x,void * dp)
 {
 
+    /* if (x[2] < -1.6){ */
+    /*     if (x[2] > -2.0){ */
+    /*         printf("shouldn't be calling this\n"); */
+    /*         dprint(3,x); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
     struct DPX dpx;
     dpx.dp = dp;
     dpx.x = x;
