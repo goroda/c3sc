@@ -142,11 +142,52 @@ struct MCNode * mcnode_init(size_t d, double * x)
 }
 
 /**********************************************************//**
+    Get the dimension
+**************************************************************/
+size_t mcnode_get_d(struct MCNode * mcn)
+{
+    return mcn->d;
+}
+
+
+/**********************************************************//**
     Get a reference to the node state
 **************************************************************/
-double * mcnode_getx_ref(struct MCNode * mcn)
+double * mcnode_get_xref(struct MCNode * mcn)
 {
     return mcn->x;
+}
+
+/**********************************************************//**
+    Get the probability of self transition
+**************************************************************/
+double mcnode_get_pself(struct MCNode * mcn)
+{
+    return mcn->pself;
+}
+
+/**********************************************************//**
+    Get the number of neighbors
+**************************************************************/
+size_t mcnode_get_N(struct MCNode * mcn)
+{
+    return mcn->N;
+}
+
+/**********************************************************//**
+    Get a reference to the neighbors
+**************************************************************/
+struct MCNode **  mcnode_get_neighbors(struct MCNode * mcn)
+{
+    return mcn->neighbors;
+}
+
+/**********************************************************//**
+    Get a reference to the transition probabilities to neighbors
+**************************************************************/
+double *  mcnode_get_pref(struct MCNode * mcn)
+{
+    return mcn->p;
 }
 
 /**********************************************************//**
@@ -285,10 +326,10 @@ double mcnode_expectation(
         evals = calloc_double(mc->N+1);
         double * t = calloc_double(mc->N+1);
         double ** x = malloc_dd(mc->N+1);
-        x[0] = mcnode_getx_ref(mc);
+        x[0] = mcnode_get_xref(mc);
         for (size_t ii = 1; ii < mc->N+1; ii++)
         {
-            x[ii] = mcnode_getx_ref(mc->neighbors[ii-1]);
+            x[ii] = mcnode_get_xref(mc->neighbors[ii-1]);
             /* if (fabs(x[ii][2]) > M_PI){ */
             /*     mcnode_print(mc,stdout,3); */
             /* } */
@@ -314,7 +355,7 @@ double mcnode_expectation(
         double ** x = malloc_dd(mc->N);
         for (size_t ii = 0; ii < mc->N; ii++)
         {
-            x[ii] = mcnode_getx_ref(mc->neighbors[ii]);
+            x[ii] = mcnode_get_xref(mc->neighbors[ii]);
         }
         f(mc->N,t,x,evals,arg);
         avg = cblas_ddot(mc->N,mc->p,1,evals,1);
@@ -360,7 +401,7 @@ void mcnode_sample_neighbor(struct MCNode * node, double noise,
     }
     else{
         //printf("whats up\n");
-        double * nx = mcnode_getx_ref(node->neighbors[ind-1]);
+        double * nx = mcnode_get_xref(node->neighbors[ind-1]);
         //dprint(node->d,nx);
         memmove(neighbor,nx,node->d*sizeof(double));
     }

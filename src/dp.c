@@ -255,7 +255,6 @@ void * c3sc_get_dp(struct C3SC * sc)
 }
 
 
-
 /** \struct DPih
  *  \brief Infinite Horizon dynamic program
  *  \var DPih::mm
@@ -546,19 +545,24 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     struct c3Opt * opt = dpx.dp->opt;
     c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
 
-    
+
+//    printf("before = ");
+//    dprint(dx,x);
     int res = c3opt_minimize(opt,ustart,&val);
     if (res < 0){
         printf("max iter reached in optimization res=%d\n",res);
-        size_t dx = mca_get_dx(dpx.dp->mm);
+        size_t dx = mca_get_dx(dpx.dp->mm);    
         printf("x = ");
         dprint(dx,x);
         dprint(du,ustart);
         for (size_t ii = 0; ii < du; ii++){
             ustart[ii] = 0.0;
         }
-        c3opt_set_verbose(opt,1);
-        c3opt_minimize(opt,ustart,&val);
+        val = 0.0;
+        printf("restart with verbose\n");
+        c3opt_set_verbose(opt,2);
+        int res2 = c3opt_minimize(opt,ustart,&val);
+        printf("res2 = %d\n",res2);
     }
     assert (res > -1);
      
@@ -580,7 +584,7 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose)
 }
 
 /**********************************************************//**
-   For computing a policy
+   For computing a particular control
 **************************************************************/
 double dpih_rhs_opt_pol(double * x,size_t ind,void * dpin)
 {
@@ -605,7 +609,6 @@ double dpih_rhs_opt_pol(double * x,size_t ind,void * dpin)
     return val;
 }
 
-
 /**********************************************************//**
    Generate a new policy by iterating optimal Bellman equation
 **************************************************************/
@@ -625,4 +628,31 @@ struct Policy * dpih_iter_vi_pol(struct DPih * dp,int verbose)
     policy_init_discrete(pol,oc->N,oc->x);
     policy_approx(pol,dpih_rhs_opt_pol,dp,verbose);
     return pol;
+}
+
+/**********************************************************//**
+   For outputing all control
+**************************************************************/
+int dpih_pol_implicit(double t,double * x,double*u,void * dpin)
+{
+    (void)(t);
+    struct DPX dpx;
+    dpx.dp = dpin;
+    dpx.x = x;
+    
+    assert (dpx.dp->opt != NULL);
+
+    size_t du = mca_get_du(dpx.dp->mm);
+    double * ustart = calloc_double(du);
+    ustart[0] = 1.0;
+    double val = 0.0;
+    struct c3Opt * opt = dpx.dp->opt;
+    c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+    
+    int res = c3opt_minimize(opt,ustart,&val);
+    printf("x = "); dprint(2,x);
+    printf("u = "); dprint(2,ustart);
+    memmove(u,ustart,du*sizeof(double));
+    free(ustart); ustart = NULL;
+    return res;
 }

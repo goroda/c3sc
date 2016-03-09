@@ -51,6 +51,7 @@ double dpih_rhs(struct DPih *,double *,double *,double *);
 struct Cost * dpih_iter_pol(struct DPih *,int);
 struct Cost * dpih_iter_vi(struct DPih *,int);
 struct Policy * dpih_iter_vi_pol(struct DPih *,int);
+int dpih_pol_implicit(double,double *,double*,void *);
 
 struct DPfh;
 #endif

@@ -69,8 +69,41 @@ void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2,
             assert (res == 0);
             /* printf("done computing policy\n"); */
             fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n",
-                    xtest[zz],ytest[jj],u->u[0],u->u[1]);
+                    xtest[zz],ytest[jj],u->u[0],0.0);//u->u[1]);
             control_free(u);
+        }
+        fprintf(fp2,"\n");
+    }
+    free(xtest); xtest = NULL;
+    free(ytest); ytest = NULL;
+}
+
+void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
+                  double * lb, double * ub)
+{
+
+    fprintf(fp2,"x y u1 u2\n");
+    double * xtest = linspace(lb[0],ub[0],N1);
+    double * ytest = linspace(lb[1],ub[1],N2);
+
+    double pt3[2];
+//    double u[2];
+    double u[1];
+    for (size_t zz = 0; zz < N1; zz++){
+        for (size_t jj = 0; jj < N2; jj++){
+
+            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
+            /* printf("\n\n\n\n\n\n"); */
+            /* printf("pt = "); dprint(2,pt3); */
+
+            int res = dpih_pol_implicit(0.0,pt3,u,dp);
+            assert (res >-1);
+            /* printf("done computing policy\n"); */
+            /* fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
+            /*         xtest[zz],ytest[jj],u[0],u[1]); */
+            fprintf(fp2, "%3.5f %3.5f %3.5f\n",
+                    xtest[zz],ytest[jj],u[0]);
+
         }
         fprintf(fp2,"\n");
     }
@@ -84,22 +117,22 @@ int f1(double t, double * x, double * u, double * out, double * jac,
     (void)(t);
     (void)(args);
     
-    /* out[0] = x[1]; */
-    /* out[1] = u[0];// + u[1]; */
-
-    /* if (jac != NULL){ */
-    /*     //df1/du */
-    /*     jac[0] = 0.0;// jac[2] = 0.0; */
-    /*     jac[1] = 1.0;// jac[3] = 1.0; */
-    /* } */
-
-    out[0] = 3*x[1] + u[1];
+    out[0] = x[1];
     out[1] = u[0];
 
     if (jac != NULL){
-        jac[0] = 0.0; jac[2] = 1.0;
-        jac[1] = 1.0; jac[3] = 0.0;
+        //df1/du
+        jac[0] = 0.0;
+        jac[1] = 1.0;
     }
+
+    /* out[0] = 3*x[1] + u[1]; */
+    /* out[1] = u[0]; */
+
+    /* if (jac != NULL){ */
+    /*     jac[0] = 0.0; jac[2] = 1.0; */
+    /*     jac[1] = 1.0; jac[3] = 0.0; */
+    /* } */
     
     return 0;
 }
@@ -112,19 +145,20 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     (void)(u);
     (void)(args);
     
-    out[0] = 1e0;
+    double val = 1e-1;
+    out[0] = val;
     out[1] = 0.0;
     out[2] = 0.0;
-    out[3] = 1e0;
+    out[3] = val;
 
     if (grad != NULL){
-        for (size_t ii = 0; ii < 2*2*2;ii++){
-            grad[ii] = 0.0;
-        }
-        /* grad[0] = 0.0; */
-        /* grad[1] = 0.0; */
-        /* grad[2] = 0.0; */
-        /* grad[3] = 0.0;//cos(8.0*x[1]); */
+        /* for (size_t ii = 0; ii < 2*2*2;ii++){ */
+        /*     grad[ii] = 0.0; */
+        /* } */
+        grad[0] = 0.0;
+        grad[1] = 0.0;
+        grad[2] = 0.0;
+        grad[3] = 0.0;
     }
     return 0;
 }
@@ -146,7 +180,7 @@ int polfunc(double t, double * x, double * u,void*arg)
     return 0;
 }
 
-int trajboundcheck(double time, double * x, void * args, int * dirs)
+int trajboundcheck(double time, double * x, void * args)
 {
     
     // two boundaries
@@ -158,33 +192,15 @@ int trajboundcheck(double time, double * x, void * args, int * dirs)
     double bound = 2.0;
     int out = 0;
     for (size_t ii = 0; ii < 2; ii++){
-        dirs[ii] = 0;
-        if (x[ii] > bound){
+        if (x[ii] >= bound){
             return 1;
         }
-        else if (x[ii] < -bound){
-            return 1;
-        }
-        else if (fabs(x[ii] - bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            // dirs[ii] = 1;
-            //out = -1;
-            
-            return 1;
-        }
-        else if (fabs(x[ii] + bound) < 1e-15){
-            // for onbound behaviour other than absorbing
-            // uncomment the next two lines
-            //dirs[ii] = -1;
-            //out = -1;
-            
+        else if (x[ii] <= -bound){
             return 1;
         }
     }
 
    if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){
-       // printf("here!!!!! (%G,%G)\n",x[0],x[1]);
        return 1;
    }
     
@@ -196,13 +212,18 @@ int stagecost(double t, double * x, double * u, double * out,
 {
     (void)(t);
     *out = 0.0;
-    *out += pow(x[0],2) + 4.0*pow(x[1],2) + pow(u[0],2) + 2.0*pow(u[1],2);
 
+    /* *out += pow(x[0],2) + 4.0*pow(x[1],2) + pow(u[0],2) + 2.0*pow(u[1],2); */
+
+    /* if (grad!= NULL){ */
+    /*     grad[0] = 2 * u[0]; */
+    /*     grad[1] = 4 * u[1]; */
+    /* } */
+
+    *out += pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
     if (grad!= NULL){
         grad[0] = 2 * u[0];
-        grad[1] = 4 * u[1];
     }
-
     return 0;
 }
 
@@ -213,14 +234,6 @@ int boundcost(double t, double * x, double * out)
     (void)(x);
     *out = 0.0;
     *out = 20.0;
-    /* if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){ */
-    /*     //printf("here !\n"); */
-    /*     *out = 0.0; */
-    /* } */
-    /* else{ */
-    /*     *out = 5.0; */
-    /* } */
-
     return 0;
 }
 
@@ -235,7 +248,6 @@ double startcost(double * x, void * args)
         return 0.2;
     }
 }
-
 
 int main(int argc, char * argv[])
 {
@@ -284,20 +296,20 @@ int main(int argc, char * argv[])
 
     size_t dx = 2;
     size_t dw = 2;
-    size_t du = 2;
+    size_t du = 1;
     double lb[2] = {-2.0, -2.0};
     double ub[2] = {2.0, 2.0};
     size_t Narr[2] = {N, N};
 
-    /* double lbu[1] = {-1.0};//,-1.0}; */
-    /* double ubu[1] = {1.0};//,1.0}; */
-    double lbu[2] = {-1.0,-1.0};
-    double ubu[2] = {1.0,1.0};
+    double lbu[1] = {-1.0};
+    double ubu[1] = {1.0};
+    /* double lbu[2] = {-1.0,-1.0}; */
+    /* double ubu[2] = {1.0,1.0}; */
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,lbu);
-    c3opt_add_ub(opt,ubu);
-    c3opt_set_relftol(opt,1e-2);
-    c3opt_set_gtol(opt,1e-4);
+    //c3opt_add_lb(opt,lbu);
+    //c3opt_add_ub(opt,ubu);
+    c3opt_set_relftol(opt,1e-4);
+    c3opt_set_gtol(opt,1e-8);
     c3opt_set_verbose(opt,0);
     
     double beta = 1.0;
@@ -343,23 +355,35 @@ int main(int argc, char * argv[])
 
 
     struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1);
-
     FILE *fp2;
     char filename[256];
-    sprintf(filename,"%s/%s.dat",dirout,"policy");
+    sprintf(filename,"%s/%s.dat",dirout,"policy_approx");
     fp2 =  fopen(filename, "w");
     if (fp2 == NULL){
         fprintf(stderr, "cat: can't open %s\n", filename);
         return 0;
     }
-
     printf("printing policy\n");
-    print_policy(fp2,pol,N1,N2,lb,ub);
+
+    double lbt[2] = {lb[0]+0.5,lb[1]+0.5};
+    double ubt[2] = {ub[0]-0.5,ub[1]-0.5};
+    print_policy(fp2,pol,N1,N2,lbt,ubt);
+    fclose(fp2);
+
+    sprintf(filename,"%s/%s.dat",dirout,"policy_implicit");
+    fp2 =  fopen(filename, "w");
+    if (fp2 == NULL){
+        fprintf(stderr, "cat: can't open %s\n", filename);
+        return 0;
+    }
+    printf("printing implicit policy\n");
+    print_policy_implict(fp2,dp,N1,N2,lbt,ubt);
     fclose(fp2);
 
     double t0 = 0.0;
-    double xs[2] = {0.5,0.7};
-    double us[2] = {0.0,0.0};
+    double xs[2] = {0.5,0.5};
+//    double us[2] = {0.0,0.0};
+    double us[1] = {0.0};
 
     struct State * state = state_alloc();
     state_init(state,dx,t0,xs);
@@ -375,12 +399,11 @@ int main(int argc, char * argv[])
     size_t nsteps = 1000;
     double space[2 + 4];
     double dt = 1e-2;
-    double noise[2];
-    int dirs[2];
+    // double noise[2];
     int res;
     for (size_t ii = 0; ii < nsteps; ii++){
-        noise[0] = randn()*sqrt(dt);
-        noise[1] = randn()*sqrt(dt);
+        //noise[0] = randn()*sqrt(dt);
+        //noise[1] = randn()*sqrt(dt);
         res = trajectory_step(traj,pol,dyn,dt,"euler",
                                space,NULL,NULL);
         if (res != 0){
@@ -390,7 +413,7 @@ int main(int argc, char * argv[])
         double * xcheck = state_getx_ref(scheck);
         double tcheck = state_gett(scheck);
 
-        res = trajboundcheck(tcheck,xcheck,NULL,dirs);
+        res = trajboundcheck(tcheck,xcheck,NULL);
         /* res = trajectory_step(traj,pol,dyn,dt, */
         /*                       "euler-maruyama", */
         /*                       space,noise,NULL); */

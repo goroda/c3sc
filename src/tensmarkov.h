@@ -16,7 +16,13 @@ struct MCNode ** mcnode_alloc_array(size_t);
 void mcnode_free_array(struct MCNode **, size_t);
 void mcnode_free(struct MCNode *);
 struct MCNode * mcnode_init(size_t, double *);
-double * mcnode_getx_ref(struct MCNode *);
+size_t mcnode_get_d(struct MCNode *);
+double * mcnode_get_xref(struct MCNode *);
+double mcnode_get_pself(struct MCNode *);
+size_t mcnode_get_N(struct MCNode *);
+struct MCNode **  mcnode_get_neighbors(struct MCNode *);
+double * mcnode_get_pref(struct MCNode *);
+
 void mcnode_add_neighbors_hspace(struct MCNode *, 
                                  double *, double,
                                  double *, struct BoundInfo *);

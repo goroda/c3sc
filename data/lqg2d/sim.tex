@@ -51,14 +51,14 @@
           ylabel={Control},
           grid=major,
 	      enlargelimits=true,
-          legend entries={$u_1$, $u_2$},
+          legend entries={$u_1$},%, $u_2$},
           legend style={
             legend pos = north west,
           },
 %          no marks,
         ]
         \addplot[thick] table [x index=0,y index=3] {\myvar};
-        \addplot[thick,dashed] table [x index=0,y index=4] {\myvar};
+%        \addplot[thick,dashed] table [x index=0,y index=4] {\myvar};
         
       \end{axis}
     \end{tikzpicture}
