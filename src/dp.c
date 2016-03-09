@@ -650,8 +650,8 @@ int dpih_pol_implicit(double t,double * x,double*u,void * dpin)
     c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
     
     int res = c3opt_minimize(opt,ustart,&val);
-    printf("x = "); dprint(2,x);
-    printf("u = "); dprint(2,ustart);
+    /* printf("x = "); dprint(2,x); */
+    /* printf("u = "); dprint(2,ustart); */
     memmove(u,ustart,du*sizeof(double));
     free(ustart); ustart = NULL;
     return res;

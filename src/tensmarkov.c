@@ -805,14 +805,14 @@ mca_get_node(struct MCA * mca, double time, double * x,
     
     //printf("get node\n");
     int onbound = bound_info_onbound(bi);
-    if (fabs(x[2])>=(M_PI-0.1)){
-        if (onbound == 0){
-            printf("bound check is wrong ");
-            dprint(3,x);
-            printf("mca->h[2]=%G\n",mca->h[2]);
-            exit(1);
-        }
-    }
+    /* if (fabs(x[2])>=(M_PI-0.1)){ */
+    /*     if (onbound == 0){ */
+    /*         printf("bound check is wrong "); */
+    /*         dprint(3,x); */
+    /*         printf("mca->h[2]=%G\n",mca->h[2]); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
     if (onbound == 0){
         *ntype = INBOUNDS;
         mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,bi);
