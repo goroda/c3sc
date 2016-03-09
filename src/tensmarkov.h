@@ -15,22 +15,28 @@ struct MCNode * mcnode_alloc(size_t);
 struct MCNode ** mcnode_alloc_array(size_t);
 void mcnode_free_array(struct MCNode **, size_t);
 void mcnode_free(struct MCNode *);
-struct MCNode * mcnode_init(size_t, double *);
-size_t mcnode_get_d(struct MCNode *);
-double * mcnode_get_xref(struct MCNode *);
-double mcnode_get_pself(struct MCNode *);
-size_t mcnode_get_N(struct MCNode *);
-struct MCNode **  mcnode_get_neighbors(struct MCNode *);
-double * mcnode_get_pref(struct MCNode *);
+struct MCNode * mcnode_init(size_t, const double *);
+size_t mcnode_get_d(const struct MCNode *);
+double * mcnode_get_xref(const struct MCNode *);
+double mcnode_get_pself(const struct MCNode *);
+size_t mcnode_get_N(const struct MCNode *);
+size_t mcnode_get_du(const struct MCNode *);
+double * mcnode_get_gpself(const struct MCNode *);
+double ** mcnode_get_gp(const struct MCNode *);
+
+struct MCNode **  mcnode_get_neighbors(const struct MCNode *);
+double * mcnode_get_pref(const struct MCNode *);
 
 void mcnode_add_neighbors_hspace(struct MCNode *, 
-                                 double *, double,
-                                 double *, struct BoundInfo *);
+                                 const double *,
+                                 const double,
+                                 const double *,
+                                 const struct BoundInfo *);
 void mcnode_add_gradients(struct MCNode *, size_t,
-                          size_t, double *,
+                          size_t, const double *,
                           double **);
 double mcnode_expectation(
-    struct MCNode *,
+    const struct MCNode *,
     void (*)(size_t,double*,double**x,double*,void*),
     void *,double*);
 void mcnode_sample_neighbor(struct MCNode *, double, double *);
