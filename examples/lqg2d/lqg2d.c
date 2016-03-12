@@ -19,6 +19,10 @@ void print_code_usage (FILE * stream, int exit_code)
             " -h --help      Display this usage information.\n"
             " -d --directory Output directory (defaults to .)\n"
             " -n --nodes     Number of nodes (defaults to 10)\n"
+            " -a --lbu       Lower bound of control (default -1.0)\n"
+            " -b --ubu       Upper bound of control (default 1.0)\n"
+            " -r --diff1     Size of diffusion for x (default 1.0)\n"
+            " -f --diff2     Size of diffusion for y (default 1.0)\n"
             " -s --steps     Number of iterations (default 100)\n"
             " -v --verbose   Output words (default 0)\n"
             "                1 - output main file stuff\n"
@@ -143,13 +147,13 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     (void)(t);
     (void)(x);
     (void)(u);
-    (void)(args);
+
+    double * val = args;
     
-    double val = 1e-1;
-    out[0] = val;
+    out[0] = val[0];
     out[1] = 0.0;
     out[2] = 0.0;
-    out[3] = val;
+    out[3] = val[1];
 
     if (grad != NULL){
         /* for (size_t ii = 0; ii < 2*2*2;ii++){ */
@@ -160,23 +164,6 @@ int s1(double t,double * x,double * u,double * out, double * grad,
         grad[2] = 0.0;
         grad[3] = 0.0;
     }
-    return 0;
-}
-
-int polfunc(double t, double * x, double * u,void*arg)
-{
-    (void)(t);
-    (void)(arg);
-    if (x[1] > 0){
-        u[0] = -1.0;
-    }
-    else if (x[1] < 0){
-        u[0] = 1.0;
-    }
-    else{
-        u[0] = 0.0;
-    }
-    // u[0] = 0.0;
     return 0;
 }
 
@@ -252,11 +239,15 @@ double startcost(double * x, void * args)
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:n:s:v:";
+    const char * const short_options = "hd:n:a:b:r:f:s:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
         { "nodes"    , 1, NULL, 'n' },
+        { "lbu"      , 1, NULL, 'a' },
+        { "ubu"      , 1, NULL, 'b' },
+        { "diff1"    , 1, NULL, 'r' },
+        { "diff2"    , 1, NULL, 'f' },
         { "steps"    , 1, NULL, 's' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
@@ -267,6 +258,9 @@ int main(int argc, char * argv[])
     int verbose = 0;
     size_t N = 10;
     size_t niter = 100;
+    double lbu[1] = {-1.0};
+    double ubu[1] = {1.0};
+    double ss[2] = {1.0,1.0};
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
         switch (next_option)
@@ -278,6 +272,18 @@ int main(int argc, char * argv[])
                 break;
             case 'n':
                 N = strtoul(optarg,NULL,10);
+                break;
+            case 'a':
+                lbu[0] = strtod(optarg,NULL);
+                break;
+            case 'b':
+                ubu[0] = strtod(optarg,NULL);
+                break;
+            case 'r':
+                ss[0] = strtod(optarg,NULL);
+                break;
+            case 'f':
+                ss[1] = strtod(optarg,NULL);
                 break;
             case 's':
                 niter = strtoul(optarg,NULL,10);
@@ -301,13 +307,11 @@ int main(int argc, char * argv[])
     double ub[2] = {2.0, 2.0};
     size_t Narr[2] = {N, N};
 
-    double lbu[1] = {-1.0};
-    double ubu[1] = {1.0};
-    /* double lbu[2] = {-1.0,-1.0}; */
-    /* double ubu[2] = {1.0,1.0}; */
+//    printf("lbu = %G\n",lbu[0]);
+//    printf("ubu = %G\n",ubu[0]);
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    //c3opt_add_lb(opt,lbu);
-    //c3opt_add_ub(opt,ubu);
+    c3opt_add_lb(opt,lbu);
+    c3opt_add_ub(opt,ubu);
     c3opt_set_relftol(opt,1e-4);
     c3opt_set_gtol(opt,1e-8);
     c3opt_set_verbose(opt,0);
@@ -317,7 +321,7 @@ int main(int argc, char * argv[])
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
-    c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
+    c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost);
@@ -353,105 +357,114 @@ int main(int argc, char * argv[])
         }
     }
 
-
-    struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1);
     FILE *fp2;
     char filename[256];
-    sprintf(filename,"%s/%s.dat",dirout,"policy_approx");
+    sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",dirout,lbu[0],ubu[0
+],1.0,1.0,"cost");
     fp2 =  fopen(filename, "w");
     if (fp2 == NULL){
         fprintf(stderr, "cat: can't open %s\n", filename);
         return 0;
     }
-    printf("printing policy\n");
 
-    double lbt[2] = {lb[0]+0.5,lb[1]+0.5};
-    double ubt[2] = {ub[0]-0.5,ub[1]-0.5};
-    print_policy(fp2,pol,N1,N2,lbt,ubt);
+    print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
 
-    sprintf(filename,"%s/%s.dat",dirout,"policy_implicit");
-    fp2 =  fopen(filename, "w");
-    if (fp2 == NULL){
-        fprintf(stderr, "cat: can't open %s\n", filename);
-        return 0;
-    }
-    printf("printing implicit policy\n");
-    print_policy_implict(fp2,dp,N1,N2,lbt,ubt);
-    fclose(fp2);
+/*     struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1); */
+/*     sprintf(filename,"%s/%s.dat",dirout,"policy_approx"); */
+/*     fp2 =  fopen(filename, "w"); */
+/*     if (fp2 == NULL){ */
+/*         fprintf(stderr, "cat: can't open %s\n", filename); */
+/*         return 0; */
+/*     } */
+/*     printf("printing policy\n"); */
 
-    double t0 = 0.0;
-    double xs[2] = {0.5,0.5};
-//    double us[2] = {0.0,0.0};
-    double us[1] = {0.0};
+/*     double lbt[2] = {lb[0]+0.5,lb[1]+0.5}; */
+/*     double ubt[2] = {ub[0]-0.5,ub[1]-0.5}; */
+/*     print_policy(fp2,pol,N1,N2,lbt,ubt); */
+/*     fclose(fp2); */
 
-    struct State * state = state_alloc();
-    state_init(state,dx,t0,xs);
+/*     sprintf(filename,"%s/%s.dat",dirout,"policy_implicit"); */
+/*     fp2 =  fopen(filename, "w"); */
+/*     if (fp2 == NULL){ */
+/*         fprintf(stderr, "cat: can't open %s\n", filename); */
+/*         return 0; */
+/*     } */
+/*     printf("printing implicit policy\n"); */
+/*     print_policy_implict(fp2,dp,N1,N2,lbt,ubt); */
+/*     fclose(fp2); */
 
-    struct Control * control = control_alloc();
-    control_init(control,du,us);
+/*     double t0 = 0.0; */
+/*     double xs[2] = {0.3,0.2}; */
+/* //    double us[2] = {0.0,0.0}; */
+/*     double us[1] = {0.0}; */
 
-    struct Trajectory * traj = NULL;
-    trajectory_add(&traj,state,control);
+/*     struct State * state = state_alloc(); */
+/*     state_init(state,dx,t0,xs); */
 
-    struct Dyn * dyn = dpih_get_dyn(dp);
+/*     struct Control * control = control_alloc(); */
+/*     control_init(control,du,us); */
 
-    size_t nsteps = 1000;
-    double space[2 + 4];
-    double dt = 1e-2;
-    // double noise[2];
-    int res;
-    for (size_t ii = 0; ii < nsteps; ii++){
-        //noise[0] = randn()*sqrt(dt);
-        //noise[1] = randn()*sqrt(dt);
-        res = trajectory_step(traj,pol,dyn,dt,"euler",
-                               space,NULL,NULL);
-        if (res != 0){
-            break;
-        }
-        struct State * scheck = trajectory_last_state(traj);
-        double * xcheck = state_getx_ref(scheck);
-        double tcheck = state_gett(scheck);
+/*     struct Trajectory * traj = NULL; */
+/*     trajectory_add(&traj,state,control); */
 
-        res = trajboundcheck(tcheck,xcheck,NULL);
-        /* res = trajectory_step(traj,pol,dyn,dt, */
-        /*                       "euler-maruyama", */
-        /*                       space,noise,NULL); */
-        if (res != 0){
-            break;
-        }
-    }
+/*     struct Dyn * dyn = dpih_get_dyn(dp); */
 
-    if (verbose == 1){
-        trajectory_print(traj,stdout,4);
-    }
+/*     size_t nsteps = 1000; */
+/*     double space[2 + 4]; */
+/*     double dt = 1e-2; */
+/*     // double noise[2]; */
+/*     int res; */
+/*     for (size_t ii = 0; ii < nsteps; ii++){ */
+/*         //noise[0] = randn()*sqrt(dt); */
+/*         //noise[1] = randn()*sqrt(dt); */
+/*         res = trajectory_step(traj,pol,dyn,dt,"euler", */
+/*                                space,NULL,NULL); */
+/*         if (res != 0){ */
+/*             break; */
+/*         } */
+/*         struct State * scheck = trajectory_last_state(traj); */
+/*         double * xcheck = state_getx_ref(scheck); */
+/*         double tcheck = state_gett(scheck); */
 
-//    char filename[256];
-    sprintf(filename,"%s/%s.dat",dirout,"traj");
-    FILE * fp = fopen(filename,"w");
-    assert (fp != NULL);
-    trajectory_print(traj,fp,4);
-    fclose(fp);
+/*         res = trajboundcheck(tcheck,xcheck,NULL); */
+/*         /\* res = trajectory_step(traj,pol,dyn,dt, *\/ */
+/*         /\*                       "euler-maruyama", *\/ */
+/*         /\*                       space,noise,NULL); *\/ */
+/*         if (res != 0){ */
+/*             break; */
+/*         } */
+/*     } */
+
+/*     if (verbose == 1){ */
+/*         trajectory_print(traj,stdout,4); */
+/*     } */
+
+/* //    char filename[256]; */
+/*     sprintf(filename,"%s/%s.dat",dirout,"traj"); */
+/*     FILE * fp = fopen(filename,"w"); */
+/*     assert (fp != NULL); */
+/*     trajectory_print(traj,fp,4); */
+/*     fclose(fp); */
 
     
     printf("cost ranks are ");
     size_t * ranks = cost_get_ranks(cost);
     iprint_sz(dx+1,ranks);
 
-    printf("policy ranks are \n");
-    for (size_t ii = 0; ii < du; ii++){
-        ranks = policy_get_ranks(pol,ii);
-        iprint_sz(dx+1,ranks);
+    /* printf("policy ranks are \n"); */
+    /* for (size_t ii = 0; ii < du; ii++){ */
+    /*     ranks = policy_get_ranks(pol,ii); */
+    /*     iprint_sz(dx+1,ranks); */
 
-    }
+    /* } */
 
-    state_free(state); state = NULL;
-    control_free(control); control = NULL;
-    trajectory_free(traj); traj = NULL;
+    /* state_free(state); state = NULL; */
+    /* control_free(control); control = NULL; */
+    /* trajectory_free(traj); traj = NULL; */
 
-    policy_free(pol);
+    /* policy_free(pol); */
 
-    
     c3sc_destroy(sc);
     return 0;
 }

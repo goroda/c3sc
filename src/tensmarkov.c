@@ -213,13 +213,13 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
         mcn->neighbors[2*ii+1] = mcnode_init(mcn->d,mcn->x);
 
         int period_dir = 0;
-        int bigood = 0;
+        //int bigood = 0;
         if (bi == NULL){
             mcn->neighbors[2*ii]->x[ii] = mcn->x[ii]-h[ii];
             mcn->neighbors[2*ii+1]->x[ii] = mcn->x[ii]+h[ii];
         }
         else{
-            bigood = 1;
+            //bigood = 1;
             period_dir = bound_info_period_dim_dir(bi,ii);
             if (period_dir == 1){ // to the right is periodic
 
