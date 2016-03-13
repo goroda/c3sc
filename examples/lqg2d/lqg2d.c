@@ -227,7 +227,7 @@ int boundcost(double t, double * x, double * out)
 double startcost(double * x, void * args)
 {
     (void)(args);
-    (void)(x);
+    (void)(x);nnnnn
     if ((fabs(x[0]) <= 2e-1) && (fabs(x[1]) < 2e-1)){
         return 0.2;
     }
@@ -314,11 +314,15 @@ int main(int argc, char * argv[])
     c3opt_set_gtol(opt,1e-12);
     c3opt_set_verbose(opt,0);
     
-    double beta = 1.0;
+    double beta = 0.1;
 
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
+    double center[2] = {0.0,0.0};
+    double width[2] = {0.5,0.5};
+    double ocost = 0.0;
+    c3sc_add_obstacle(sc,center,width,ocost);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);

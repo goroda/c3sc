@@ -540,18 +540,20 @@ double dpih_rhs_opt_cost(double * x,void * dp)
 
     size_t du = mca_get_du(dpx.dp->mm);
     double * ustart = calloc_double(du);
+    /* double out = dpih_rhs(dpx.dp,x,ustart,NULL); */
+    /* free(ustart); */
+    /* return out; */
     
     double val = 0.0;
     struct c3Opt * opt = dpx.dp->opt;
     c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
-
 
 //    printf("before = ");
 //    dprint(dx,x);
     int res = c3opt_minimize(opt,ustart,&val);
     if (res < -1){
         printf("max iter reached in optimization res=%d\n",res);
-        size_t dx = mca_get_dx(dpx.dp->mm);    
+        size_t dx = mca_get_dx(dpx.dp->mm);
         printf("x = ");
         dprint(dx,x);
         dprint(du,ustart);
@@ -566,8 +568,10 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     }
     // assert (res > -1);
 
-    /* printf("x = "); dprint(2,x); */
-    /* printf("u = %G\n",ustart[0]); */
+    /* if (ustart[0] > 1e-2){ */
+    /*     printf("x = "); dprint(2,x); */
+    /*     printf("u = %3.15G\n",ustart[0]); */
+    /* } */
     free(ustart); ustart = NULL;
     return val;
 }

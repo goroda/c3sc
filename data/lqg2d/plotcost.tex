@@ -19,11 +19,11 @@
 
 \begin{document}
 %\foreach \j in {1,2,...,10}
-%\foreach \j in {1,50,...,300}
+\foreach \j in {1,100,...,500}
 %\foreach \j in {1,10,...,50}
 %\foreach \j in {1,50,...,200}
 %\foreach \j in {1,25,...,100}
-\foreach \j in {1,200,...,1000}
+%\foreach \j in {1,200,...,1000}
 %\foreach \j in {1,1000,...,10000}
 {
   \begin{tikzpicture}
@@ -33,6 +33,12 @@
         zlabel=$z$,
         title=\j,
         view={0}{90},
+        %% colorbar style={ 
+        %%   point meta min=0,
+        %%   point meta max=15,
+        %%   ytick={0,5,10,15,20},
+        %%   yticklabels={0,5,10,15,20},
+        %% },
         colorbar,
         grid=both,
       ]
