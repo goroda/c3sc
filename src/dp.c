@@ -549,7 +549,7 @@ double dpih_rhs_opt_cost(double * x,void * dp)
 //    printf("before = ");
 //    dprint(dx,x);
     int res = c3opt_minimize(opt,ustart,&val);
-    if (res < 0){
+    if (res < -1){
         printf("max iter reached in optimization res=%d\n",res);
         size_t dx = mca_get_dx(dpx.dp->mm);    
         printf("x = ");
@@ -564,8 +564,10 @@ double dpih_rhs_opt_cost(double * x,void * dp)
         int res2 = c3opt_minimize(opt,ustart,&val);
         printf("res2 = %d\n",res2);
     }
-    assert (res > -1);
-     
+    // assert (res > -1);
+
+    /* printf("x = "); dprint(2,x); */
+    /* printf("u = %G\n",ustart[0]); */
     free(ustart); ustart = NULL;
     return val;
 }
@@ -643,16 +645,20 @@ int dpih_pol_implicit(double t,double * x,double*u,void * dpin)
     assert (dpx.dp->opt != NULL);
 
     size_t du = mca_get_du(dpx.dp->mm);
-    double * ustart = calloc_double(du);
-    ustart[0] = 1.0;
-    double val = 0.0;
-    struct c3Opt * opt = dpx.dp->opt;
-    c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+    for (size_t ii = 0; ii < du; ii++){
+        u[ii] = dpih_rhs_opt_pol(x,ii,dpin);
+    }
+    int res = 0;
+    /* double * ustart = calloc_double(du); */
+    /* ustart[0] = 1.0; */
+    /* double val = 0.0; */
+    /* struct c3Opt * opt = dpx.dp->opt; */
+    /* c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx); */
     
-    int res = c3opt_minimize(opt,ustart,&val);
-    /* printf("x = "); dprint(2,x); */
-    /* printf("u = "); dprint(2,ustart); */
-    memmove(u,ustart,du*sizeof(double));
-    free(ustart); ustart = NULL;
+    /* int res = c3opt_minimize(opt,ustart,&val); */
+    /* /\* printf("x = "); dprint(2,x); *\/ */
+    /* /\* printf("u = "); dprint(2,ustart); *\/ */
+    /* memmove(u,ustart,du*sizeof(double)); */
+    /* free(ustart); ustart = NULL; */
     return res;
 }

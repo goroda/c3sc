@@ -70,7 +70,7 @@ void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2,
             /* printf("pt = "); dprint(2,pt3); */
             struct Control * u = NULL;
             int res = policy_eval(pol,0.0,pt3,&u);
-            assert (res == 0);
+//            assert (res == 0);
             /* printf("done computing policy\n"); */
             fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n",
                     xtest[zz],ytest[jj],u->u[0],0.0);//u->u[1]);
@@ -101,7 +101,7 @@ void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
             /* printf("pt = "); dprint(2,pt3); */
 
             int res = dpih_pol_implicit(0.0,pt3,u,dp);
-            //assert (res >-1);
+            assert (res >-1);
             /* printf("done computing policy\n"); */
             /* fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
             /*         xtest[zz],ytest[jj],u[0],u[1]); */
@@ -310,8 +310,8 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_relftol(opt,1e-4);
-    c3opt_set_gtol(opt,1e-8);
+    c3opt_set_relftol(opt,1e-9);
+    c3opt_set_gtol(opt,1e-12);
     c3opt_set_verbose(opt,0);
     
     double beta = 1.0;
@@ -324,7 +324,7 @@ int main(int argc, char * argv[])
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost);
 
-    size_t N1 = 50, N2 = 50;
+    size_t N1 = N, N2 = N;
     struct DPih * dp = c3sc_get_dp(sc);
     struct Cost * cost = dpih_get_cost(dp);
     cost_approx(cost,startcost,NULL,verbose-1);
@@ -357,8 +357,8 @@ int main(int argc, char * argv[])
 
     FILE *fp2;
     char filename[256];
-    sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",dirout,lbu[0],ubu[0
-],1.0,1.0,"cost");
+    sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
+            dirout,lbu[0],ubu[0],1.0,1.0,"cost");
     fp2 =  fopen(filename, "w");
     if (fp2 == NULL){
         fprintf(stderr, "cat: can't open %s\n", filename);
@@ -368,29 +368,39 @@ int main(int argc, char * argv[])
     print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
 
-/*     struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1); */
-/*     sprintf(filename,"%s/%s.dat",dirout,"policy_approx"); */
-/*     fp2 =  fopen(filename, "w"); */
-/*     if (fp2 == NULL){ */
-/*         fprintf(stderr, "cat: can't open %s\n", filename); */
-/*         return 0; */
-/*     } */
-/*     printf("printing policy\n"); */
+    struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1);
+    sprintf(filename,"%s/%s.dat",dirout,"policy_approx");
+    fp2 =  fopen(filename, "w");
+    if (fp2 == NULL){
+        fprintf(stderr, "cat: can't open %s\n", filename);
+        return 0;
+    }
+    printf("printing policy\n");
 
-/*     double lbt[2] = {lb[0]+0.5,lb[1]+0.5}; */
-/*     double ubt[2] = {ub[0]-0.5,ub[1]-0.5}; */
-/*     print_policy(fp2,pol,N1,N2,lbt,ubt); */
-/*     fclose(fp2); */
+    print_policy(fp2,pol,N1,N2,lb,ub);
+    fclose(fp2);
 
-/*     sprintf(filename,"%s/%s.dat",dirout,"policy_implicit"); */
-/*     fp2 =  fopen(filename, "w"); */
-/*     if (fp2 == NULL){ */
-/*         fprintf(stderr, "cat: can't open %s\n", filename); */
-/*         return 0; */
-/*     } */
-/*     printf("printing implicit policy\n"); */
-/*     print_policy_implict(fp2,dp,N1,N2,lbt,ubt); */
-/*     fclose(fp2); */
+
+    /* c3opt_set_verbose(opt,2); */
+    /* double pttest[2] = {0.5,0.5}; */
+    /* double utest[1]; */
+    /* int res = dpih_pol_implicit(0.0,pttest,utest,dp); */
+    /* double ut = dpih_rhs_opt_pol(pttest,0,dp); */
+    /* printf("x = "); dprint(2,pttest); */
+    /* printf("u = %G\n", utest[0]); */
+    /* printf("u = %G\n", ut); */
+    /* assert (res > -1); */
+    /* return 1; */
+    
+    sprintf(filename,"%s/%s.dat",dirout,"policy_implicit");
+    fp2 =  fopen(filename, "w");
+    if (fp2 == NULL){
+        fprintf(stderr, "cat: can't open %s\n", filename);
+        return 0;
+    }
+    printf("printing implicit policy\n");
+    print_policy_implict(fp2,dp,N1,N2,lb,ub);
+    fclose(fp2);
 
 /*     double t0 = 0.0; */
 /*     double xs[2] = {0.3,0.2}; */
