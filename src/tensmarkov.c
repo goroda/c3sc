@@ -127,7 +127,7 @@ void mcnode_free(struct MCNode * mcn)
     Initialize a node by copying an an array x of size d, 
     node has no neighbors and only transitions to itself
 **************************************************************/
-struct MCNode * mcnode_init(size_t d, double * x)
+struct MCNode * mcnode_init(size_t d, const double * x)
 {
     struct MCNode * mm = mcnode_alloc(d);
     assert (mm != NULL);
@@ -144,7 +144,7 @@ struct MCNode * mcnode_init(size_t d, double * x)
 /**********************************************************//**
     Get the dimension
 **************************************************************/
-size_t mcnode_get_d(struct MCNode * mcn)
+size_t mcnode_get_d(const struct MCNode * mcn)
 {
     return mcn->d;
 }
@@ -153,7 +153,7 @@ size_t mcnode_get_d(struct MCNode * mcn)
 /**********************************************************//**
     Get a reference to the node state
 **************************************************************/
-double * mcnode_get_xref(struct MCNode * mcn)
+double * mcnode_get_xref(const struct MCNode * mcn)
 {
     return mcn->x;
 }
@@ -161,7 +161,7 @@ double * mcnode_get_xref(struct MCNode * mcn)
 /**********************************************************//**
     Get the probability of self transition
 **************************************************************/
-double mcnode_get_pself(struct MCNode * mcn)
+double mcnode_get_pself(const struct MCNode * mcn)
 {
     return mcn->pself;
 }
@@ -169,7 +169,7 @@ double mcnode_get_pself(struct MCNode * mcn)
 /**********************************************************//**
     Get the number of neighbors
 **************************************************************/
-size_t mcnode_get_N(struct MCNode * mcn)
+size_t mcnode_get_N(const struct MCNode * mcn)
 {
     return mcn->N;
 }
@@ -177,7 +177,7 @@ size_t mcnode_get_N(struct MCNode * mcn)
 /**********************************************************//**
     Get a reference to the neighbors
 **************************************************************/
-struct MCNode **  mcnode_get_neighbors(struct MCNode * mcn)
+struct MCNode **  mcnode_get_neighbors(const struct MCNode * mcn)
 {
     return mcn->neighbors;
 }
@@ -185,10 +185,36 @@ struct MCNode **  mcnode_get_neighbors(struct MCNode * mcn)
 /**********************************************************//**
     Get a reference to the transition probabilities to neighbors
 **************************************************************/
-double *  mcnode_get_pref(struct MCNode * mcn)
+double *  mcnode_get_pref(const struct MCNode * mcn)
 {
     return mcn->p;
 }
+
+/**********************************************************//**
+    Get the dimension of the gradients
+**************************************************************/
+size_t mcnode_get_du(const struct MCNode * mcn)
+{
+    return mcn->du;
+}
+
+/**********************************************************//**
+    Get the derivative of self transition probability
+**************************************************************/
+double * mcnode_get_gpself(const struct MCNode * mcn)
+{
+    return mcn->gpself;
+}
+
+/**********************************************************//**
+    Get the derivative of transition probabilities to neighbors
+**************************************************************/
+double ** mcnode_get_gp(const struct MCNode * mcn)
+{
+    return mcn->gp;
+}
+
+
 
 /**********************************************************//**
     Add neighbors to a node that are a distance of 
@@ -201,8 +227,9 @@ double *  mcnode_get_pref(struct MCNode * mcn)
     \param[in]     bi    - boundary info
 **************************************************************/
 void mcnode_add_neighbors_hspace(struct MCNode * mcn, 
-                                 double * h, double pself,
-                                 double * probs, struct BoundInfo * bi)
+                                 const double * h, double pself,
+                                 const double * probs,
+                                 const struct BoundInfo * bi)
 {
     assert (mcn != NULL);
     assert (mcn->N == 0);
@@ -276,7 +303,8 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
     \param[in]     gprob  - gradients of transition to neighbors
 **************************************************************/
 void mcnode_add_gradients(struct MCNode * mcn, size_t N,
-                          size_t du, double *gpself,
+                          size_t du,
+                          const double *gpself,
                           double ** gprob)
 {
     assert (mcn != NULL);
@@ -306,7 +334,7 @@ void mcnode_add_gradients(struct MCNode * mcn, size_t N,
     \return average
 **************************************************************/
 double mcnode_expectation(
-    struct MCNode * mc,
+    const struct MCNode * mc,
     void (*f)(size_t,double*,double**x,double*,void*),
     void * arg,double * grad)
 {
@@ -777,14 +805,14 @@ mca_get_node(struct MCA * mca, double time, double * x,
     
     //printf("get node\n");
     int onbound = bound_info_onbound(bi);
-    if (fabs(x[2])>=(M_PI-0.1)){
-        if (onbound == 0){
-            printf("bound check is wrong ");
-            dprint(3,x);
-            printf("mca->h[2]=%G\n",mca->h[2]);
-            exit(1);
-        }
-    }
+    /* if (fabs(x[2])>=(M_PI-0.1)){ */
+    /*     if (onbound == 0){ */
+    /*         printf("bound check is wrong "); */
+    /*         dprint(3,x); */
+    /*         printf("mca->h[2]=%G\n",mca->h[2]); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
     if (onbound == 0){
         *ntype = INBOUNDS;
         mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,bi);

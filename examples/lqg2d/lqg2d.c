@@ -101,7 +101,7 @@ void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
             /* printf("pt = "); dprint(2,pt3); */
 
             int res = dpih_pol_implicit(0.0,pt3,u,dp);
-            assert (res >-1);
+            //assert (res >-1);
             /* printf("done computing policy\n"); */
             /* fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
             /*         xtest[zz],ytest[jj],u[0],u[1]); */
@@ -307,8 +307,6 @@ int main(int argc, char * argv[])
     double ub[2] = {2.0, 2.0};
     size_t Narr[2] = {N, N};
 
-//    printf("lbu = %G\n",lbu[0]);
-//    printf("ubu = %G\n",ubu[0]);
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);

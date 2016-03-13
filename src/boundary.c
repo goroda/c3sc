@@ -8,11 +8,6 @@
 
 #include "boundary.h"
 
-enum EBTYPE {
-    ABSORB=1, 
-    PERIODIC=2
-};
-
 /** \struct ExternalBoundary
  *  \brief Structure to handle external boundary conditions
   *  \var ExternalBoundary::left
@@ -310,9 +305,43 @@ void bound_info_free(struct BoundInfo * bi)
 }
 
 /**********************************************************//**
+    Set a boundary info dimension to a given value
+
+    \return 
+            -1 if don't know what to do with type
+            0 if successful
+            1 if periodic and need further information
+**************************************************************/
+int bound_info_set_dim(struct BoundInfo * bi, enum BOUNDRESULT br,
+                       enum EBTYPE type, size_t dim)
+{
+    bi->br[dim] = br;
+    bi->type[dim] = type;
+    if (type == ABSORB){
+        bi->absorb_overall = 1;
+    }
+    else if (type == PERIODIC){
+        return 1;
+    }
+    else if (type != NONE){
+        return -1;
+    }
+    return 0;
+}
+/**********************************************************//**
+    Set a mapping for x
+**************************************************************/
+int bound_info_set_xmap_dim(struct BoundInfo * bi, double x, size_t dim)
+
+{
+    bi->xmap[dim] = x;
+    return 0;
+}
+
+/**********************************************************//**
     Return boundary type
 **************************************************************/
-struct BoundInfo * boundary_type(struct Boundary * bound,double time,double * x)
+struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const double * x)
 {
     (void)(time);
 
@@ -321,50 +350,26 @@ struct BoundInfo * boundary_type(struct Boundary * bound,double time,double * x)
     /*     printf("bound check above, x= "); */
     /*     dprint(3,x); */
     /*}*/
+    enum EBTYPE type;
+    int res;
     for (size_t ii = 0; ii < bound->d; ii++){
         bi->br[ii] = IN;
         if (external_boundary_check_left(bound->eb[ii],x[ii])){
-            /* if (ii == 2){ */
-            /*     if (fabs(x[ii])>=3.14159){ */
-            /*         printf("bound check is left, x=%G\n",x[ii]); */
-            /*         dprint(3,x); */
-            /*     } */
-            /* } */
-            bi->br[ii] = LEFT;
-            bi->type[ii] = external_boundary_get_type(bound->eb[ii]);
-            if (bi->type[ii] == ABSORB){
-                bi->absorb_overall = 1;
-                bi->xmap[ii] = x[ii];
-            }
-            else if (bi->type[ii] == PERIODIC){
-                bi->xmap[ii] = external_boundary_get_right(bound->eb[ii]);
-            }
-            else{
-                assert (1 == 0);
+            type = external_boundary_get_type(bound->eb[ii]);
+            res = bound_info_set_dim(bi,LEFT,type,ii);
+            assert (res > -1);
+            if (res == 1){
+                bound_info_set_xmap_dim(bi,external_boundary_get_right(bound->eb[ii]),ii);
             }
         }
         else if (external_boundary_check_right(bound->eb[ii],x[ii])){
-            /* if (ii == 2){ */
-            /*     if (fabs(x[ii])>=3.14159){ */
-            /*         printf("bound check is right, x=%G\n",x[ii]); */
-            /*         dprint(3,x); */
-            /*     } */
-            /* } */
-            bi->br[ii] = RIGHT;
-            bi->type[ii] = external_boundary_get_type(bound->eb[ii]);
-            if (bi->type[ii] == ABSORB){
-                bi->xmap[ii] = x[ii];
-                bi->absorb_overall = 1;
-            }
-            else if (bi->type[ii] == PERIODIC){
-                bi->xmap[ii] = external_boundary_get_left(bound->eb[ii]);
-                //printf("xmap[%zu] = %G\n",ii,bi->xmap[ii]);
-            }
-            else{
-                assert (1 == 0);
+            type = external_boundary_get_type(bound->eb[ii]);
+            res = bound_info_set_dim(bi,RIGHT,type,ii);
+            assert (res > -1);
+            if (res == 1){
+                bound_info_set_xmap_dim(bi,external_boundary_get_left(bound->eb[ii]),ii);
             }
         }
-        //printf("ii = %zu\n,br=%d\n",ii,bi->br[ii]);
     }
  
     return bi;
@@ -373,7 +378,7 @@ struct BoundInfo * boundary_type(struct Boundary * bound,double time,double * x)
 /**********************************************************//**
     Return 0 if not on boundary
 **************************************************************/
-int bound_info_onbound(struct BoundInfo * bi)
+int bound_info_onbound(const struct BoundInfo * bi)
 {
     for (size_t ii = 0; ii < bi->d; ii++){
         if (bi->br[ii] != IN){
@@ -386,7 +391,7 @@ int bound_info_onbound(struct BoundInfo * bi)
 /**********************************************************//**
     Return 0 if not on boundary
 **************************************************************/
-int bound_info_absorb(struct BoundInfo * bi)
+int bound_info_absorb(const struct BoundInfo * bi)
 {
     if (bi->absorb_overall == 1){
         return 1;
@@ -397,7 +402,7 @@ int bound_info_absorb(struct BoundInfo * bi)
 /**********************************************************//**
     Return 0 if not on boundary
 **************************************************************/
-int bound_info_period(struct BoundInfo * bi)
+int bound_info_period(const struct BoundInfo * bi)
 {
     for (size_t ii = 0; ii < bi->d; ii++){
         if (bi->br[ii] != IN){
@@ -412,7 +417,7 @@ int bound_info_period(struct BoundInfo * bi)
 /**********************************************************//**
     Return 0 if not on boundary, -1 if on left boundary, 1 if on right
 **************************************************************/
-int bound_info_period_dim_dir(struct BoundInfo * bi,size_t dim)
+int bound_info_period_dim_dir(const struct BoundInfo * bi,size_t dim)
 {
     if (bi->type[dim] == PERIODIC){
         if (bi->br[dim] == LEFT){
@@ -428,7 +433,7 @@ int bound_info_period_dim_dir(struct BoundInfo * bi,size_t dim)
 /**********************************************************//**
     Return mapping for periodic boundary conditions
 **************************************************************/
-double bound_info_period_xmap(struct BoundInfo * bi, size_t dim)
+double bound_info_period_xmap(const struct BoundInfo * bi, size_t dim)
 {
     return bi->xmap[dim];
 }

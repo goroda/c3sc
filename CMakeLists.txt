@@ -45,7 +45,13 @@ SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 include_directories(src/include)
 
 add_subdirectory(src)
-add_subdirectory(test)
 add_subdirectory(examples)
 
+add_subdirectory(test)
+
+#enable_testing ()
+#add_test(NAME MCATest
+#         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build
+#         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/build/test/mca_test/mca_test)
+#add_test (NAME MCATest COMMAND ${PROJECT_SOURCE_DIR}/build/test/mca_test/mca_test)
 
