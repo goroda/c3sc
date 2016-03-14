@@ -125,6 +125,14 @@ void c3sc_set_external_boundary(struct C3SC * sc, size_t dim,
 }
 
 /**********************************************************//**
+    Add a rectangular obstacle
+**************************************************************/
+void c3sc_add_obstacle(struct C3SC * sc, double * center, double * lengths)
+{
+    boundary_add_obstacle(sc->bound,center,lengths);
+}
+
+/**********************************************************//**
     Add dynamics of stochastic cotnrol
 
     \param[in,out] sc    - stochastic control problem
@@ -211,10 +219,12 @@ void c3sc_attach_opt(struct C3SC * sc, struct c3Opt * opt)
     \param[in]     beta - discount factor
     \param[in]     s    - stage cost
     \param[in]     b    - boundary cost
+    \param[in]     o    - obstacle cost (NULL if none)
 **************************************************************/
 void c3sc_init_dp(struct C3SC * sc, double beta,
                   int (*s)(double,double*,double*,double*,double*),
-                  int (*b)(double,double*,double*))
+                  int (*b)(double,double*,double*),
+                  int (*o)(double*,double*))
 {
     assert(sc != NULL);
 
@@ -240,7 +250,7 @@ void c3sc_init_dp(struct C3SC * sc, double beta,
     }
     
     assert (sc->type == IH);
-    sc->dpih = dpih_alloc(beta,s,b);
+    sc->dpih = dpih_alloc(beta,s,b,o);
     dpih_attach_mca(sc->dpih, sc->mca);
     dpih_attach_cost(sc->dpih, sc->cost);
     dpih_attach_policy(sc->dpih, sc->pol);
@@ -269,6 +279,8 @@ void * c3sc_get_dp(struct C3SC * sc)
  *  stage cost f(time,state,control,out,grad)
  *  \var DPih::boundcost
  *  boundary cost f(time,state,out)
+ *  \var DPih::obscost
+ *  cost of hitting obstacle f(state,out)
  *  \var DPih::opt
  *  optimization options
  */
@@ -281,6 +293,7 @@ struct DPih
     double beta; // discount factor
     int (*stagecost)(double,double*,double*,double*,double*);
     int (*boundcost)(double,double*,double*);
+    int (*obscost)(double*,double*);
 
     struct c3Opt * opt;
 };
@@ -293,13 +306,15 @@ struct DPih
     \param[in] beta - discount factor
     \param[in] s    - stagecost
     \param[in] b    - boundary cost
+    \param[in] obs  - cost of being in obstacle
 
     \return dynamic program
 **************************************************************/
 struct DPih * 
 dpih_alloc(double beta,
            int (*s)(double,double*,double*,double*,double*),
-           int (*b)(double,double*,double*))
+           int (*b)(double,double*,double*),
+           int (*obs)(double *,double*))
 {
     struct DPih * dp = malloc(sizeof(struct DPih));
     if (dp == NULL){
@@ -313,6 +328,7 @@ dpih_alloc(double beta,
     dp->beta = beta;
     dp->stagecost = s;
     dp->boundcost = b;
+    dp->obscost = obs;
 
     dp->opt = NULL;
     return dp;
@@ -406,31 +422,44 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
     double dt;
     double * gdt = NULL;
     double t = 0.0;
-    int absorb = 0;
+    struct BoundInfo * bi = NULL;
     double val;
     size_t du = mca_get_du(dp->mm);
     if (grad == NULL){
         val = mca_expectation(dp->mm,t,x,u,&dt,NULL,
                               cost_eval_bb,dp->cost,
-                              &absorb,grad);
+                              &bi,grad);
     }
     else{
 
         gdt = calloc_double(du);
         val = mca_expectation(dp->mm,t,x,u,&dt,gdt,
                               cost_eval_bb,dp->cost,
-                              &absorb,grad);
+                              &bi,grad);
     }
 
     double out;
+    int absorb = bound_info_absorb(bi);
     if (absorb == 1){
-        int res = dp->boundcost(t,x,&out);
+        int in_obstacle = bound_info_get_in_obstacle(bi);
+        if (in_obstacle < 0){
+            int res = dp->boundcost(t,x,&out);
+            assert (res == 0);
+        }
+        else{
+            assert (dp->obscost != NULL);
+            int res = dp->obscost(x,&out);
+            assert(res == 0);
+        }
         if (grad != NULL){
             for (size_t ii = 0; ii < du; ii++ ){
                 grad[ii] = 0.0;
             }
         }
-        assert (res == 0);
+        /* printf("\n\nx = ");dprint(2,x); */
+        /* printf("in obstacle %d\n",in_obstacle); */
+        /* printf("out = %G\n",out); */
+
     }
     else{
         double sc;
@@ -457,7 +486,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
         }
     }
     free(gdt); gdt = NULL;
-
+    bound_info_free(bi); bi = NULL;
     return out;
 }
 

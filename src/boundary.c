@@ -176,6 +176,80 @@ int external_boundary_check_right(struct ExternalBoundary * bd, double x)
     return 0;
 }
 
+struct BoundRect
+{
+    size_t dim;
+    double * center;
+    double * lb;
+    double * ub;
+};
+
+struct BoundRect * bound_rect_init(size_t dim, double * center, double * lengths)
+{
+    struct BoundRect * br;
+    br = malloc(sizeof(struct BoundRect));
+    if (br == NULL){
+        fprintf(stderr, "Error allocating BoundRect\n");
+        exit(1);
+    }
+    br->dim = dim;
+    br->center = calloc_double(dim);
+    memmove(br->center,center,dim*sizeof(double));
+    br->lb = calloc_double(dim);
+    br->ub = calloc_double(dim);
+    for (size_t ii = 0; ii < dim; ii++){
+        br->lb[ii] = center[ii] - lengths[ii]/2.0;
+        br->ub[ii] = center[ii] + lengths[ii]/2.0;
+    }
+    return br;
+}
+
+struct BoundRect ** bound_rect_alloc_array(size_t N)
+{
+    struct BoundRect ** br;
+    br = malloc(N * sizeof(struct BoundRect *));
+    if (br == NULL){
+        fprintf(stderr,"Error allocating an array of BoundRect\n");
+        exit(1);
+    }
+    for (size_t ii = 0; ii < N; ii++)
+    {
+        br[ii] = NULL;
+    }
+    return br;
+}
+
+void bound_rect_free(struct BoundRect * br)
+{
+    if (br != NULL){
+        free(br->center); br->center = NULL;
+        free(br->lb); br->lb = NULL;
+        free(br->ub); br->ub = NULL;
+        free(br); br = NULL;
+    }
+}
+
+void bound_rect_free_array(struct BoundRect ** br, size_t N)
+{
+    if (br != NULL){
+        for (size_t ii = 0; ii < N; ii++){
+            bound_rect_free(br[ii]); br[ii] = NULL;
+        }
+        free(br); br = NULL;
+    }
+}
+
+int bound_rect_inside(struct BoundRect * br,const double * x)
+{
+    int inside_obstacle = 1;
+    for (size_t ii = 0; ii < br->dim; ii++){
+        if ((x[ii] < br->lb[ii]) || (x[ii] > br->ub[ii])){
+            inside_obstacle = 0;
+            break;
+        }
+    }
+    return inside_obstacle;
+}
 
 /** \struct Boundary
  *  \brief Structure to handle any boundary conditions
@@ -183,10 +257,6 @@ int external_boundary_check_right(struct ExternalBoundary * bd, double x)
  *  dimension of state space
  *  \var Boundary::eb
  *  external boundaries
- *  \var Boundary::bcheck
- *  user supplied function for checking
- *  \var Boundary::args
- *  arguments to bcheck
  */
 struct Boundary
 {
@@ -194,9 +264,10 @@ struct Boundary
 
     struct ExternalBoundary ** eb;
 
-    int (*bcheck)(double,double *, void *, int *);
-    void * args;
-
+    size_t n;
+    size_t nalloc;
+    struct BoundRect ** br;
+    double * costs;
 };
 
 /**********************************************************//**
@@ -221,14 +292,15 @@ boundary_alloc(size_t d,double * lb, double * ub)
     /* dprint(d,lb); */
     /* dprint(d,ub); */
     for (size_t ii = 0; ii < d; ii++){
-
         bound->eb[ii] = external_boundary_alloc(lb[ii],ub[ii],"absorb");
         /* printf("%G,%G\n",external_boundary_get_left(bound->eb[ii]), */
         /*        external_boundary_get_right(bound->eb[ii])); */
     }
 
-    bound->bcheck = NULL;
-    bound->args = NULL;
+    bound->n = 0;
+    bound->nalloc = 10;
+    bound->br = bound_rect_alloc_array(bound->nalloc);
+    
     return bound;
 }
 
@@ -240,8 +312,23 @@ void boundary_free(struct Boundary * bound)
     if (bound != NULL){
         external_boundary_free_array(bound->eb, bound->d);
         bound->eb = NULL;
+        bound_rect_free_array(bound->br,bound->nalloc);
+        bound->br = NULL;
         free(bound); bound = NULL;
     }
+}
+
+/**********************************************************//**
+    Add a rectangular obstacle
+**************************************************************/
+void boundary_add_obstacle(struct Boundary * bound, double * center, double * lengths)
+{
+    if (bound->n == bound->nalloc){
+        fprintf(stderr,"Not enough space allocated for obstacles in boundary\n");
+        exit(1);
+    }
+    bound->br[bound->n] = bound_rect_init(bound->d,center,lengths);
+    bound->n = bound->n+1;
 }
 
 /**********************************************************//**
@@ -260,6 +347,7 @@ struct BoundInfo
     enum EBTYPE * type;
     double * xmap; // equivalence mappigns for periodic boundaries
     int absorb_overall; // if shared edge
+    int in_obstacle;
 
 };
 
@@ -287,6 +375,7 @@ struct BoundInfo * bound_info_alloc(size_t d)
         exit(1);
     }
     bi->absorb_overall = 0;
+    bi->in_obstacle = -1;
 
     return bi;
 }
@@ -339,7 +428,7 @@ int bound_info_set_xmap_dim(struct BoundInfo * bi, double x, size_t dim)
 }
 
 /**********************************************************//**
-    Return boundary type
+    Return boundary info
 **************************************************************/
 struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const double * x)
 {
@@ -371,7 +460,15 @@ struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const
             }
         }
     }
- 
+
+    for (size_t ii = 0; ii < bound->n; ii++){
+        int inobs = bound_rect_inside(bound->br[ii],x);
+        if (inobs == 1){
+            bi->in_obstacle = (int) ii;
+            bi->absorb_overall = 1;
+            break;
+        }
+    }
     return bi;
 }
 
@@ -380,6 +477,9 @@ struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const
 **************************************************************/
 int bound_info_onbound(const struct BoundInfo * bi)
 {
+    if (bi->in_obstacle > -1){
+        return 1;
+    }
     for (size_t ii = 0; ii < bi->d; ii++){
         if (bi->br[ii] != IN){
             return 1;
@@ -436,4 +536,12 @@ int bound_info_period_dim_dir(const struct BoundInfo * bi,size_t dim)
 double bound_info_period_xmap(const struct BoundInfo * bi, size_t dim)
 {
     return bi->xmap[dim];
+}
+
+/**********************************************************//**
+    Return the in_bound parameter
+**************************************************************/
+int bound_info_get_in_obstacle(const struct BoundInfo * bi)
+{
+    return bi->in_obstacle;
 }

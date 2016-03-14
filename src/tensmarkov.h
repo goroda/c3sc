@@ -56,7 +56,7 @@ double
 mca_expectation(struct MCA *,double,double *,double *,double *,
                 double *,
                 void(*)(size_t,double*,double**,double*,void*),
-                void *,int*,double*);
+                void *,struct BoundInfo **,double*);
 
 struct MCNode *
 mca_inbound_node(struct MCA*,double,double*,
@@ -67,7 +67,7 @@ mca_outbound_node(struct MCA *, double, double *);
 struct MCNode *
 mca_get_node(struct MCA *,double,double *,
              double *,double *,double*,
-             enum NodeType *,double*);
+             struct BoundInfo **,double*);
 
 void mca_step(struct MCA *, double, double *, double *,double,
               double *, double *);

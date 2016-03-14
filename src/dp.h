@@ -16,6 +16,7 @@ struct C3SC * c3sc_create(enum SCTYPE, size_t, size_t, size_t);
 void c3sc_destroy(struct C3SC *);
 void c3sc_set_state_bounds(struct C3SC *,double *,double *);
 void c3sc_set_external_boundary(struct C3SC *,size_t,char *);
+void c3sc_add_obstacle(struct C3SC *, double *, double *);
 void c3sc_add_dynamics(struct C3SC *,  
                        int (*)(double,double*,double*,
                                 double*,double*,void*),
@@ -27,7 +28,8 @@ void c3sc_init_mca(struct C3SC *, size_t *);
 void c3sc_attach_opt(struct C3SC *, struct c3Opt *);
 void c3sc_init_dp(struct C3SC *, double,
                   int (*)(double,double*,double*,double*,double*),
-                  int (*)(double,double*,double*));
+                  int (*)(double,double*,double*),
+                  int (*)(double*,double*));
 
 void * c3sc_get_dp(struct C3SC *);
 ////////////////////////////////////////////////////
@@ -35,7 +37,8 @@ struct DPih;
 struct DPih * 
 dpih_alloc(double,
            int (*)(double,double*,double*,double*,double*),
-           int (*)(double,double*,double*));
+           int (*)(double,double*,double*),
+           int (*)(double*,double*));
 
 void dpih_free(struct DPih *);
 void dpih_free_deep(struct DPih *);

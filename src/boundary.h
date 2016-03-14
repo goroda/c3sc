@@ -15,17 +15,16 @@ void boundary_external_set_type(struct Boundary *,size_t,char *);
 struct BoundInfo * boundary_type(const struct Boundary *,double,const double *);
 
 
-
-
 enum BOUNDRESULT {
     IN,
     LEFT,
-    RIGHT
+    RIGHT,
 };
+
 struct BoundInfo;
 struct BoundInfo * bound_info_alloc(size_t);
 void bound_info_free(struct BoundInfo *);
-
+void boundary_add_obstacle(struct Boundary *, double *, double *);
 int bound_info_set_dim(struct BoundInfo *, enum BOUNDRESULT,
                        enum EBTYPE, size_t);
 int bound_info_set_xmap_dim(struct BoundInfo *, double, size_t);
@@ -34,4 +33,5 @@ int bound_info_absorb(const struct BoundInfo *);
 int bound_info_period(const struct BoundInfo *);
 int bound_info_period_dim_dir(const struct BoundInfo *,size_t);
 double bound_info_period_xmap(const struct BoundInfo *,size_t);
+int bound_info_get_in_obstacle(const struct BoundInfo *);
 #endif

@@ -261,7 +261,7 @@ int main(int argc, char * argv[])
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
-    c3sc_init_dp(sc,beta,stagecost,boundcost);
+    c3sc_init_dp(sc,beta,stagecost,boundcost,NULL);
 
     size_t N1 = 50, N2 = 50;
     struct DPih * dp = c3sc_get_dp(sc);

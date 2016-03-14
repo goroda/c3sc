@@ -69,7 +69,7 @@ void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2,
             /* printf("\n\n\n\n\n\n"); */
             /* printf("pt = "); dprint(2,pt3); */
             struct Control * u = NULL;
-            int res = policy_eval(pol,0.0,pt3,&u);
+            policy_eval(pol,0.0,pt3,&u);
 //            assert (res == 0);
             /* printf("done computing policy\n"); */
             fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n",
@@ -220,14 +220,21 @@ int boundcost(double t, double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 20.0;
+    *out = 100.0;
+    return 0;
+}
+
+int ocost(double * x,double * out)
+{
+    (void)(x);
+    *out = 0.0;
     return 0;
 }
 
 double startcost(double * x, void * args)
 {
     (void)(args);
-    (void)(x);nnnnn
+    (void)(x);
     if ((fabs(x[0]) <= 2e-1) && (fabs(x[1]) < 2e-1)){
         return 0.2;
     }
@@ -321,12 +328,11 @@ int main(int argc, char * argv[])
     c3sc_set_state_bounds(sc,lb,ub);
     double center[2] = {0.0,0.0};
     double width[2] = {0.5,0.5};
-    double ocost = 0.0;
-    c3sc_add_obstacle(sc,center,width,ocost);
+    c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
-    c3sc_init_dp(sc,beta,stagecost,boundcost);
+    c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
 
     size_t N1 = N, N2 = N;
     struct DPih * dp = c3sc_get_dp(sc);
@@ -372,17 +378,17 @@ int main(int argc, char * argv[])
     print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
 
-    struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1);
-    sprintf(filename,"%s/%s.dat",dirout,"policy_approx");
-    fp2 =  fopen(filename, "w");
-    if (fp2 == NULL){
-        fprintf(stderr, "cat: can't open %s\n", filename);
-        return 0;
-    }
-    printf("printing policy\n");
+    /* struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1); */
+    /* sprintf(filename,"%s/%s.dat",dirout,"policy_approx"); */
+    /* fp2 =  fopen(filename, "w"); */
+    /* if (fp2 == NULL){ */
+    /*     fprintf(stderr, "cat: can't open %s\n", filename); */
+    /*     return 0; */
+    /* } */
+    /* printf("printing policy\n"); */
 
-    print_policy(fp2,pol,N1,N2,lb,ub);
-    fclose(fp2);
+    /* print_policy(fp2,pol,N1,N2,lb,ub); */
+    /* fclose(fp2); */
 
 
     /* c3opt_set_verbose(opt,2); */
@@ -396,15 +402,15 @@ int main(int argc, char * argv[])
     /* assert (res > -1); */
     /* return 1; */
     
-    sprintf(filename,"%s/%s.dat",dirout,"policy_implicit");
-    fp2 =  fopen(filename, "w");
-    if (fp2 == NULL){
-        fprintf(stderr, "cat: can't open %s\n", filename);
-        return 0;
-    }
-    printf("printing implicit policy\n");
-    print_policy_implict(fp2,dp,N1,N2,lb,ub);
-    fclose(fp2);
+    /* sprintf(filename,"%s/%s.dat",dirout,"policy_implicit"); */
+    /* fp2 =  fopen(filename, "w"); */
+    /* if (fp2 == NULL){ */
+    /*     fprintf(stderr, "cat: can't open %s\n", filename); */
+    /*     return 0; */
+    /* } */
+    /* printf("printing implicit policy\n"); */
+    /* print_policy_implict(fp2,dp,N1,N2,lb,ub); */
+    /* fclose(fp2); */
 
 /*     double t0 = 0.0; */
 /*     double xs[2] = {0.3,0.2}; */

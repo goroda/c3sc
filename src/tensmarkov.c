@@ -292,6 +292,12 @@ void mcnode_add_neighbors_hspace(struct MCNode * mcn,
     memmove(mcn->p,probs,2*mcn->d * sizeof(double));
 }
 
+
+void mcnode_init_self_grad(struct MCNode * mcn, size_t du)
+{
+    mcn->gpself = calloc_double(du);
+}
+
 /**********************************************************//**
     Add gradients of probability transitions to neighbors with 
     respect to control  
@@ -340,7 +346,10 @@ double mcnode_expectation(
 {
 
     if (grad!= NULL){
-        assert (mc->gp != NULL);
+        //printf("num neighbors = %zu\n",mc->N);
+        if (mc->N > 0){
+            assert(mc->gp != NULL);
+        }
         assert(mc->gpself != NULL);
         for (size_t ii = 0; ii < mc->du; ii++){
             grad[ii] = 0.0;
@@ -627,6 +636,8 @@ mca_outbound_node(struct MCA * mca, double time, double * x)
 {
     (void)(time);
     struct MCNode * mcn = mcnode_init(mca->d,x);
+    size_t du = mca_get_du(mca);
+    mcnode_init_self_grad(mcn,du);
     return mcn;
 }
 
@@ -787,7 +798,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
     \param[in]     u      - current control
     \param[in,out] dt     - time step
     \param[in,out] gdt    - gradient of time step
-    \param[in,out] ntype  - node type
+    \param[in,out] bi     - boundary info
     \param[in]     grad   - flag for specifying whether or not to
                             compute gradients of transitions with 
                             respect to control (NULL for no)
@@ -795,40 +806,28 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
 struct MCNode *
 mca_get_node(struct MCA * mca, double time, double * x,
              double * u, double * dt, double * gdt,
-             enum NodeType * ntype,
+             struct BoundInfo ** bi,
              double *grad)
 {
 
-    struct BoundInfo * bi = boundary_type(mca->bound,time,x);
+    *bi = boundary_type(mca->bound,time,x);
     struct MCNode * mcn = NULL;
 
-    
     //printf("get node\n");
-    int onbound = bound_info_onbound(bi);
-    /* if (fabs(x[2])>=(M_PI-0.1)){ */
-    /*     if (onbound == 0){ */
-    /*         printf("bound check is wrong "); */
-    /*         dprint(3,x); */
-    /*         printf("mca->h[2]=%G\n",mca->h[2]); */
-    /*         exit(1); */
-    /*     } */
-    /* } */
+    int onbound = bound_info_onbound(*bi);
     if (onbound == 0){
-        *ntype = INBOUNDS;
-        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,bi);
+        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,*bi);
     }
     else{
-        int absorb = bound_info_absorb(bi);
+        int absorb = bound_info_absorb(*bi);
         if (absorb == 1){
-            *ntype = OUTBOUNDS;
             *dt = 0;
             mcn = mca_outbound_node(mca,time,x);            
         }
         else{
-            int period = bound_info_period(bi);
+            int period = bound_info_period(*bi);
             if (period != 0){
-                *ntype = INBOUNDS;
-                mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,bi);
+                mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,*bi);
             }
             else{
                 fprintf(stderr,"Not sure what to do with this node\n");
@@ -839,72 +838,32 @@ mca_get_node(struct MCA * mca, double time, double * x,
         }
     }
     // printf("got node\n");
-    bound_info_free(bi); bi = NULL;
+    //bound_info_free(bi); bi = NULL;
     return mcn;
 }
 
 /**********************************************************//**
     Compute expectation of a function
     
-    \param[in]     mca    - markov chain approximation 
-    \param[in]     time   - time
-    \param[in]     x      - current state
-    \param[in]     u      - current control
-    \param[in,out] dt     - time step
-    \param[in]     f      - function(npts,times,states,out,arg)
-    \param[in,out] arg    - function arguments
-    \param[in,out] absorb - absorption
-    \param[in,out] grad   - gradient
+    \param[in]     mca  - markov chain approximation 
+    \param[in]     time - time
+    \param[in]     x    - current state
+    \param[in]     u    - current control
+    \param[in,out] dt   - time step
+    \param[in]     f    - function(npts,times,states,out,arg)
+    \param[in,out] arg  - function arguments
+    \param[in,out] bi   - boundary information
+    \param[in,out] grad - gradient
 **************************************************************/
 double
 mca_expectation(struct MCA * mca, double time,
                 double * x, double * u, double * dt, double * gdt,
                 void (*f)(size_t,double *,double **,double*,void*),
-                void * arg,int * absorb, double * grad)
+                void * arg, struct BoundInfo ** bi, double * grad)
 {
-    enum NodeType ntype;
 
-
-    /* if (x[2] < -1.6){ */
-    /*     if (x[2] > -2.0){ */
-    /*         dprint(3,x); */
-    /*         exit(1); */
-    /*     } */
-    /* } */
-//    dprint(3,x);
-    struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,&ntype,grad);
-
-    /* if (grad){ */
-    /*     for (size_t ii = 0; ii < mca->d; ii++){ */
-    /*         printf("minus grad "); */
-    /*         dprint(1,mcn->gp[2*ii]); */
-    /*         printf("plus grad "); */
-    /*         dprint(1,mcn->gp[2*ii+1]); */
-    /*     } */
-    /*     printf("grad self = "); */
-    /*     dprint(1,mcn->gpself); */
-    /*     printf("probs = "); */
-    /*     dprint(2*mcn->d,mcn->p); */
-    /*     printf("self prob = %G\n",mcn->pself); */
-    /* } */
-    double val = 0.0;
-    if (ntype == INBOUNDS){
-        val = mcnode_expectation(mcn,f,arg,grad);
-        *absorb = 0;
-    }
-    else if (ntype == OUTBOUNDS){
-        *absorb = 1;
-    }
-    else if (ntype == ONBOUNDS){
-        *absorb = 1;
-        fprintf(stderr,"Not sure what to do with ONBOUND nodes yet\n");
-        exit(1);
-    }
-    else{
-        fprintf(stderr,"Node type %d is unknown\n",ntype);
-        exit(1);
-    }
-    
+    struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,bi,grad);
+    double val = mcnode_expectation(mcn,f,arg,grad);
     mcnode_free(mcn); mcn = NULL;
     return val;
 }
