@@ -368,7 +368,7 @@ int main(int argc, char * argv[])
     FILE *fp2;
     char filename[256];
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
-            dirout,lbu[0],ubu[0],1.0,1.0,"cost");
+            dirout,lbu[0],ubu[0],ss[0],ss[1],"cost");
     fp2 =  fopen(filename, "w");
     if (fp2 == NULL){
         fprintf(stderr, "cat: can't open %s\n", filename);
