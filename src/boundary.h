@@ -30,6 +30,7 @@ int bound_info_set_dim(struct BoundInfo *, enum BOUNDRESULT,
                        enum EBTYPE, size_t);
 int bound_info_set_xmap_dim(struct BoundInfo *, double, size_t);
 int bound_info_onbound(const struct BoundInfo *);
+int bound_info_onbound_dim(const struct BoundInfo *,size_t);
 int bound_info_absorb(const struct BoundInfo *);
 int bound_info_period(const struct BoundInfo *);
 int bound_info_period_dim_dir(const struct BoundInfo *,size_t);

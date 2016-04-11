@@ -2,7 +2,6 @@
 // Authors: Alex Gorodetsky
 // Email  : goroda@mit.edu
 
-
 //Code
 
 #include <stdio.h>
@@ -61,9 +60,8 @@ void Test_mcnode_prepend(CuTest * tc)
     mcn = mcnode_init(dglob,x);
     mcnode_set_pself(mcn,pselfin);
 
-    struct MCNList * neigh = mcnode_get_neigh(mcn);
     for (size_t ii = 0; ii < dglob;ii++){
-        mcnlist_prepend(&neigh,ii,x[ii]-h[ii],probs[ii],NULL);
+        mcnode_prepend_neigh(mcn,ii,x[ii]-h[ii],probs[ii],NULL);
     }
 
     double pself = mcnode_get_pself(mcn);
@@ -77,6 +75,7 @@ void Test_mcnode_prepend(CuTest * tc)
         CuAssertIntEquals(tc,on,dir);
         CuAssertDblEquals(tc,x[on]-h[on],xval,1e-15);
         temp = mcnlist_get_next(temp);
+        on--;
     }
     
     mcnode_free(mcn); mcn = NULL;
@@ -112,11 +111,9 @@ void Test_mcnode_expectation(CuTest * tc)
         gprobself[jj] = randu();
     }
 
-    
     mcn = mcnode_init(dglob,x);
     mcnode_set_pself(mcn,pselfin);
     mcnode_set_gradient(mcn,du,gprobself);
-
 
     for (size_t ii = 0; ii < dglob; ii++){
         mcnode_prepend_neigh(mcn,ii,x[ii]-h[ii],probs[ii],gprob[ii]);
@@ -141,6 +138,458 @@ void Test_mcnode_expectation(CuTest * tc)
     mcnode_free(mcn); mcn = NULL;
 }
 
+int f1(double t, double * x, double * u, double * out,
+       double * jac, void * args)
+{
+    (void)(t);
+    (void)(args);
+    out[0] = x[1];
+    out[1] = u[0];
+    if (jac != NULL){
+        //df1/du
+        jac[0] = 0.0;
+        jac[1] = 1.0;
+    }
+    return 0;
+}
+
+int s1(double t,double * x,double * u,double * out, double * grad,
+       void * args)
+{
+    (void)(t);
+    (void)(x);
+    (void)(u);
+    (void)(args);
+    out[0] = 1.0;
+    out[1] = 0.0;
+    out[2] = 0.0;
+    out[3] = 1.0;
+    if (grad != NULL){
+        grad[0] = 0.0;
+        grad[1] = 0.0;
+        grad[2] = 0.0;
+        grad[3] = 0.0;
+    }
+    return 0;
+}
+
+void Test_mca_get_node_absorb(CuTest * tc)
+{
+    printf("Testing Function: mca_get_node w/ absorbing conditions(1)\n");
+
+    size_t d = 2;
+    size_t du = 1;
+    size_t dw = 2;
+    double h[2] = {1e-1, 1e-2};
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0};
+
+    struct Boundary * bound = boundary_alloc(d,lb,ub);
+    struct Drift * drift = drift_alloc(d,du);
+    drift_add_func(drift,f1,NULL);
+    struct Diff * diff = diff_alloc(d,du,dw);
+    diff_add_func(diff,s1,NULL);
+    struct Dyn  * dyn = dyn_alloc(drift,diff);
+
+    struct MCA * mca = mca_alloc(d,du,dw,h);
+    mca_attach_dyn(mca,dyn);
+    mca_attach_bound(mca,bound);
+
+    struct BoundInfo * bi = NULL;
+    
+    // first check corner point that is absorbing
+    double pt[2] = {-2.0,-2.0};
+    double u[1] = {0.0};
+    double time = 0.0;
+
+    double dt; 
+    struct MCNode * mcn = mca_get_node(mca,time,pt,u,&dt,NULL,&bi,NULL);
+    int onbound = bound_info_onbound(bi);
+    CuAssertIntEquals(tc,1,onbound);
+    int absorb = bound_info_absorb(bi);
+    CuAssertIntEquals(tc,1,absorb);
+    int period = bound_info_period(bi);
+    CuAssertIntEquals(tc,0,period);
+    int reflect = bound_info_reflect(bi);
+    CuAssertIntEquals(tc,0,reflect);
+    int N = mcnode_get_n(mcn);
+    CuAssertIntEquals(tc,0,N);
+    double p = mcnode_get_pself(mcn);
+    CuAssertDblEquals(tc,1.0,p,1e-15);
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    // check non-corner but absorbing point
+    pt[0] = 0.4; pt[1] = 2.0;
+    mcn = mca_get_node(mca,time,pt,u,&dt,NULL,&bi,NULL);
+    onbound = bound_info_onbound(bi);
+    CuAssertIntEquals(tc,1,onbound);
+    absorb = bound_info_absorb(bi);
+    CuAssertIntEquals(tc,1,absorb);
+    period = bound_info_period(bi);
+    CuAssertIntEquals(tc,0,period);
+    reflect = bound_info_reflect(bi);
+    CuAssertIntEquals(tc,0,reflect);
+    N = mcnode_get_n(mcn);
+    CuAssertIntEquals(tc,0,N);
+    p = mcnode_get_pself(mcn);
+    CuAssertDblEquals(tc,1.0,p,1e-15);
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    // check non-absorbing point
+    pt[0] = 0.4; pt[1] = 0.8;
+    double evald[2]; 
+    drift_eval(drift,time,pt,u,evald,NULL);
+    double evaldiff[4];
+    diff_eval(diff,time,pt,u,evaldiff,NULL);
+
+    
+    double Qh = h[1]*(h[1]/h[0]*fabs(evald[0]) + fabs(evald[1]));
+    Qh +=  evaldiff[0]*evaldiff[0]*h[1]*h[1]/h[0]/h[0] + 
+           evaldiff[3]*evaldiff[3];
+//    printf("Qh should = %G\n",Qh);
+
+    double dtshould = h[1]*h[1] / Qh;
+    mcn = mca_get_node(mca,time,pt,u,&dt,NULL,&bi,NULL);
+    CuAssertDblEquals(tc,dtshould,dt,1e-14);
+    onbound = bound_info_onbound(bi);
+    CuAssertIntEquals(tc,0,onbound);
+    absorb = bound_info_absorb(bi);
+    CuAssertIntEquals(tc,0,absorb);
+    period = bound_info_period(bi);
+    CuAssertIntEquals(tc,0,period);
+    reflect = bound_info_reflect(bi);
+    CuAssertIntEquals(tc,0,reflect);
+    N = mcnode_get_n(mcn);
+    CuAssertIntEquals(tc,4,N);
+   
+    // left,right, up, down
+    double p1=0.0,p2=0.0,p3=0.0,p4=0.0; 
+    if (evald[0] > 0){
+        p2 = h[1]*h[1]/h[0]*evald[0] + pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+        p1 = pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+    }
+    else{
+        p1 = -h[1]*h[1]/h[0]*evald[0] + pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+        p2 = pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+    }
+    
+    if (evald[1] > 0){
+        p3 = h[1]*evald[1] + pow(evaldiff[3],2)/2.0;
+        p4 = pow(evaldiff[3],2)/2.0;
+    }
+    else{
+        p4 = -h[1]*evald[1] + pow(evaldiff[3],2)/2.0;
+        p3 = pow(evaldiff[3],2)/2.0;
+    }
+
+    p1 /= Qh;
+    p2 /= Qh;
+    p3 /= Qh;
+    p4 /= Qh;
+
+    struct MCNList * temp = mcnode_get_neigh(mcn);
+    while (temp != NULL){
+        size_t dir = mcnlist_get_dir(temp);
+        double val = mcnlist_get_val(temp);
+        double p = mcnlist_get_p(temp);
+        if (dir == 0){
+            if (val > pt[dir]){
+                CuAssertDblEquals(tc,val,pt[0]+h[0],1e-15);
+                CuAssertDblEquals(tc,p2,p,1e-15);
+            }
+            else{
+                CuAssertDblEquals(tc,val,pt[0]-h[0],1e-15);
+                CuAssertDblEquals(tc,p1,p,1e-15);
+            }
+        }
+        if (dir == 1){
+            if (val > pt[dir]){
+                CuAssertDblEquals(tc,val,pt[1]+h[1],1e-15);
+                CuAssertDblEquals(tc,p3,p,1e-15);
+            }
+            else{
+                CuAssertDblEquals(tc,val,pt[1]-h[1],1e-15);
+                CuAssertDblEquals(tc,p4,p,1e-15);
+            }
+        }
+        temp = mcnlist_get_next(temp);
+    }
+
+    /* p = mcnode_get_pself(mcn); */
+    /* CuAssertDblEquals(tc,1.0,p,1e-15); */
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    mca_free_deep(mca);
+}
+
+void Test_mca_get_node_absorb_grad(CuTest * tc)
+{
+    printf("Testing Function: mca_get_node w/ absorbing conditions (2)\n");
+
+    size_t d = 2;
+    size_t du = 1;
+    size_t dw = 2;
+    double h[2] = {1e-1, 1e-2};
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0};
+
+    struct Boundary * bound = boundary_alloc(d,lb,ub);
+    struct Drift * drift = drift_alloc(d,du);
+    drift_add_func(drift,f1,NULL);
+    struct Diff * diff = diff_alloc(d,du,dw);
+    diff_add_func(diff,s1,NULL);
+    struct Dyn  * dyn = dyn_alloc(drift,diff);
+
+    struct MCA * mca = mca_alloc(d,du,dw,h);
+    mca_attach_dyn(mca,dyn);
+    mca_attach_bound(mca,bound);
+
+    struct BoundInfo * bi = NULL;
+    
+    // first check corner point that is absorbing
+    double pt[2] = {-2.0,-2.0};
+    double u[1] = {0.0};
+    double time = 0.0;
+
+    double dt; 
+    double gdt[1];
+    double grad[1];
+    struct MCNode * mcn = mca_get_node(mca,time,pt,u,&dt,gdt,&bi,grad);
+    double * gself = mcnode_get_gpself(mcn);
+    CuAssertDblEquals(tc,0.0,gself[0],1e-15);
+    mcnode_free(mcn);
+    bound_info_free(bi);
+    
+//    printf("doesnt get here!\n");
+    // check non-corner but absorbing point
+    pt[0] = 0.4; pt[1] = 2.0;
+    mcn = mca_get_node(mca,time,pt,u,&dt,gdt,&bi,grad);
+    gself = mcnode_get_gpself(mcn);
+    CuAssertDblEquals(tc,0.0,gself[0],1e-15);
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    // check non-absorbing point
+    pt[0] = 0.4; pt[1] = 0.8;
+    double evald[2];
+    double evaldg[2];
+    drift_eval(drift,time,pt,u,evald,evaldg);
+    double evaldiff[4];
+    diff_eval(diff,time,pt,u,evaldiff,NULL);
+
+    double Qh = h[1]*(h[1]/h[0]*fabs(evald[0]) + fabs(evald[1]));
+    Qh +=  evaldiff[0]*evaldiff[0]*h[1]*h[1]/h[0]/h[0] +
+           evaldiff[3]*evaldiff[3];
+
+    double dQ;
+    if (evald[0] > 0){
+        dQ = h[1]*h[1]/h[0] * evaldg[0];
+    }
+    else{
+        dQ = -h[1]*h[1]/h[0] * evaldg[0];
+    }
+    if (evald[1] > 0){
+        dQ = h[1] * evaldg[1];
+    }
+    else{
+        dQ = -h[1] * evaldg[1];
+    }
+
+    //printf("dQshould = %G\n",dQ);
+    double dtshould = h[1]*h[1] / Qh;
+    //printf("dtshould = %G\n",dtshould);
+    double gdtshould = - h[1]*h[1]/ Qh/Qh * dQ;
+    mcn = mca_get_node(mca,time,pt,u,&dt,gdt,&bi,grad);
+    gself = mcnode_get_gpself(mcn);
+    CuAssertDblEquals(tc,dtshould,dt,1e-14);
+    CuAssertDblEquals(tc,gdtshould,gdt[0],1e-14);
+
+    // left,right, up, down
+    double p1=0.0,p2=0.0,p3=0.0,p4=0.0; 
+    if (evald[0] > 0){
+        p2 = h[1]*h[1]/h[0]*evald[0] + pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+        p1 = pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+    }
+    else{
+        p1 = -h[1]*h[1]/h[0]*evald[0] + pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+        p2 = pow(evaldiff[0]*h[1]/h[0],2)/2.0;
+    }
+    
+    if (evald[1] > 0){
+        p3 = h[1]*evald[1] + pow(evaldiff[3],2)/2.0;
+        p4 = pow(evaldiff[3],2)/2.0;
+    }
+    else{
+        p4 = -h[1]*evald[1] + pow(evaldiff[3],2)/2.0;
+        p3 = pow(evaldiff[3],2)/2.0;
+    }
+   
+    //gradients of left,right,up,down
+    double dp1=0.0,dp2=0.0,dp3=0.0,dp4=0.0;
+    if (evald[0] > 0){
+        dp2 = h[1]*h[1]/h[0]*evaldg[0];
+        dp1 = 0.0; 
+    }
+    else{
+        dp1 = -h[1]*h[1]/h[0]*evaldg[0];
+        dp2 = 0.0;
+    }
+    if (evald[1] > 0){
+        dp3 = h[1]*evaldg[1];
+        dp4 = 0.0;
+    }
+    else{
+        dp4 = -h[1]*evaldg[1];
+        dp3 = 0.0;
+    }
+    
+    dp1 = (Qh*dp1 - p1*dQ)/Qh/Qh;
+    dp2 = (Qh*dp2 - p2*dQ)/Qh/Qh;
+    dp3 = (Qh*dp3 - p3*dQ)/Qh/Qh;
+    dp4 = (Qh*dp4 - p4*dQ)/Qh/Qh;
+
+    struct MCNList * temp = mcnode_get_neigh(mcn);
+    while (temp != NULL){
+        size_t dir = mcnlist_get_dir(temp);
+        double val = mcnlist_get_val(temp);
+        double * gradp = mcnlist_get_gradp(temp);
+        if (dir == 0){
+            if (val > pt[dir]){
+                CuAssertDblEquals(tc,val,pt[0]+h[0],1e-15);
+                CuAssertDblEquals(tc,dp2,gradp[0],1e-15);
+            }
+            else{
+                CuAssertDblEquals(tc,val,pt[0]-h[0],1e-15);
+                CuAssertDblEquals(tc,dp1,gradp[0],1e-15);
+            }
+        }
+        if (dir == 1){
+            if (val > pt[dir]){
+                CuAssertDblEquals(tc,val,pt[1]+h[1],1e-15);
+                CuAssertDblEquals(tc,dp3,gradp[0],1e-15);
+            }
+            else{
+                CuAssertDblEquals(tc,val,pt[1]-h[1],1e-15);
+                CuAssertDblEquals(tc,dp4,gradp[0],1e-15);
+            }
+        }
+        temp = mcnlist_get_next(temp);
+    }
+
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    mca_free_deep(mca);
+}
+
+void Test_mca_get_node_reflect(CuTest * tc)
+{
+    printf("Testing Function: mca_get_node w/ reflecting conditions(1)\n");
+
+    size_t d = 2;
+    size_t du = 1;
+    size_t dw = 2;
+    double h[2] = {1e-1, 1e-2};
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0};
+
+    struct Boundary * bound = boundary_alloc(d,lb,ub);
+    boundary_external_set_type(bound,0,"reflect");
+    boundary_external_set_type(bound,1,"reflect");
+
+    struct Drift * drift = drift_alloc(d,du);
+    drift_add_func(drift,f1,NULL);
+    struct Diff * diff = diff_alloc(d,du,dw);
+    diff_add_func(diff,s1,NULL);
+    struct Dyn  * dyn = dyn_alloc(drift,diff);
+
+    struct MCA * mca = mca_alloc(d,du,dw,h);
+    mca_attach_dyn(mca,dyn);
+    mca_attach_bound(mca,bound);
+
+    struct BoundInfo * bi = NULL;
+    
+    // first check that corner point that is reflecting
+    double pt[2] = {-2.0,-2.0};
+    double u[1] = {0.0};
+    double time = 0.0;
+    double evald[2]; 
+    drift_eval(drift,time,pt,u,evald,NULL);
+    double evaldiff[4];
+    diff_eval(diff,time,pt,u,evaldiff,NULL);
+
+    double dt;
+    struct MCNode * mcn = mca_get_node(mca,time,pt,u,&dt,NULL,&bi,NULL);
+    int onbound = bound_info_onbound(bi);
+    CuAssertIntEquals(tc,1,onbound);
+    int absorb = bound_info_absorb(bi);
+    CuAssertIntEquals(tc,0,absorb);
+    int period = bound_info_period(bi);
+    CuAssertIntEquals(tc,0,period);
+    int reflect = bound_info_reflect(bi);
+    CuAssertIntEquals(tc,1,reflect);
+    int N = mcnode_get_n(mcn);
+    CuAssertIntEquals(tc,2,N);
+
+    /* double p1; // right; */
+    /* double p2; // down; */
+
+    /* double Qh = h[1]*(h[1]/h[0]*fabs(evald[0]) + fabs(evald[1])); */
+    /* Qh +=  evaldiff[0]*evaldiff[0]*h[1]*h[1]/h[0]/h[0] +  */
+    /*        evaldiff[3]*evaldiff[3]; */
+
+    double p = mcnode_get_pself(mcn);
+    CuAssertIntEquals(tc,1,p>=0);
+//    CuAssertDblEquals(tc,1.0,p,1e-15);
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    // check non-corner but reflecting point
+    pt[0] = 0.4; pt[1] = 2.0;
+    mcn = mca_get_node(mca,time,pt,u,&dt,NULL,&bi,NULL);
+    onbound = bound_info_onbound(bi);
+    CuAssertIntEquals(tc,1,onbound);
+    absorb = bound_info_absorb(bi);
+    CuAssertIntEquals(tc,0,absorb);
+    period = bound_info_period(bi);
+    CuAssertIntEquals(tc,0,period);
+    reflect = bound_info_reflect(bi);
+    CuAssertIntEquals(tc,1,reflect);
+    N = mcnode_get_n(mcn);
+    CuAssertIntEquals(tc,3,N);
+    p = mcnode_get_pself(mcn);
+    CuAssertIntEquals(tc,1,p>=0);
+    /* CuAssertDblEquals(tc,1.0,p,1e-15); */
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    // check non-areflecting point
+    pt[0] = 0.4; pt[1] = 0.8;
+    mcn = mca_get_node(mca,time,pt,u,&dt,NULL,&bi,NULL);
+    onbound = bound_info_onbound(bi);
+    CuAssertIntEquals(tc,0,onbound);
+    absorb = bound_info_absorb(bi);
+    CuAssertIntEquals(tc,0,absorb);
+    period = bound_info_period(bi);
+    CuAssertIntEquals(tc,0,period);
+    reflect = bound_info_reflect(bi);
+    CuAssertIntEquals(tc,0,reflect);
+    N = mcnode_get_n(mcn);
+    CuAssertIntEquals(tc,4,N);
+    p = mcnode_get_pself(mcn);
+//    printf("p = %G\n",p);
+    CuAssertIntEquals(tc,1,p>=0);
+    /* CuAssertDblEquals(tc,1.0,p,1e-15); */
+    mcnode_free(mcn);
+    bound_info_free(bi);
+
+    mca_free_deep(mca);
+}
+
+
 CuSuite * MCAGetSuite()
 {
     //printf("----------------------------\n");
@@ -150,5 +599,8 @@ CuSuite * MCAGetSuite()
     SUITE_ADD_TEST(suite, Test_mcnode_init);
     SUITE_ADD_TEST(suite, Test_mcnode_prepend);
     SUITE_ADD_TEST(suite, Test_mcnode_expectation);
+    SUITE_ADD_TEST(suite, Test_mca_get_node_absorb);
+    SUITE_ADD_TEST(suite, Test_mca_get_node_absorb_grad);
+    SUITE_ADD_TEST(suite, Test_mca_get_node_reflect);
     return suite;
 }

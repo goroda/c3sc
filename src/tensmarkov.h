@@ -25,6 +25,8 @@ double mcnode_get_pself(const struct MCNode *);
 size_t mcnode_get_du(const struct MCNode *);
 double * mcnode_get_gpself(const struct MCNode *);
 struct MCNList * mcnode_get_neigh(const struct MCNode *);
+size_t mcnode_get_n(const struct MCNode *);
+
 void mcnode_prepend_neigh(struct MCNode *, size_t,
                           double, double, double *);
 
@@ -34,6 +36,7 @@ double mcnlist_get_p(const struct MCNList *);
 double * mcnlist_get_gradp(const struct MCNList *);
 size_t mcnlist_get_dir(const struct MCNList *);
 double mcnlist_get_val(const struct MCNList *);
+size_t mcnlist_length(const struct MCNList *);
 struct MCNList * mcnlist_get_next(const struct MCNList *);
 
 void mcnlist_free(struct MCNList *);
@@ -79,6 +82,10 @@ mca_expectation(struct MCA *,double,double *,double *,double *,
 struct MCNode *
 mca_inbound_node(struct MCA*,double,double*,
                  double*,double*,double*,double*);
+struct MCNode *
+mca_reflect_node(struct MCA *,double, double *,
+                 double *, double *,double *,double *,
+                 struct BoundInfo *);
 
 struct MCNode *
 mca_outbound_node(struct MCA *, double, double *);

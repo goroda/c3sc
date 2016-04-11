@@ -122,31 +122,35 @@ void cost_approx(struct Cost * c,
     c3approx_init_lin_elem(c3a);
     c3approx_set_lin_elem_fixed(c3a,c->N,c->x);
 
-    size_t init_rank = 3;
+    size_t init_rank = 5;
     c3approx_init_cross(c3a,init_rank,verbose);
     c3approx_set_fiber_opt_brute_force(c3a,c->N,c->x);
     
-    c3approx_set_cross_tol(c3a,1e-7);
+    c3approx_set_cross_tol(c3a,1e-10);
     c3approx_set_cross_maxiter(c3a,10);
     c3approx_set_round_tol(c3a,1e-10);
-    c3approx_set_adapt_kickrank(c3a,2);
+    c3approx_set_adapt_kickrank(c3a,5);
     size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->d; ii++){
         if (c->N[ii] < minN){ minN = c->N[ii];}
     }
-    c3approx_set_adapt_maxiter(c3a,(minN-3)/2);
+    c3approx_set_adapt_maxiter(c3a,(minN-5)/5);
 
     // determine starting nodes
+//    printf("x[0] = "); dprint(c->N[0],c->x[0]);
     double ** start = malloc_dd(c->d);
     size_t * nstart = calloc_size_t(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
-        nstart[ii] = 3;
+        nstart[ii] = 5;
         assert (c->N[ii] > 5);
         size_t mid = c->N[ii]/2;
         start[ii] = calloc_double(nstart[ii]);
-        start[ii][0] = c->x[ii][1];
-        start[ii][1] = c->x[ii][mid];
-        start[ii][2] = c->x[ii][c->N[ii]-2];
+        start[ii][0] = c->x[ii][0];
+        start[ii][1] = c->x[ii][1];
+        start[ii][2] = c->x[ii][mid];
+        start[ii][3] = c->x[ii][c->N[ii]-2];
+        start[ii][4] = c->x[ii][c->N[ii]-1];
+//        printf("start = "); dprint(5,start[ii]);
     }
     c3approx_set_start(c3a,nstart,start);
 

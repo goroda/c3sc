@@ -178,7 +178,6 @@ void c3sc_init_mca(struct C3SC * sc, size_t * N)
         exit(1);
     }
 
-
     sc->cost = cost_alloc(sc->dx,sc->lbx,sc->ubx);
     double ** x = malloc_dd(sc->dx);
     double * h = calloc_double(sc->dx);

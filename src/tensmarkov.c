@@ -155,7 +155,7 @@ double mcnode_get_pself(const struct MCNode * mcn){ return mcn->pself; }
 size_t mcnode_get_du(const struct MCNode * mcn){ return mcn->du;}
 double * mcnode_get_gpself(const struct MCNode * mcn){ return mcn->gpself;}
 struct MCNList * mcnode_get_neigh(const struct MCNode * mcn){ return mcn->neigh;}
-//size_t mcnode_get_N(const struct MCNode * mcn){ return mcn->N;}
+size_t mcnode_get_n(const struct MCNode * mcn){ return mcnlist_length(mcn->neigh);}
 
 //////////////////////////////////
 
@@ -174,6 +174,17 @@ double * mcnlist_get_gradp(const struct MCNList * mcn){return mcn->gradp;}
 size_t mcnlist_get_dir(const struct MCNList * mcn){return mcn->dir;}
 double mcnlist_get_val(const struct MCNList * mcn){return mcn->val;}
 struct MCNList * mcnlist_get_next(const struct MCNList * mcn){return mcn->next;}
+size_t mcnlist_length(const struct MCNList * mcn)
+{
+    size_t N = 0;
+    const struct MCNList * temp = mcn;
+    while (temp != NULL){
+        N++;
+        temp = temp->next;
+    }
+    return N;
+}
+
 
 /**********************************************************//**
     Allocate memory for a list
@@ -531,7 +542,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
     assert(mca->dyn != NULL);
     assert (mca->dw == mca->d);
 
-    struct MCNode * mcn = mcnode_alloc(mca->d);
+    struct MCNode * mcn = mcnode_init(mca->d,x);
     
     //double * probs = calloc_double(2*mca->d);
     double * dQ = NULL;
@@ -580,24 +591,21 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
         t = pow(mca->minh/mca->h[ii],2);
         
         node_minus->p = t * diff/2.0;
-        node_plus->p       = t * diff/2.0;
+        node_plus->p  = t * diff/2.0;
 
         if (grad != NULL){
-
             cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
-
             cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                         node_plus->gradp,1);
             cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                         node_minus->gradp,1);
-
         }
         
         Qh += t*diff;
         
         if (mca->drift[ii] > 0){
             node_plus->p += hrel * mca->drift[ii];
-            Qh += node_plus->p;
+            Qh += hrel*mca->drift[ii];
             if (grad != NULL){
                 cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,node_plus->gradp,1);
                 cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
@@ -606,7 +614,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
         }
         else{
             node_minus->p += hrel * (-mca->drift[ii]);
-            Qh += node_minus->p;
+            Qh += hrel * (-mca->drift[ii]);
             if (grad != NULL){
                 cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,node_minus->gradp,1);
                 cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
@@ -617,12 +625,14 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
     }
 
 //    printf("got through second part \n");
+//    printf("Qh = %G\n",Qh);
     *dt = minh2 / Qh;
 
     double pself = 1.0;
     if (grad != NULL){
         double Qh2 = pow(Qh,2);
         for (size_t jj = 0; jj < du; jj++){
+//            printf("dQ[%zu]=%3.15G\n",jj,dQ[jj]);
             gdt[jj] = -minh2 * dQ[jj] / Qh2;
         }
         struct MCNList * temp = mcn->neigh;
@@ -648,6 +658,258 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
         }
     }
 //    printf("got through last part\n");
+    if (pself < 0){
+        pself = 0.0;
+    }
+    mcnode_set_pself(mcn,pself);
+//    printf("return\n");
+    return mcn;
+}
+
+void mca_upwind_dim(struct MCA * mca, struct MCNode * mcn,
+                    double * x, size_t ngrad,
+                    double minh2, double * Qh, double * dQ, size_t ii,
+                    double * grad)
+{
+    size_t du = mca_get_du(mca);
+    // prepend the - and + nodes.
+    // mcn->neigh points to plus node
+    // mcn->neigh->next points to minus node
+    mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
+    mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
+    struct MCNList * node_plus = mcn->neigh;
+    struct MCNList * node_minus = mcn->neigh->next;
+            
+    double hrel = (minh2/mca->h[ii]);
+
+    double diff = pow(mca->diff[ii*mca->d+ii],2);
+    // general case (also needs further modifications)
+    //diff = cblas_ddot(mca->dw,
+    //                  mca->diff+ii,mca->d,
+    //                  mca->diff+ii,mca->d);
+    double t = pow(mca->minh/mca->h[ii],2);
+        
+    node_minus->p = t * diff/2.0;
+    node_plus->p  = t * diff/2.0;
+
+    if (grad != NULL){
+        cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
+        cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                    node_plus->gradp,1);
+        cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                    node_minus->gradp,1);
+    }
+        
+    *Qh += t*diff;
+        
+    if (mca->drift[ii] > 0){
+        node_plus->p += hrel * mca->drift[ii];
+        *Qh += hrel*mca->drift[ii];
+        if (grad != NULL){
+            cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,node_plus->gradp,1);
+            cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
+        }
+
+    }
+    else{
+        node_minus->p += hrel * (-mca->drift[ii]);
+        *Qh += hrel * (-mca->drift[ii]);
+        if (grad != NULL){
+            cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,node_minus->gradp,1);
+            cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
+        }
+    }    
+
+}
+
+/**********************************************************//**
+    Generate a node that is inside the boundarys and its 
+    transitions
+    
+    \param[in]     mca  - markov chain approximation 
+    \param[in]     time - time
+    \param[in]     x    - current state
+    \param[in]     u    - current control
+    \param[in,out] dt   - output transition time
+    \param[in,out] gdt  - allocated space for gradient of dt
+    \param[in]     grad - flag for specifying whether or not to
+                          compute gradients of transitions with
+                          respect to control (NULL for no)
+    \param[in]     bi   - boundary info
+
+    \return node
+
+    \note 
+    No funny boundary conditions
+**************************************************************/
+struct MCNode *
+mca_reflect_node(struct MCA * mca, double time, double * x,
+                 double * u, double *dt,double * gdt, double *grad,
+                 struct BoundInfo * bi)
+{
+
+
+    assert(mca->dyn != NULL);
+    assert (mca->dw == mca->d);
+
+    struct MCNode * mcn = mcnode_init(mca->d,x);
+    
+    //double * probs = calloc_double(2*mca->d);
+    double * dQ = NULL;
+
+    int res;
+    size_t du = dyn_get_du(mca->dyn);
+    size_t ngrad = 0;
+    if (grad != NULL){
+        ngrad = du;
+        mcnode_init_self_grad(mcn,du);
+            
+        //gprob = malloc_dd(2*mca->d);
+        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+                       mca->gdrift,mca->diff,mca->gdiff);
+        dQ = calloc_double(du);
+
+    }
+    else{
+        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+                       NULL,mca->diff,NULL);
+    }
+
+    assert(res == 0);
+    
+//    printf("got through first part\n");
+    /* printf("this node is reflecting "); */
+    /* dprint(mca->d,x); */
+    double Qh = 0.0;
+    double minh2 = pow(mca->minh,2);
+    double hrel;
+    for (size_t ii = 0; ii < mca->d; ii++){
+        //printf("ii=%zu\n",ii);
+        int on_bound = bound_info_onbound_dim(bi,ii);
+
+        if (on_bound == 0){
+            if (x[ii] <= -2.0){
+                printf("STOP!\n");
+                exit(1);
+            }
+//            printf("before\n");
+            mca_upwind_dim(mca,mcn,x,ngrad,minh2,&Qh,dQ,ii,grad);
+//            printf("after\n");
+            /* printf("point not on boundary, total neighbors are %zu\n", */
+            /*        mcnode_get_n(mcn)); */
+        }
+        else{
+            // general case needs modification
+            double diff = pow(mca->diff[ii*mca->d+ii],2);
+            double t = pow(mca->minh/mca->h[ii],2);
+            Qh += t*diff;
+            hrel = (minh2/mca->h[ii]);
+            int reflect = bound_info_reflect(bi);
+            assert (reflect == 1);
+            int reflect_dir = bound_info_reflect_dim_dir(bi,ii);
+            //printf("before\n");
+            if (reflect_dir == -1){ // just do right side poition
+                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
+                if (x[ii] + mca->h[ii] > 2.0){
+                    printf("stop please!\n");
+                    exit(1);
+                }
+                struct MCNList * node_plus = mcn->neigh;
+                node_plus->p  = t * diff/2.0;
+
+                if (grad != NULL){
+                    cblas_daxpy(du,2.0*t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                                dQ,1);
+                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                                node_plus->gradp,1);
+                }
+                if (mca->drift[ii] > 0){
+                    node_plus->p += hrel * mca->drift[ii];
+                    Qh += hrel*mca->drift[ii];
+                    if (grad != NULL){
+                        cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,
+                                    node_plus->gradp,1);
+                        cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
+                    }
+                }
+                else{
+                    Qh += hrel * (-mca->drift[ii]);
+                    if (grad != NULL){
+                        cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
+                    }
+                }
+            }
+            else{ // just do left side portion
+                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
+                if (x[ii] - mca->h[ii] < -2.0){
+                    printf("stop!\n");
+                    exit(1);
+                }
+                struct MCNList * node_minus = mcn->neigh;
+                node_minus->p  = t * diff/2.0;
+                if (grad != NULL){
+                    cblas_daxpy(du,2.0*t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                                dQ,1);
+                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                                node_minus->gradp,1);
+                }
+                if (mca->drift[ii] < 0){
+                    node_minus->p += hrel * (-mca->drift[ii]);
+                    Qh += hrel * (-mca->drift[ii]);
+                    if (grad != NULL){
+                        cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,
+                                    node_minus->gradp,1);
+                        cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
+                    }
+                }
+                else{
+                    Qh += hrel*mca->drift[ii];
+                    if (grad != NULL){
+                        cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
+                    }
+                }
+            }
+            //printf("after\n");
+        }
+    }
+
+//    printf("got through second part \n");
+//    printf("Qh = %G\n",Qh);
+    *dt = minh2 / Qh;
+
+    double pself = 1.0;
+    if (grad != NULL){
+        double Qh2 = pow(Qh,2);
+        for (size_t jj = 0; jj < du; jj++){
+//            printf("dQ[%zu]=%3.15G\n",jj,dQ[jj]);
+            gdt[jj] = -minh2 * dQ[jj] / Qh2;
+        }
+        struct MCNList * temp = mcn->neigh;
+        while (temp != NULL){
+            for (size_t jj = 0; jj < du; jj++){
+                temp->gradp[jj] = (Qh * temp->gradp[jj] - dQ[jj]*temp->p)/Qh2;
+            }
+            temp->p /= Qh;
+            pself -= temp->p;
+            
+            cblas_daxpy(du,-1.0,temp->gradp,1,mcn->gpself,1);
+            
+            temp = temp->next; 
+        }
+        free(dQ); dQ = NULL;
+    }
+    else{
+        struct MCNList * temp = mcn->neigh;
+        while (temp != NULL){
+            temp->p /= Qh;
+            pself -= temp->p;
+            temp = temp->next; 
+        }
+    }
+//    printf("got through last part\n");
+    if (pself < 0){
+        pself = 0.0;
+    }
     mcnode_set_pself(mcn,pself);
 //    printf("return\n");
     return mcn;
@@ -676,25 +938,39 @@ mca_get_node(struct MCA * mca, double time, double * x,
 
     *bi = boundary_type(mca->bound,time,x);
     struct MCNode * mcn = NULL;
+    
 
-    printf("get node\n");
+//    printf("get node\n"); dprint(mca->d, x);
     int onbound = bound_info_onbound(*bi);
-    printf("onbound = %d\n",onbound);
+//    printf("onbound = %d\n",onbound);
+    /* if (x[1] < -2.0){ */
+    /*     printf("what!\n"); */
+    /*     if (onbound == 0){ */
+    /*         printf("get node\n"); dprint(mca->d, x); */
+    /*         printf("onbound = %d\n",onbound); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
     if (onbound == 0){
         mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad);
     }
     else{
         int absorb = bound_info_absorb(*bi);
-        printf("absorb = %d\n",absorb);
+        //      printf("absorb = %d\n",absorb);
         if (absorb == 1){
             *dt = 0;
+            if (gdt != NULL){
+                for (size_t ii = 0; ii < mca->du; ii++){
+                    gdt[ii] = 0.0;
+                }
+            }
             mcn = mca_outbound_node(mca,time,x);            
         }
         else{
             int reflect = bound_info_reflect(*bi);
             if (reflect != 0){
-                assert (1 == 0);
-                //mcn = mca_reflect_node(mca,time,x,u,dt,gdt,grad,*bi);
+//                assert (1 == 0);
+                mcn = mca_reflect_node(mca,time,x,u,dt,gdt,grad,*bi);
             }
             else{
                 int period = bound_info_period(*bi);
@@ -737,11 +1013,14 @@ mca_expectation(struct MCA * mca, double time,
                 void * arg, struct BoundInfo ** bi, double * grad)
 {
 
-    printf("compute expectation\n");
+//    printf("compute expectation\n");
     struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,bi,grad);
+
+//    printf("before onbound=%zu ",bound_info_onbound(*bi)); dprint(mca->d, x);
     double val = mcnode_expectation(mcn,f,arg,grad);
+//    printf("after\n");
     mcnode_free(mcn); mcn = NULL;
-    printf("computed\n");
+//    printf("computed\n");
     return val;
 }
 

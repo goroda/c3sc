@@ -492,6 +492,22 @@ int bound_info_onbound(const struct BoundInfo * bi)
 }
 
 /**********************************************************//**
+    Return 0 if dimension dim is not on boundary or 
+    1 if in an obstacle or this dimension is on a boundary
+**************************************************************/
+int bound_info_onbound_dim(const struct BoundInfo * bi,size_t dim)
+{
+    if (bi->in_obstacle > -1){
+        return 1;
+    }
+    if (bi->br[dim] != IN){
+        return 1;
+    }
+    
+    return 0;
+}
+
+/**********************************************************//**
     Return 0 if not on boundary
 **************************************************************/
 int bound_info_absorb(const struct BoundInfo * bi)
