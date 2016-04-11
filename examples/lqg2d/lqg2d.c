@@ -18,7 +18,7 @@ void print_code_usage (FILE * stream, int exit_code)
     fprintf(stream,
             " -h --help      Display this usage information.\n"
             " -d --directory Output directory (defaults to .)\n"
-            " -n --nodes     Number of nodes (defaults to 10)\n"
+            " -n --nodes     Number of nodes (defaults to 20)\n"
             " -a --lbu       Lower bound of control (default -1.0)\n"
             " -b --ubu       Upper bound of control (default 1.0)\n"
             " -r --diff1     Size of diffusion for x (default 1.0)\n"
@@ -115,8 +115,8 @@ void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
     free(ytest); ytest = NULL;
 }
 
-int f1(double t, double * x, double * u, double * out, double * jac,
-       void * args)
+int f1(double t, double * x, double * u, double * out,
+       double * jac, void * args)
 {
     (void)(t);
     (void)(args);
@@ -263,7 +263,7 @@ int main(int argc, char * argv[])
 
     char * dirout = ".";
     int verbose = 0;
-    size_t N = 10;
+    size_t N = 20;
     size_t niter = 100;
     double lbu[1] = {-1.0};
     double ubu[1] = {1.0};
@@ -317,8 +317,9 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_relftol(opt,1e-9);
-    c3opt_set_gtol(opt,1e-12);
+    c3opt_set_absxtol(opt,1e-8);
+    c3opt_set_relftol(opt,1e-8);
+    c3opt_set_gtol(opt,1e-10);
     c3opt_set_verbose(opt,0);
     
     double beta = 0.1;
@@ -374,7 +375,6 @@ int main(int argc, char * argv[])
         fprintf(stderr, "cat: can't open %s\n", filename);
         return 0;
     }
-
     print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
 

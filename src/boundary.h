@@ -3,8 +3,9 @@
 
 enum EBTYPE {
     NONE=0,
-    ABSORB=1, 
-    PERIODIC=2
+    ABSORB=1,
+    PERIODIC=2,
+    REFLECT=3
 };
 
 struct Boundary;
@@ -33,5 +34,8 @@ int bound_info_absorb(const struct BoundInfo *);
 int bound_info_period(const struct BoundInfo *);
 int bound_info_period_dim_dir(const struct BoundInfo *,size_t);
 double bound_info_period_xmap(const struct BoundInfo *,size_t);
+int bound_info_reflect(const struct BoundInfo *);
+int bound_info_reflect_dim_dir(const struct BoundInfo *,size_t);
+
 int bound_info_get_in_obstacle(const struct BoundInfo *);
 #endif

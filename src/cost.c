@@ -106,7 +106,7 @@ void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
     \param[in]     verbose - verbosity level for approximation
 
     \note
-    c->bds and c->cost should be NULL
+    c->cost should be NULL
 **************************************************************/
 void cost_approx(struct Cost * c,
                  double (*f)(double *, void *),
@@ -118,73 +118,43 @@ void cost_approx(struct Cost * c,
     assert (c->N != NULL);
     assert (c->x != NULL);
 
-    
-    struct LinElemExpAopts ** aopts = NULL;
-    aopts = malloc(c->d*sizeof(struct LinElemExpAopts *));
-    assert (aopts != NULL);
+    struct C3Approx * c3a = c3approx_create(CROSS,c->d,c->bds->lb,c->bds->ub);
+    c3approx_init_lin_elem(c3a);
+    c3approx_set_lin_elem_fixed(c3a,c->N,c->x);
 
-    for (size_t ii = 0; ii < c->d;ii++){
-        aopts[ii] = lin_elem_exp_aopts_alloc(c->N[ii], c->x[ii]);
-    }
-
-    struct FtApproxArgs * fapp = NULL;
-    struct FiberOptArgs * fopt = NULL;
-    fapp = ft_approx_args_create_le2(c->d,aopts); 
+    size_t init_rank = 3;
+    c3approx_init_cross(c3a,init_rank,verbose);
+    c3approx_set_fiber_opt_brute_force(c3a,c->N,c->x);
     
-    struct c3Vector ** c3v = c3vector_alloc_array(c->d);
+    c3approx_set_cross_tol(c3a,1e-7);
+    c3approx_set_cross_maxiter(c3a,10);
+    c3approx_set_round_tol(c3a,1e-10);
+    c3approx_set_adapt_kickrank(c3a,2);
     size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->d; ii++){
-        c3v[ii] = c3vector_alloc(c->N[ii],c->x[ii]);
-        if (c->N[ii] < minN){
-            minN = c->N[ii];
-        }
-        //       dprint(c->N[ii],c->x[ii]);
+        if (c->N[ii] < minN){ minN = c->N[ii];}
     }
-    fopt = fiber_opt_args_bf(c->d,c3v);
+    c3approx_set_adapt_maxiter(c3a,(minN-3)/2);
 
-    struct FtCrossArgs fca;
-    ft_cross_args_init(&fca);
-    fca.dim = c->d;
-    fca.ranks = calloc_size_t(c->d+1);
-    for (size_t ii = 0; ii < c->d+1; ii++){
-        fca.ranks[ii] = 3;
-    }
-    fca.ranks[0] = 1;
-    fca.ranks[c->d] = 1;
-    fca.epsilon = 1e-7;
-    fca.maxiter = 10;
-    fca.epsround = 1e-10;
-    fca.kickrank = 2;
-    fca.maxiteradapt = (minN-3)/(fca.kickrank);
-    assert( (3 + fca.kickrank*fca.maxiteradapt) <= minN);
-    fca.verbose = verbose;
-    fca.optargs = fopt;
-
+    // determine starting nodes
     double ** start = malloc_dd(c->d);
-
+    size_t * nstart = calloc_size_t(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
+        nstart[ii] = 3;
         assert (c->N[ii] > 5);
         size_t mid = c->N[ii]/2;
-        //printf("mid = %zu\n",mid);
-        start[ii] = calloc_double(3);
+        start[ii] = calloc_double(nstart[ii]);
         start[ii][0] = c->x[ii][1];
         start[ii][1] = c->x[ii][mid];
         start[ii][2] = c->x[ii][c->N[ii]-2];
-        //printf("start is "); dprint(3,start[ii]);
     }
+    c3approx_set_start(c3a,nstart,start);
 
-    c->cost = function_train_cross(f,args,c->bds,
-                                   start,&fca,fapp);
+    c->cost = c3approx_do_cross(c3a,f,args);
     
-    for (size_t ii = 0; ii < c->d; ii++){
-        lin_elem_exp_aopts_free(aopts[ii]); aopts[ii] = NULL;
-    }
-    free(aopts); aopts = NULL;
-    c3vector_free_array(c3v,c->d); c3v = NULL;
-    ft_approx_args_free(fapp); fapp = NULL;
-    free(fca.ranks); fca.ranks = NULL;
-    free_dd(c->d,start);
-    fiber_opt_args_free(fopt); fopt = NULL;
+    free(nstart); nstart = NULL;
+    free_dd(c->d,start); start = NULL;
+    c3approx_destroy(c3a); c3a = NULL;
 }
 
 /**********************************************************//**
@@ -231,24 +201,20 @@ int cost_eval(struct Cost * cost,
 /**********************************************************//**
     Black box (bb) interface to cost function evaluation
 
-    \param[in]     N    - number of points at which to evaluate
     \param[in]     t    - times of points
     \param[in]     x    - locations of points
-    \param[in,out] out  - allocated evaluation space
     \param[in]     args - pointer to cost function structure
+
+    \return value
 **************************************************************/
-void cost_eval_bb(size_t N, double * t, double ** x,
-                  double * out, void * args)
+double cost_eval_bb(double t,double * x,void * args)
 {
     struct Cost * c = args;
-    int res;
-    for (size_t ii = 0; ii < N; ii++)
-    {
-        res = cost_eval(c,t[ii],x[ii],out+ii);
-        assert (res == 0);
-    }
+    double out;
+    int res = cost_eval(c,t,x,&out);
+    assert (res == 0);
+    return out;
 }
-
 
 /**********************************************************//**
     Evaluate a cost function at two neighboring points

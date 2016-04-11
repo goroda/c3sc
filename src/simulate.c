@@ -458,15 +458,17 @@ int trajectory_step(struct Trajectory * traj,
                                 dyn,space,space+d);
     }
     else if (strcmp(method,"markov-chain") == 0){
-        struct MCA * mm = args;
-        double no = *(double *)noise;
-        double * uu = control_getu_ref(u);
+        (void)(args);
+        assert (1 == 0);
+        /* struct MCA * mm = args; */
+        /* double no = *(double *)noise; */
+        /* double * uu = control_getu_ref(u); */
 
-        s = state_alloc();
-        state_init_zero(s,d,t);
-        double * newx = state_getx_ref(s);
-        mca_step(mm,t,x,uu,no,&dt,newx);
-        s->t = t+dt;
+        /* s = state_alloc(); */
+        /* state_init_zero(s,d,t); */
+        /* double * newx = state_getx_ref(s); */
+        /* mca_step(mm,t,x,uu,no,&dt,newx); */
+        /* s->t = t+dt; */
     }
     else{
         return 1;

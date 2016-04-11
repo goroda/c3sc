@@ -13,7 +13,7 @@
 #include "tensmarkov.h"
 
 
-static const size_t dglob = 5;
+#define dglob 5
 
 void Test_mcnode_alloc(CuTest * tc)
 {
@@ -31,7 +31,7 @@ void Test_mcnode_init(CuTest * tc)
     printf("Testing Function: mcnode_init \n");
 
     struct MCNode * mcn = NULL;
-    double x[5] = {1.0,2.0,3.0,4.0,5.0};
+    double x[dglob] = {1.0,2.0,3.0,4.0,5.0};
     mcn = mcnode_init(dglob,x);
 
     size_t dg = mcnode_get_d(mcn);
@@ -44,179 +44,50 @@ void Test_mcnode_init(CuTest * tc)
     double pself = mcnode_get_pself(mcn);
     CuAssertDblEquals(tc,1.0,pself,1e-15);
 
-    size_t N = mcnode_get_N(mcn);
-    CuAssertIntEquals(tc,0,N);
-
-    struct MCNode ** neigh = mcnode_get_neighbors(mcn);
-    CuAssertIntEquals(tc,1,neigh==NULL);
-
-    double * p = mcnode_get_pref(mcn);
-    CuAssertIntEquals(tc,1,p==NULL);
-
     mcnode_free(mcn); mcn = NULL;
 }
 
-void Test_mcnode_hspace(CuTest * tc)
+void Test_mcnode_prepend(CuTest * tc)
 {
-    printf("Testing Function: mcnode_add_neighbors_hspace (with no BondaryInfo)\n");
+    printf("Testing Function: mcnlist_prepend (with no BondaryInfo)\n");
 
 
     struct MCNode * mcn = NULL;
-    double x[5] = {1.0,2.0,3.0,4.0,5.0};
-    mcn = mcnode_init(dglob,x);
-
-    double h[5] = {1.0,0.5,0.25,0.25,0.2};
+    double x[dglob] = {1.0,2.0,3.0,4.0,5.0};
+    double h[dglob] = {1.0,0.5,0.25,0.25,0.2};
     double pselfin = 0.2;
-    double probs[10] = {0.2,0.2,0.2,0.1,0.1,
-                        0.0,0.0,0.0,0.0,0.0};
+    double probs[dglob] = {0.2,0.2,0.2,0.1,0.1};
 
-    mcnode_add_neighbors_hspace(mcn,h,pselfin,probs,NULL);
-
-    double pself = mcnode_get_pself(mcn);
-    CuAssertDblEquals(tc,pselfin,pself,1e-15);
-
-    size_t N = mcnode_get_N(mcn);
-    CuAssertIntEquals(tc,2*dglob,N);
-
-    struct MCNode ** neigh = mcnode_get_neighbors(mcn);
-    for (size_t ii = 0; ii < dglob; ii++){
-        double * y = mcnode_get_xref(neigh[2*ii]);
-        double * z = mcnode_get_xref(neigh[2*ii+1]);
-        for (size_t jj = 0; jj < dglob;jj++){
-            if (jj == ii){
-                CuAssertDblEquals(tc,x[ii]-h[ii],y[ii],1e-15);
-                CuAssertDblEquals(tc,x[ii]+h[ii],z[ii],1e-15);
-            }
-            else{
-                CuAssertDblEquals(tc,x[jj],y[jj],1e-15);
-                CuAssertDblEquals(tc,x[jj],z[jj],1e-15);
-            }
-        }
-    }
-    double * p = mcnode_get_pref(mcn);
-    double diff = norm2diff(p,probs,2*dglob);
-    CuAssertDblEquals(tc,0.0,diff,1e-15);
-
-    mcnode_free(mcn); mcn = NULL;
-}
-
-void Test_mcnode_hspace2(CuTest * tc)
-{
-    printf("Testing Function: mcnode_add_neighbors_hspace (with absorb BondaryInfo)\n");
-
-
-    struct MCNode * mcn = NULL;
-    double x[5] = {1.0,2.0,3.0,4.0,5.0};
     mcn = mcnode_init(dglob,x);
+    mcnode_set_pself(mcn,pselfin);
 
-    double h[5] = {1.0,0.5,0.25,0.25,0.2};
-    double pselfin = 0.2;
-    double probs[10] = {0.2,0.2,0.2,0.1,0.1,
-                        0.0,0.0,0.0,0.0,0.0};
-
-    struct BoundInfo * bi = bound_info_alloc(dglob);
-    int res;
+    struct MCNList * neigh = mcnode_get_neigh(mcn);
     for (size_t ii = 0; ii < dglob;ii++){
-        res = bound_info_set_dim(bi,IN,NONE,ii);
-        CuAssertIntEquals(tc,0,res);
+        mcnlist_prepend(&neigh,ii,x[ii]-h[ii],probs[ii],NULL);
     }
-
-    double mapval = 0.12345;
-    size_t mapind = 2;
-    res = bound_info_set_dim(bi,LEFT,PERIODIC,mapind);
-    CuAssertIntEquals(tc,1,res);
-
-    bound_info_set_xmap_dim(bi,mapval,mapind);
-    
-    mcnode_add_neighbors_hspace(mcn,h,pselfin,probs,bi);
 
     double pself = mcnode_get_pself(mcn);
     CuAssertDblEquals(tc,pselfin,pself,1e-15);
 
-    size_t N = mcnode_get_N(mcn);
-    CuAssertIntEquals(tc,2*dglob,N);
-
-    //mcnode_print(mcn,stdout,3);
-    struct MCNode ** neigh = mcnode_get_neighbors(mcn);
-    for (size_t ii = 0; ii < dglob; ii++){
-        double * y = mcnode_get_xref(neigh[2*ii]);
-        double * z = mcnode_get_xref(neigh[2*ii+1]);
-        for (size_t jj = 0; jj < dglob;jj++){
-            if (jj == ii){
-                if (ii != mapind){
-                    CuAssertDblEquals(tc,x[ii]-h[ii],y[ii],1e-15);
-                    CuAssertDblEquals(tc,x[ii]+h[ii],z[ii],1e-15);
-                }
-                else{
-                    CuAssertDblEquals(tc,mapval-h[ii],y[ii],1e-15);
-                    CuAssertDblEquals(tc,x[ii]+h[ii],z[ii],1e-15);
-                }
-            }
-            else{
-                CuAssertDblEquals(tc,x[jj],y[jj],1e-15);
-                CuAssertDblEquals(tc,x[jj],z[jj],1e-15);
-            }
-        }
-    }
-    double * p = mcnode_get_pref(mcn);
-    double diff = norm2diff(p,probs,2*dglob);
-    CuAssertDblEquals(tc,0.0,diff,1e-15);
-
-    bound_info_free(bi); bi = NULL;
-    mcnode_free(mcn); mcn = NULL;
-}
-
-void Test_mcnode_gradients(CuTest * tc)
-{
-    printf("Testing Function: mcnode_add_gradients\n");
-
-    struct MCNode * mcn = NULL;
-    double x[5] = {1.0,2.0,3.0,4.0,5.0};
-    mcn = mcnode_init(dglob,x);
-
-    double h[5] = {1.0,0.5,0.25,0.25,0.2};
-    double pselfin = 0.2;
-    double probs[10] = {0.2,0.2,0.2,0.1,0.1,
-                        0.0,0.0,0.0,0.0,0.0};
-
-    size_t du = 4;
-    double ** gprob = malloc_dd(2*dglob);
-    for (size_t ii = 0; ii < 2*dglob; ii++){
-        gprob[ii] = calloc_double(du);
-        for (size_t jj = 0; jj < du; jj++){
-            gprob[ii][jj] = randu();
-        }
-    }
-    double * gprobself = calloc_double(du);
-    for (size_t jj = 0; jj < du; jj++){
-        gprobself[jj] = randu();
+    struct MCNList * temp = mcnode_get_neigh(mcn);
+    int on = 4;
+    while (temp != NULL){
+        size_t dir = mcnlist_get_dir(temp);
+        double xval = mcnlist_get_val(temp);
+        CuAssertIntEquals(tc,on,dir);
+        CuAssertDblEquals(tc,x[on]-h[on],xval,1e-15);
+        temp = mcnlist_get_next(temp);
     }
     
-
-    mcnode_add_neighbors_hspace(mcn,h,pselfin,probs,NULL);
-    mcnode_add_gradients(mcn,2*dglob,du,gprobself,gprob);
-
-    size_t ddu = mcnode_get_du(mcn);
-    CuAssertIntEquals(tc,du,ddu);
-    double * gpself = mcnode_get_gpself(mcn);
-    CuAssertIntEquals(tc,1,gpself!=NULL);
-
-    double ** gpn = mcnode_get_gp(mcn);
-    CuAssertIntEquals(tc,1,gpn!=NULL);
-
-    CuAssertIntEquals(tc,1,0);
     mcnode_free(mcn); mcn = NULL;
 }
 
-void expfunc(size_t Nvals, double * times, double ** states, double * out, void * arg)
+double expfunc(double t, double * x, void * args)
 {
-    (void)(times);
-    (void)(arg);
-
-    for (size_t ii = 0; ii < Nvals; ii++){
-        double * x = states[ii];
-        out[ii] = x[1]*x[2] + sin(x[3]);
-    }
+    (void)(t);
+    (void)(args);
+    double out = x[0] * x[1] + x[3] * sin(x[1]);
+    return out;
 }
 
 void Test_mcnode_expectation(CuTest * tc)
@@ -225,16 +96,12 @@ void Test_mcnode_expectation(CuTest * tc)
 
     struct MCNode * mcn = NULL;
     double x[5] = {1.0,2.0,3.0,4.0,5.0};
-    mcn = mcnode_init(dglob,x);
-
     double h[5] = {1.0,0.5,0.25,0.25,0.2};
     double pselfin = 0.2;
-    double probs[10] = {0.2,0.2,0.2,0.1,0.1,
-                        0.0,0.0,0.0,0.0,0.0};
-
+    double probs[5] = {0.2,0.2,0.2,0.1,0.1};
     size_t du = 4;
-    double ** gprob = malloc_dd(2*dglob);
-    for (size_t ii = 0; ii < 2*dglob; ii++){
+    double ** gprob = malloc_dd(dglob);
+    for (size_t ii = 0; ii < dglob; ii++){
         gprob[ii] = calloc_double(du);
         for (size_t jj = 0; jj < du; jj++){
             gprob[ii][jj] = randu();
@@ -244,18 +111,35 @@ void Test_mcnode_expectation(CuTest * tc)
     for (size_t jj = 0; jj < du; jj++){
         gprobself[jj] = randu();
     }
+
     
-    mcnode_add_neighbors_hspace(mcn,h,pselfin,probs,NULL);
-    mcnode_add_gradients(mcn,2*dglob,du,gprobself,gprob);
+    mcn = mcnode_init(dglob,x);
+    mcnode_set_pself(mcn,pselfin);
+    mcnode_set_gradient(mcn,du,gprobself);
+
+
+    for (size_t ii = 0; ii < dglob; ii++){
+        mcnode_prepend_neigh(mcn,ii,x[ii]-h[ii],probs[ii],gprob[ii]);
+    }
     
     double avg = mcnode_expectation(mcn,expfunc,NULL,NULL);
-    double as = 0.0;
-//    as += 
     
-    CuAssertIntEquals(tc,1,0);
+    double xtemp[5];
+    memmove(xtemp,x,5*sizeof(double));
+    double as = 0.0;
+    for (size_t ii = 0; ii < 5; ii++){
+        xtemp[ii] = x[ii] - h[ii];
+        as += probs[ii] * expfunc(0,xtemp,NULL);
+        xtemp[ii] = x[ii];
+    }
+    as += pselfin * expfunc(0,x,NULL);
+            
+    CuAssertDblEquals(tc,as,avg,1e-14);
+    
+    free_dd(dglob,gprob);
+    free(gprobself);
     mcnode_free(mcn); mcn = NULL;
 }
-
 
 CuSuite * MCAGetSuite()
 {
@@ -264,8 +148,7 @@ CuSuite * MCAGetSuite()
     CuSuite * suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, Test_mcnode_alloc);
     SUITE_ADD_TEST(suite, Test_mcnode_init);
-    SUITE_ADD_TEST(suite, Test_mcnode_hspace);
-    SUITE_ADD_TEST(suite, Test_mcnode_hspace2);
-    SUITE_ADD_TEST(suite, Test_mcnode_gradients);
+    SUITE_ADD_TEST(suite, Test_mcnode_prepend);
+    SUITE_ADD_TEST(suite, Test_mcnode_expectation);
     return suite;
 }

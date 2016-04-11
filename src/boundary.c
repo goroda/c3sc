@@ -29,7 +29,7 @@ struct ExternalBoundary
 
     \param[in] left  - left edge
     \param[in] right - right edge
-    \param[in] type  - "absorb" or "periodic"
+    \param[in] type  - "absorb","periodic","reflect"
 
     \return boundary
 **************************************************************/
@@ -48,6 +48,9 @@ external_boundary_alloc(double left, double right, char * type)
     }
     else if (strcmp(type,"periodic") == 0){
         db->type = PERIODIC;
+    }
+    else if (strcmp(type,"reflect") == 0){
+        db->type = REFLECT;
     }
     else{
         fprintf(stderr, "External boundary of type %s is unknown\n",type);
@@ -110,8 +113,10 @@ void external_boundary_set_type(struct ExternalBoundary * db, char * type)
         db->type = ABSORB;
     }
     else if (strcmp(type,"periodic") == 0){
-
         db->type = PERIODIC;
+    }
+    else if (strcmp(type,"reflect") == 0){
+        db->type = REFLECT;
     }
     else{
         fprintf(stderr, "External boundary of type %s is unknown\n",type);
@@ -336,7 +341,6 @@ void boundary_add_obstacle(struct Boundary * bound, double * center, double * le
 **************************************************************/
 void boundary_external_set_type(struct Boundary * b,size_t dim,char * type)
 {
-
     external_boundary_set_type(b->eb[dim],type);
 }
 
@@ -348,7 +352,6 @@ struct BoundInfo
     double * xmap; // equivalence mappigns for periodic boundaries
     int absorb_overall; // if shared edge
     int in_obstacle;
-
 };
 
 /**********************************************************//**
@@ -376,7 +379,6 @@ struct BoundInfo * bound_info_alloc(size_t d)
     }
     bi->absorb_overall = 0;
     bi->in_obstacle = -1;
-
     return bi;
 }
 
@@ -412,9 +414,10 @@ int bound_info_set_dim(struct BoundInfo * bi, enum BOUNDRESULT br,
     else if (type == PERIODIC){
         return 1;
     }
-    else if (type != NONE){
+    else if ((type != NONE) & (type != REFLECT)){
         return -1;
     }
+
     return 0;
 }
 /**********************************************************//**
@@ -500,7 +503,7 @@ int bound_info_absorb(const struct BoundInfo * bi)
 }
 
 /**********************************************************//**
-    Return 0 if not on boundary
+    Return 0 if not a periodic boundary
 **************************************************************/
 int bound_info_period(const struct BoundInfo * bi)
 {
@@ -515,7 +518,7 @@ int bound_info_period(const struct BoundInfo * bi)
 }
 
 /**********************************************************//**
-    Return 0 if not on boundary, -1 if on left boundary, 1 if on right
+    Return 0 if periodic boundary, -1 if on left boundary, 1 if on right
 **************************************************************/
 int bound_info_period_dim_dir(const struct BoundInfo * bi,size_t dim)
 {
@@ -536,6 +539,37 @@ int bound_info_period_dim_dir(const struct BoundInfo * bi,size_t dim)
 double bound_info_period_xmap(const struct BoundInfo * bi, size_t dim)
 {
     return bi->xmap[dim];
+}
+
+/**********************************************************//**
+    Return 0 if not a reflective boundary
+**************************************************************/
+int bound_info_reflect(const struct BoundInfo * bi)
+{
+    for (size_t ii = 0; ii < bi->d; ii++){
+        if (bi->br[ii] != IN){
+            if (bi->type[ii] == REFLECT){
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/**********************************************************//**
+    Return 0 if not reflect boundary, -1 if on left boundary, 1 if on right
+**************************************************************/
+int bound_info_reflect_dim_dir(const struct BoundInfo * bi,size_t dim)
+{
+    if (bi->type[dim] == REFLECT){
+        if (bi->br[dim] == LEFT){
+            return -1;
+        }
+        else{
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /**********************************************************//**
