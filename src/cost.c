@@ -126,9 +126,9 @@ void cost_approx(struct Cost * c,
     c3approx_init_cross(c3a,init_rank,verbose);
     c3approx_set_fiber_opt_brute_force(c3a,c->N,c->x);
     
-    c3approx_set_cross_tol(c3a,1e-10);
+    c3approx_set_cross_tol(c3a,1e-5);
     c3approx_set_cross_maxiter(c3a,10);
-    c3approx_set_round_tol(c3a,1e-10);
+    c3approx_set_round_tol(c3a,1e-5);
     c3approx_set_adapt_kickrank(c3a,5);
     size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->d; ii++){
@@ -184,19 +184,42 @@ int cost_eval(struct Cost * cost,
 //    dprint(cost->bds->dim, cost->bds->ub);
 //    printf("x is \n");
 //    dprint(cost->bds->dim,x);
+
     int res = c3sc_check_bounds(cost->bds->dim,
                                 cost->bds->lb,
                                 cost->bds->ub,
                                 x);
+
+    double * xuse = NULL;
+    if (res != 0){
+        xuse = calloc_double(cost->bds->dim);
+        for (size_t ii = 0; ii < cost->bds->dim; ii++){
+            if (x[ii] < cost->bds->lb[ii]){
+                xuse[ii] = cost->bds->lb[ii];
+            }
+            else if (x[ii] > cost->bds->ub[ii]){
+                xuse[ii] = cost->bds->ub[ii];
+            }
+            else{
+                xuse[ii] = x[ii];
+            }
+        }
+    }
+    else{
+        xuse = x;
+    }
 //    printf("res = %d\n",res);
 
+    /* if (res != 0){ */
+    /*     printf("point is not in bounds for cost evaluation \n"); */
+    /*     dprint(cost->bds->dim,x); */
+    /*     return res; */
+    /* } */
+    
+    *eval = function_train_eval(cost->cost,xuse);
     if (res != 0){
-        printf("point is not in bounds for cost evaluation \n");
-        dprint(cost->bds->dim,x);
-        return res;
+        free(xuse); xuse = NULL;
     }
-
-    *eval = function_train_eval(cost->cost,x);
 
     return 0;
     

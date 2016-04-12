@@ -37,7 +37,7 @@ void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * l
     fprintf(fp2,"x y f\n");
     double * xtest = linspace(lb[0],ub[0],N1);
     double * ytest = linspace(lb[1],ub[1],N2);
-
+//    printf("lb[0] = %G\n",lb[0]);
     double pt3[2];
     double v2;
     for (size_t zz = 0; zz < N1; zz++){
@@ -311,16 +311,16 @@ int main(int argc, char * argv[])
     size_t dx = 2;
     size_t dw = 2;
     size_t du = 1;
-    double lb[2] = {-2.0, -2.0};
-    double ub[2] = {2.0, 2.0};
+    double lb[2] = {-1.0, -1.0};
+    double ub[2] = {1.0, 1.0};
     size_t Narr[2] = {N, N};
 
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-14);
-    c3opt_set_relftol(opt,1e-20);
-    c3opt_set_gtol(opt,1e-20);
+    c3opt_set_absxtol(opt,1e-10);
+    c3opt_set_relftol(opt,1e-10);
+    c3opt_set_gtol(opt,1e-10);
     c3opt_set_verbose(opt,0);
     
     double beta = 0.1;
@@ -332,7 +332,7 @@ int main(int argc, char * argv[])
     c3sc_set_external_boundary(sc,1,"reflect");
     double center[2] = {0.0,0.0};
     double width[2] = {0.5,0.5};
-    c3sc_add_obstacle(sc,center,width);
+//    c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);

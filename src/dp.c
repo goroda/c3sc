@@ -440,6 +440,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
     double out;
     int absorb = bound_info_absorb(bi);
     if (absorb == 1){
+        printf("MASSIVE ERROR!\n");
         int in_obstacle = bound_info_get_in_obstacle(bi);
         if (in_obstacle < 0){
             int res = dp->boundcost(t,x,&out);
@@ -552,7 +553,6 @@ double dpih_rhs_opt_bb(size_t du, double * u, double * grad, void * arg)
 **************************************************************/
 double dpih_rhs_opt_cost(double * x,void * dp)
 {
-
     /* if (x[2] < -1.6){ */
     /*     if (x[2] > -2.0){ */
     /*         printf("shouldn't be calling this\n"); */
@@ -575,13 +575,13 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     double val = 0.0;
     struct c3Opt * opt = dpx.dp->opt;
     c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
-
+    size_t dx = mca_get_dx(dpx.dp->mm);
 //    printf("before = ");
 //    dprint(dx,x);
     int res = c3opt_minimize(opt,ustart,&val);
     if (res < -1){
         printf("max iter reached in optimization res=%d\n",res);
-        size_t dx = mca_get_dx(dpx.dp->mm);
+
         printf("x = ");
         dprint(dx,x);
         dprint(du,ustart);
@@ -600,6 +600,9 @@ double dpih_rhs_opt_cost(double * x,void * dp)
     /*     printf("x = "); dprint(2,x); */
     /*     printf("u = %3.15G\n",ustart[0]); */
     /* } */
+
+    /* printf("x = "); dprint(dx, x); */
+    /* printf("optimal u = %G\n",ustart[0]); */
     free(ustart); ustart = NULL;
     return val;
 }

@@ -9,7 +9,6 @@
 #include "simulate.h"
 #include "util.h"
 
-
 /** \struct Policy
  *  \brief Policy
  *  \var Policy::dx
@@ -39,7 +38,6 @@ struct Policy
     struct FT1DArray * ftc;
 
 };
-
 
 /**********************************************************//**
     Allocate memory for a policy

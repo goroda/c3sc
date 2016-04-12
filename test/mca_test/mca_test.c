@@ -533,7 +533,16 @@ void Test_mca_get_node_reflect(CuTest * tc)
     CuAssertIntEquals(tc,1,reflect);
     int N = mcnode_get_n(mcn);
     CuAssertIntEquals(tc,2,N);
-
+    struct MCNList * temp = mcnode_get_neigh(mcn);
+    double sum_prob = 0.0;
+    while (temp != NULL){
+        size_t dir = mcnlist_get_dir(temp);
+        double val = mcnlist_get_val(temp);
+        double p = mcnlist_get_p(temp);
+//        printf("new pt[%zu] = %G p_trans=%G\n",dir,val,p);
+        sum_prob += p;
+        temp = mcnlist_get_next(temp);
+    }
     /* double p1; // right; */
     /* double p2; // down; */
 
@@ -543,9 +552,35 @@ void Test_mca_get_node_reflect(CuTest * tc)
 
     double p = mcnode_get_pself(mcn);
     CuAssertIntEquals(tc,1,p>=0);
+    sum_prob += p;
+    CuAssertDblEquals(tc,1.0,sum_prob,1e-14);
 //    CuAssertDblEquals(tc,1.0,p,1e-15);
     mcnode_free(mcn);
     bound_info_free(bi);
+
+    // check derivative
+    double gradc[1];
+    double gdt[1];
+    double gradc2[1];
+    double gdt2[1];
+    u[0] = 2.0;
+    struct MCNode * mcn1 = mca_get_node(mca,time,pt,u,&dt,gdt,&bi,gradc);
+    double v1 = mcnode_expectation(mcn1,expfunc,NULL,gradc);
+    bound_info_free(bi);
+    u[0] = u[0]+1e-4;
+    double dt2;
+    struct MCNode * mcn2 = mca_get_node(mca,time,pt,u,&dt2,gdt2,&bi,gradc2);
+    double v2 = mcnode_expectation(mcn2,expfunc,NULL,gradc2);
+    double grad_diff = (v2-v1)/1e-4;
+    double gdt_diff = (dt2-dt)/1e-4;
+    /* printf("%G \n",grad_diff-gradc[0]); */
+    /* printf("%G \n",gdt_diff-gdt[0]); */
+    CuAssertDblEquals(tc,grad_diff,gradc[0],1e-3);
+    CuAssertDblEquals(tc,gdt_diff,gdt[0],1e-3);
+    bound_info_free(bi);
+    mcnode_free(mcn1);
+    mcnode_free(mcn2);
+    
 
     // check non-corner but reflecting point
     pt[0] = 0.4; pt[1] = 2.0;

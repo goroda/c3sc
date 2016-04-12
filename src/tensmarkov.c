@@ -810,15 +810,15 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
             //printf("before\n");
             if (reflect_dir == -1){ // just do right side poition
                 mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
-                if (x[ii] + mca->h[ii] > 2.0){
-                    printf("stop please!\n");
-                    exit(1);
-                }
+                /* if (x[ii] + mca->h[ii] > 2.0){ */
+                /*     printf("stop please!\n"); */
+                /*     exit(1); */
+                /* } */
                 struct MCNList * node_plus = mcn->neigh;
                 node_plus->p  = t * diff/2.0;
 
                 if (grad != NULL){
-                    cblas_daxpy(du,2.0*t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                                 dQ,1);
                     cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                                 node_plus->gradp,1);
@@ -841,14 +841,14 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
             }
             else{ // just do left side portion
                 mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
-                if (x[ii] - mca->h[ii] < -2.0){
-                    printf("stop!\n");
-                    exit(1);
-                }
+                /* if (x[ii] - mca->h[ii] < -2.0){ */
+                /*     printf("stop!\n"); */
+                /*     exit(1); */
+                /* } */
                 struct MCNList * node_minus = mcn->neigh;
                 node_minus->p  = t * diff/2.0;
                 if (grad != NULL){
-                    cblas_daxpy(du,2.0*t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                                 dQ,1);
                     cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
                                 node_minus->gradp,1);
