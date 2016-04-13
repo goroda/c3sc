@@ -723,7 +723,7 @@ void mca_upwind_dim(struct MCA * mca, struct MCNode * mcn,
 }
 
 /**********************************************************//**
-    Generate a node that is inside the boundarys and its 
+    Generate a node that is part of a reflective boundary and its 
     transitions
     
     \param[in]     mca  - markov chain approximation 
@@ -788,15 +788,7 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
         int on_bound = bound_info_onbound_dim(bi,ii);
 
         if (on_bound == 0){
-            if (x[ii] <= -2.0){
-                printf("STOP!\n");
-                exit(1);
-            }
-//            printf("before\n");
             mca_upwind_dim(mca,mcn,x,ngrad,minh2,&Qh,dQ,ii,grad);
-//            printf("after\n");
-            /* printf("point not on boundary, total neighbors are %zu\n", */
-            /*        mcnode_get_n(mcn)); */
         }
         else{
             // general case needs modification
@@ -810,10 +802,6 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
             //printf("before\n");
             if (reflect_dir == -1){ // just do right side poition
                 mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
-                /* if (x[ii] + mca->h[ii] > 2.0){ */
-                /*     printf("stop please!\n"); */
-                /*     exit(1); */
-                /* } */
                 struct MCNList * node_plus = mcn->neigh;
                 node_plus->p  = t * diff/2.0;
 
@@ -841,10 +829,6 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
             }
             else{ // just do left side portion
                 mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
-                /* if (x[ii] - mca->h[ii] < -2.0){ */
-                /*     printf("stop!\n"); */
-                /*     exit(1); */
-                /* } */
                 struct MCNList * node_minus = mcn->neigh;
                 node_minus->p  = t * diff/2.0;
                 if (grad != NULL){
@@ -869,19 +853,14 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
                     }
                 }
             }
-            //printf("after\n");
         }
     }
 
-//    printf("got through second part \n");
-//    printf("Qh = %G\n",Qh);
     *dt = minh2 / Qh;
-
     double pself = 1.0;
     if (grad != NULL){
         double Qh2 = pow(Qh,2);
         for (size_t jj = 0; jj < du; jj++){
-//            printf("dQ[%zu]=%3.15G\n",jj,dQ[jj]);
             gdt[jj] = -minh2 * dQ[jj] / Qh2;
         }
         struct MCNList * temp = mcn->neigh;
@@ -906,12 +885,166 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
             temp = temp->next; 
         }
     }
-//    printf("got through last part\n");
     if (pself < 0){
         pself = 0.0;
     }
     mcnode_set_pself(mcn,pself);
-//    printf("return\n");
+    return mcn;
+}
+
+/**********************************************************//**
+    Generate a node that is part of a periodic boundary and its 
+    transitions
+    
+    \param[in]     mca  - markov chain approximation 
+    \param[in]     time - time
+    \param[in]     x    - current state
+    \param[in]     u    - current control
+    \param[in,out] dt   - output transition time
+    \param[in,out] gdt  - allocated space for gradient of dt
+    \param[in]     grad - flag for specifying whether or not to
+                          compute gradients of transitions with
+                          respect to control (NULL for no)
+    \param[in]     bi   - boundary info
+
+    \return node
+
+    \note 
+    No funny boundary conditions
+**************************************************************/
+struct MCNode *
+mca_period_node(struct MCA * mca, double time, double * x,
+                 double * u, double *dt,double * gdt, double *grad,
+                 struct BoundInfo * bi)
+{
+
+
+    assert(mca->dyn != NULL);
+    assert (mca->dw == mca->d);
+
+    struct MCNode * mcn = mcnode_init(mca->d,x);
+    
+    //double * probs = calloc_double(2*mca->d);
+    double * dQ = NULL;
+
+    int res;
+    size_t du = dyn_get_du(mca->dyn);
+    size_t ngrad = 0;
+    if (grad != NULL){
+        ngrad = du;
+        mcnode_init_self_grad(mcn,du);
+            
+        //gprob = malloc_dd(2*mca->d);
+        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+                       mca->gdrift,mca->diff,mca->gdiff);
+        dQ = calloc_double(du);
+    }
+    else{
+        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+                       NULL,mca->diff,NULL);
+    }
+
+    assert(res == 0);
+    
+//    printf("got through first part\n");
+    /* printf("this node is reflecting "); */
+    /* dprint(mca->d,x); */
+    double Qh = 0.0;
+    double minh2 = pow(mca->minh,2);
+    double hrel;
+    for (size_t ii = 0; ii < mca->d; ii++){
+        //printf("ii=%zu\n",ii);
+        int on_bound = bound_info_onbound_dim(bi,ii);
+
+        if (on_bound == 0){
+            mca_upwind_dim(mca,mcn,x,ngrad,minh2,&Qh,dQ,ii,grad);
+        }
+        else{
+            // general case needs modification
+            double diff = pow(mca->diff[ii*mca->d+ii],2);
+            double t = pow(mca->minh/mca->h[ii],2);
+            Qh += t*diff;
+            hrel = (minh2/mca->h[ii]);
+            int period = bound_info_period(bi);
+            assert (period == 1);
+            int period_dir = bound_info_period_dim_dir(bi,ii);
+            double xmap = bound_info_period_xmap(bi,ii);
+            //printf("before\n");
+            if (period_dir == -1){ // left maps to something
+                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,xmap-mca->h[ii],ngrad);
+            }
+            else{ // just do left side portion
+                mcnlist_prepend_empty(&(mcn->neigh),ii,xmap+mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
+            }
+
+            struct MCNList * node_plus = mcn->neigh;
+            struct MCNList * node_minus = mcn->neigh->next;
+            node_minus->p = t * diff/2.0;
+            node_plus->p  = t * diff/2.0;
+
+            if (grad != NULL){
+                cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
+                cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                            node_plus->gradp,1);
+                cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                            node_minus->gradp,1);
+            }
+        
+            if (mca->drift[ii] > 0){
+                node_plus->p += hrel * mca->drift[ii];
+                Qh += hrel*mca->drift[ii];
+                if (grad != NULL){
+                    cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,node_plus->gradp,1);
+                    cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
+                }
+
+            }
+            else{
+                node_minus->p += hrel * (-mca->drift[ii]);
+                Qh += hrel * (-mca->drift[ii]);
+                if (grad != NULL){
+                    cblas_daxpy(du,-hrel,mca->gdrift+ii,
+                                mca->d,node_minus->gradp,1);
+                    cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
+                }
+            }
+        }
+    }
+    *dt = minh2 / Qh;
+    double pself = 1.0;
+    if (grad != NULL){
+        double Qh2 = pow(Qh,2);
+        for (size_t jj = 0; jj < du; jj++){
+            gdt[jj] = -minh2 * dQ[jj] / Qh2;
+        }
+        struct MCNList * temp = mcn->neigh;
+        while (temp != NULL){
+            for (size_t jj = 0; jj < du; jj++){
+                temp->gradp[jj] = (Qh * temp->gradp[jj] - dQ[jj]*temp->p)/Qh2;
+            }
+            temp->p /= Qh;
+            pself -= temp->p;
+            
+            cblas_daxpy(du,-1.0,temp->gradp,1,mcn->gpself,1);
+            
+            temp = temp->next; 
+        }
+        free(dQ); dQ = NULL;
+    }
+    else{
+        struct MCNList * temp = mcn->neigh;
+        while (temp != NULL){
+            temp->p /= Qh;
+            pself -= temp->p;
+            temp = temp->next; 
+        }
+    }
+    if (pself < 0){
+        pself = 0.0;
+    }
+    mcnode_set_pself(mcn,pself);
     return mcn;
 }
 
@@ -975,8 +1108,8 @@ mca_get_node(struct MCA * mca, double time, double * x,
             else{
                 int period = bound_info_period(*bi);
                 if (period != 0){
-                    assert (1 == 0);
-//                    mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad,*bi);
+                    /* assert (1 == 0); */
+                    mcn = mca_period_node(mca,time,x,u,dt,gdt,grad,*bi);
                 }
                 else{
                     fprintf(stderr,"Not sure what to do with this node\n");

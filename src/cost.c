@@ -126,9 +126,9 @@ void cost_approx(struct Cost * c,
     c3approx_init_cross(c3a,init_rank,verbose);
     c3approx_set_fiber_opt_brute_force(c3a,c->N,c->x);
     
-    c3approx_set_cross_tol(c3a,1e-5);
+    c3approx_set_cross_tol(c3a,1e-7);
     c3approx_set_cross_maxiter(c3a,10);
-    c3approx_set_round_tol(c3a,1e-5);
+    c3approx_set_round_tol(c3a,1e-7);
     c3approx_set_adapt_kickrank(c3a,5);
     size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->d; ii++){

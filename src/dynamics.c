@@ -12,14 +12,6 @@
  *  dimension of state space
  *  \var Drift::du
  *  dimension of control
- *  \var Drift::lbx
- *  Lower bounds for state space
- *  \var Drift::ubx
- *  Upper bounds for state space
- *  \var Drift::lbu
- *  Lower bounds for control space
- *  \var Drift::ubx
- *  Upper bounds for control space
  *  \var Drift::b
  *  RHS of drift term to stochastic differential equation
  *  f(time,state,control,out,grad,args)
@@ -31,10 +23,6 @@ struct Drift
     size_t dx;
     size_t du;
     //these could be null
-    double * lbx;
-    double * ubx;
-    double * lbu;
-    double * ubu;
 
     int (*b)(double,const double *,const double *, double *,double*,void *);
     void * bargs;
@@ -50,10 +38,6 @@ struct Drift * drift_alloc(size_t dx, size_t du)
 
     b->dx = dx;
     b->du = du;
-    b->lbx = NULL;
-    b->ubx = NULL;
-    b->lbu = NULL;
-    b->ubu = NULL;
     b->b = NULL;
     b->bargs = NULL;
 
@@ -63,10 +47,6 @@ struct Drift * drift_alloc(size_t dx, size_t du)
 void drift_free(struct Drift * drift)
 {
     if (drift != NULL){
-        free(drift->lbx); drift->lbx = NULL;
-        free(drift->ubx); drift->ubx = NULL;
-        free(drift->lbu); drift->lbu = NULL;
-        free(drift->ubu); drift->ubu = NULL;
         free(drift); drift = NULL;
     }
 }
