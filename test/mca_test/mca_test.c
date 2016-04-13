@@ -11,7 +11,6 @@
 #include "CuTest.h"	
 #include "tensmarkov.h"
 
-
 #define dglob 5
 
 void Test_mcnode_alloc(CuTest * tc)
@@ -138,7 +137,7 @@ void Test_mcnode_expectation(CuTest * tc)
     mcnode_free(mcn); mcn = NULL;
 }
 
-int f1(double t, double * x, double * u, double * out,
+int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
 {
     (void)(t);
@@ -293,25 +292,25 @@ void Test_mca_get_node_absorb(CuTest * tc)
     while (temp != NULL){
         size_t dir = mcnlist_get_dir(temp);
         double val = mcnlist_get_val(temp);
-        double p = mcnlist_get_p(temp);
+        double pp = mcnlist_get_p(temp);
         if (dir == 0){
             if (val > pt[dir]){
                 CuAssertDblEquals(tc,val,pt[0]+h[0],1e-15);
-                CuAssertDblEquals(tc,p2,p,1e-15);
+                CuAssertDblEquals(tc,p2,pp,1e-15);
             }
             else{
                 CuAssertDblEquals(tc,val,pt[0]-h[0],1e-15);
-                CuAssertDblEquals(tc,p1,p,1e-15);
+                CuAssertDblEquals(tc,p1,pp,1e-15);
             }
         }
         if (dir == 1){
             if (val > pt[dir]){
                 CuAssertDblEquals(tc,val,pt[1]+h[1],1e-15);
-                CuAssertDblEquals(tc,p3,p,1e-15);
+                CuAssertDblEquals(tc,p3,pp,1e-15);
             }
             else{
                 CuAssertDblEquals(tc,val,pt[1]-h[1],1e-15);
-                CuAssertDblEquals(tc,p4,p,1e-15);
+                CuAssertDblEquals(tc,p4,pp,1e-15);
             }
         }
         temp = mcnlist_get_next(temp);
@@ -536,8 +535,8 @@ void Test_mca_get_node_reflect(CuTest * tc)
     struct MCNList * temp = mcnode_get_neigh(mcn);
     double sum_prob = 0.0;
     while (temp != NULL){
-        size_t dir = mcnlist_get_dir(temp);
-        double val = mcnlist_get_val(temp);
+        /* size_t dir = mcnlist_get_dir(temp); */
+        /* double val = mcnlist_get_val(temp); */
         double p = mcnlist_get_p(temp);
 //        printf("new pt[%zu] = %G p_trans=%G\n",dir,val,p);
         sum_prob += p;

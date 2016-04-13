@@ -5,8 +5,8 @@
 struct Drift * drift_alloc(size_t, size_t);
 void drift_free(struct Drift *);
 void drift_add_func(struct Drift *,
-                    int (*)(double,double*,double*,
-                             double*,double*,void*),
+                    int (*)(double,const double*,const double*,
+                            double*,double*,void*),
                     void *);
 size_t drift_get_dx(struct Drift *);
 int drift_eval(struct Drift *,double,double*,double*,

@@ -9,6 +9,7 @@ else ()
     target_link_libraries(c3sc
         ${blas_lapack}
         c3
+        ${PROJECT_LINK_LIBS}
         -lm
         )
         

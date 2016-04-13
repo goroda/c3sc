@@ -33,17 +33,16 @@ double * control_getu_ref(struct Control *);
 
 //////////////////////////////////////////
 
-
-struct Trajectory * trajectory_alloc();
-void trajectory_free(struct Trajectory *);
-int trajectory_add(struct Trajectory **, struct State *, 
-                   struct Control *);
-int trajectory_add_ref(struct Trajectory **, struct State *,
-                       struct Control *);
-struct State * trajectory_last_state(struct Trajectory *);
-int trajectory_step(struct Trajectory *, struct Policy *, 
-                    struct Dyn *, double, char *, 
-                    double *, void *, void *);
-void trajectory_print(struct Trajectory *, FILE *, int);
+/* struct Trajectory * trajectory_alloc(); */
+/* void trajectory_free(struct Trajectory *); */
+/* int trajectory_add(struct Trajectory **, struct State *,  */
+/*                    struct Control *); */
+/* int trajectory_add_ref(struct Trajectory **, struct State *, */
+/*                        struct Control *); */
+/* struct State * trajectory_last_state(struct Trajectory *); */
+/* int trajectory_step(struct Trajectory *, struct Policy *,  */
+/*                     struct Dyn *, double, char *,  */
+/*                     double *, void *, void *); */
+/* void trajectory_print(struct Trajectory *, FILE *, int); */
 
 #endif  

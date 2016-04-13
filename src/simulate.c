@@ -7,7 +7,6 @@
 #include "c3.h"
 #include "simulate.h"
 #include "control.h"
-#include "integrate.h"
 #include "tensmarkov.h"
 
 /**********************************************************//**
@@ -256,225 +255,225 @@ void control_print(struct Control * s, FILE * fp, int prec)
 
 ////////////////////////////////////////////////////////
 
-/**********************************************************//**
-    Allocate Trajectory
-**************************************************************/
-struct Trajectory * trajectory_alloc()
-{
-    struct Trajectory * t = malloc(sizeof(struct Trajectory ));
-    if (t == NULL){
-        fprintf(stderr, "Cannot allocate trajectory\n");
-        exit(1);
-    }
+/* /\**********************************************************\//\** */
+/*     Allocate Trajectory */
+/* **************************************************************\/ */
+/* struct Trajectory * trajectory_alloc() */
+/* { */
+/*     struct Trajectory * t = malloc(sizeof(struct Trajectory )); */
+/*     if (t == NULL){ */
+/*         fprintf(stderr, "Cannot allocate trajectory\n"); */
+/*         exit(1); */
+/*     } */
     
-    t->s = NULL;
-    t->u = NULL;
-    t->next = NULL;
-    return t;
-}
+/*     t->s = NULL; */
+/*     t->u = NULL; */
+/*     t->next = NULL; */
+/*     return t; */
+/* } */
 
-/**********************************************************//**
-    Free Trajectory
-**************************************************************/
-void trajectory_free(struct Trajectory * traj)
-{
-    if (traj != NULL){
-        state_free(traj->s); traj->s = NULL;
-        control_free(traj->u); traj->u = NULL;
-        trajectory_free(traj->next); traj->next = NULL;
-        free(traj); traj = NULL;
-    }
-}
+/* /\**********************************************************\//\** */
+/*     Free Trajectory */
+/* **************************************************************\/ */
+/* void trajectory_free(struct Trajectory * traj) */
+/* { */
+/*     if (traj != NULL){ */
+/*         state_free(traj->s); traj->s = NULL; */
+/*         control_free(traj->u); traj->u = NULL; */
+/*         trajectory_free(traj->next); traj->next = NULL; */
+/*         free(traj); traj = NULL; */
+/*     } */
+/* } */
 
-/**********************************************************//**
-    Add a state and control to the trajectory
+/* /\**********************************************************\//\** */
+/*     Add a state and control to the trajectory */
 
-    \param[in,out] traj - trajectory
-    \param[in]     s    - state
-    \param[in]     u    - control
-**************************************************************/
-int trajectory_add(struct Trajectory ** traj,
-                   struct State * s,
-                   struct Control * u)
-{
-    if (*traj == NULL){
-        (*traj) = trajectory_alloc();
-        (*traj)->s = state_copy(s);
-        (*traj)->u = control_copy(u);
-        (*traj)->next = NULL;
-    }
-    else{
-        trajectory_add(&((*traj)->next),s,u);
-    }
-    return 0;
-}
+/*     \param[in,out] traj - trajectory */
+/*     \param[in]     s    - state */
+/*     \param[in]     u    - control */
+/* **************************************************************\/ */
+/* int trajectory_add(struct Trajectory ** traj, */
+/*                    struct State * s, */
+/*                    struct Control * u) */
+/* { */
+/*     if (*traj == NULL){ */
+/*         (*traj) = trajectory_alloc(); */
+/*         (*traj)->s = state_copy(s); */
+/*         (*traj)->u = control_copy(u); */
+/*         (*traj)->next = NULL; */
+/*     } */
+/*     else{ */
+/*         trajectory_add(&((*traj)->next),s,u); */
+/*     } */
+/*     return 0; */
+/* } */
 
-/**********************************************************//**
-    Add a state and control to the trajectory by reference
+/* /\**********************************************************\//\** */
+/*     Add a state and control to the trajectory by reference */
 
-    \param[in,out] traj - trajectory
-    \param[in]     s    - state
-    \param[in]     u    - control
-**************************************************************/
-int trajectory_add_ref(struct Trajectory ** traj,
-                       struct State * s,
-                       struct Control * u)
-{
-    if (*traj == NULL){
-        (*traj) = trajectory_alloc();
-        (*traj)->s = s;
-        (*traj)->u = u;
-        (*traj)->next = NULL;
-    }
-    else{
-        trajectory_add_ref(&((*traj)->next),s,u);
-    }
-    return 0;
-}
+/*     \param[in,out] traj - trajectory */
+/*     \param[in]     s    - state */
+/*     \param[in]     u    - control */
+/* **************************************************************\/ */
+/* int trajectory_add_ref(struct Trajectory ** traj, */
+/*                        struct State * s, */
+/*                        struct Control * u) */
+/* { */
+/*     if (*traj == NULL){ */
+/*         (*traj) = trajectory_alloc(); */
+/*         (*traj)->s = s; */
+/*         (*traj)->u = u; */
+/*         (*traj)->next = NULL; */
+/*     } */
+/*     else{ */
+/*         trajectory_add_ref(&((*traj)->next),s,u); */
+/*     } */
+/*     return 0; */
+/* } */
 
-/**********************************************************//**
-    Print the trajectory
+/* /\**********************************************************\//\** */
+/*     Print the trajectory */
 
-    \param[in,out] traj - trajectory
-    \param[in]     fp   - stream to print to
-    \param[in]     prec - precision with which to print
-**************************************************************/
-void trajectory_print(struct Trajectory * traj,
-                      FILE *fp,
-                      int prec)
-{
+/*     \param[in,out] traj - trajectory */
+/*     \param[in]     fp   - stream to print to */
+/*     \param[in]     prec - precision with which to print */
+/* **************************************************************\/ */
+/* void trajectory_print(struct Trajectory * traj, */
+/*                       FILE *fp, */
+/*                       int prec) */
+/* { */
     
-    if (traj == NULL){
-//        fprintf(fp,"NULL\n");
-        fprintf(fp,"\n");
-    }
-    else{
-        //fprintf(fp, "State: ");
-        state_print(traj->s,fp,1,prec);
-        //fprintf(fp, "Control: ");
-        control_print(traj->u,fp,prec);
-        fprintf(fp,"\n");
-        trajectory_print(traj->next,fp,prec);
-    }
-}
+/*     if (traj == NULL){ */
+/* //        fprintf(fp,"NULL\n"); */
+/*         fprintf(fp,"\n"); */
+/*     } */
+/*     else{ */
+/*         //fprintf(fp, "State: "); */
+/*         state_print(traj->s,fp,1,prec); */
+/*         //fprintf(fp, "Control: "); */
+/*         control_print(traj->u,fp,prec); */
+/*         fprintf(fp,"\n"); */
+/*         trajectory_print(traj->next,fp,prec); */
+/*     } */
+/* } */
 
-/**********************************************************//**
-    Get a reference to the last state
-**************************************************************/
-struct State * trajectory_last_state(struct Trajectory * traj)
-{
-    if (traj == NULL){
-        return NULL;
-    }
-    else{
-        while (traj->next != NULL){
-            traj = traj->next;
-        }
-        return traj->s;
-    }
-}
+/* /\**********************************************************\//\** */
+/*     Get a reference to the last state */
+/* **************************************************************\/ */
+/* struct State * trajectory_last_state(struct Trajectory * traj) */
+/* { */
+/*     if (traj == NULL){ */
+/*         return NULL; */
+/*     } */
+/*     else{ */
+/*         while (traj->next != NULL){ */
+/*             traj = traj->next; */
+/*         } */
+/*         return traj->s; */
+/*     } */
+/* } */
 
-/**********************************************************//**
-    Take a step of a trajectory
+/* /\**********************************************************\//\** */
+/*     Take a step of a trajectory */
 
-    \param[in,out] traj   - trajectory
-    \param[in]     pol    - policy
-    \param[in]     dyn    - dynamics
-    \param[in]     dt     - time step
-                            Used when method=
-                            "euler" or 
-                            "euler-maruyama"
-    \param[in]     method - integration algorithm
-    \param[in]     space  - free space to use for computation
-    \param[in]     noise  - noise arguments
-    \param[in]     args   - additional arguments
+/*     \param[in,out] traj   - trajectory */
+/*     \param[in]     pol    - policy */
+/*     \param[in]     dyn    - dynamics */
+/*     \param[in]     dt     - time step */
+/*                             Used when method= */
+/*                             "euler" or  */
+/*                             "euler-maruyama" */
+/*     \param[in]     method - integration algorithm */
+/*     \param[in]     space  - free space to use for computation */
+/*     \param[in]     noise  - noise arguments */
+/*     \param[in]     args   - additional arguments */
 
-    \note
-    Let d denote dimension of state 
-    Let dw denote dimension of noise 
-    Method "euler" - space (d), 
-                     noise NULL, 
-                     args NULL  
-    Method "euler-maruyama" - space(d + d*dw), 
-                              noise (dw) gaussian samples,  
-                              args NULL 
-    Method "markov-chain" (kushner 2001) 
-                          - space (2d+1) 
-                          - noise (1) uniform (0,1) sample 
-                          - args TensorMM
-**************************************************************/
-int trajectory_step(struct Trajectory * traj,
-                    struct Policy * pol, 
-                    struct Dyn * dyn,
-                    double dt, char * method, 
-                    double * space,
-                    void * noise, void * args)
-{
+/*     \note */
+/*     Let d denote dimension of state  */
+/*     Let dw denote dimension of noise  */
+/*     Method "euler" - space (d),  */
+/*                      noise NULL,  */
+/*                      args NULL   */
+/*     Method "euler-maruyama" - space(d + d*dw),  */
+/*                               noise (dw) gaussian samples,   */
+/*                               args NULL  */
+/*     Method "markov-chain" (kushner 2001)  */
+/*                           - space (2d+1)  */
+/*                           - noise (1) uniform (0,1) sample  */
+/*                           - args TensorMM */
+/* **************************************************************\/ */
+/* int trajectory_step(struct Trajectory * traj, */
+/*                     struct Policy * pol,  */
+/*                     struct Dyn * dyn, */
+/*                     double dt, char * method,  */
+/*                     double * space, */
+/*                     void * noise, void * args) */
+/* { */
     
-    if (traj == NULL){
-        fprintf(stderr,"Warning: cannot advance trajectory starting\n");
-        fprintf(stderr,"         from NULL Trajectory\n");
-        return 1;
-    }
-    else if (pol == NULL){
-        fprintf(stderr,"Warning: cannot advance trajectory starting\n");
-        fprintf(stderr,"         from NULL Policy\n");
-        return 1;
-    }
-    else if (dyn == NULL){
-        fprintf(stderr,"Warning: cannot advance trajectory starting\n");
-        fprintf(stderr,"         from NULL Dyn\n");
-        return 1;
-    }
-    assert (dt > 0);
+/*     if (traj == NULL){ */
+/*         fprintf(stderr,"Warning: cannot advance trajectory starting\n"); */
+/*         fprintf(stderr,"         from NULL Trajectory\n"); */
+/*         return 1; */
+/*     } */
+/*     else if (pol == NULL){ */
+/*         fprintf(stderr,"Warning: cannot advance trajectory starting\n"); */
+/*         fprintf(stderr,"         from NULL Policy\n"); */
+/*         return 1; */
+/*     } */
+/*     else if (dyn == NULL){ */
+/*         fprintf(stderr,"Warning: cannot advance trajectory starting\n"); */
+/*         fprintf(stderr,"         from NULL Dyn\n"); */
+/*         return 1; */
+/*     } */
+/*     assert (dt > 0); */
 
-    struct State * current_state = trajectory_last_state(traj);
-    if (current_state == NULL){
-        return 1;
-    }
+/*     struct State * current_state = trajectory_last_state(traj); */
+/*     if (current_state == NULL){ */
+/*         return 1; */
+/*     } */
 
-    size_t d = state_getd(current_state);
-    double t = state_gett(current_state);
-    double * x = state_getx_ref(current_state);
-    if (x == NULL){
-        return 1;
-    }
+/*     size_t d = state_getd(current_state); */
+/*     double t = state_gett(current_state); */
+/*     double * x = state_getx_ref(current_state); */
+/*     if (x == NULL){ */
+/*         return 1; */
+/*     } */
 
-    struct Control * u = NULL;
-    int res = policy_eval(pol,t,x,&u);
-    if (res != 0){
-        control_free(u);
-        return res;
-    }
-    struct State * s = NULL;
-    if (strcmp(method,"euler") == 0){
-        s = euler_step(current_state,u,dt,
-                       dyn,space);
-    }
-    else if (strcmp(method,"euler-maruyama") == 0){
-        // args is a realization of the noise
-        // should be generated with variance dt
-        s = euler_maruyama_step(current_state,noise,u,dt,
-                                dyn,space,space+d);
-    }
-    else if (strcmp(method,"markov-chain") == 0){
-        (void)(args);
-        assert (1 == 0);
-        /* struct MCA * mm = args; */
-        /* double no = *(double *)noise; */
-        /* double * uu = control_getu_ref(u); */
+/*     struct Control * u = NULL; */
+/*     int res = policy_eval(pol,t,x,&u); */
+/*     if (res != 0){ */
+/*         control_free(u); */
+/*         return res; */
+/*     } */
+/*     struct State * s = NULL; */
+/*     if (strcmp(method,"euler") == 0){ */
+/*         s = euler_step(current_state,u,dt, */
+/*                        dyn,space); */
+/*     } */
+/*     else if (strcmp(method,"euler-maruyama") == 0){ */
+/*         // args is a realization of the noise */
+/*         // should be generated with variance dt */
+/*         s = euler_maruyama_step(current_state,noise,u,dt, */
+/*                                 dyn,space,space+d); */
+/*     } */
+/*     else if (strcmp(method,"markov-chain") == 0){ */
+/*         (void)(args); */
+/*         assert (1 == 0); */
+/*         /\* struct MCA * mm = args; *\/ */
+/*         /\* double no = *(double *)noise; *\/ */
+/*         /\* double * uu = control_getu_ref(u); *\/ */
 
-        /* s = state_alloc(); */
-        /* state_init_zero(s,d,t); */
-        /* double * newx = state_getx_ref(s); */
-        /* mca_step(mm,t,x,uu,no,&dt,newx); */
-        /* s->t = t+dt; */
-    }
-    else{
-        return 1;
-    }
+/*         /\* s = state_alloc(); *\/ */
+/*         /\* state_init_zero(s,d,t); *\/ */
+/*         /\* double * newx = state_getx_ref(s); *\/ */
+/*         /\* mca_step(mm,t,x,uu,no,&dt,newx); *\/ */
+/*         /\* s->t = t+dt; *\/ */
+/*     } */
+/*     else{ */
+/*         return 1; */
+/*     } */
 
-    res = trajectory_add_ref(&traj,s,u);
-    return res;
+/*     res = trajectory_add_ref(&traj,s,u); */
+/*     return res; */
 
-}
+/* } */

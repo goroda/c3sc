@@ -18,8 +18,8 @@ void c3sc_set_state_bounds(struct C3SC *,double *,double *);
 void c3sc_set_external_boundary(struct C3SC *,size_t,char *);
 void c3sc_add_obstacle(struct C3SC *, double *, double *);
 void c3sc_add_dynamics(struct C3SC *,  
-                       int (*)(double,double*,double*,
-                                double*,double*,void*),
+                       int (*)(double,const double*,const double*,
+                               double*,double*,void*),
                        void *,
                        int (*)(double,double*,double*,
                                 double*,double*,void*),
@@ -32,7 +32,9 @@ void c3sc_init_dp(struct C3SC *, double,
                   int (*)(double*,double*));
 
 void * c3sc_get_dp(struct C3SC *);
+struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC *);
 ////////////////////////////////////////////////////
+
 struct DPih;
 struct DPih * 
 dpih_alloc(double,
@@ -58,4 +60,11 @@ struct Policy * dpih_iter_vi_pol(struct DPih *,int);
 int dpih_pol_implicit(double,double *,double*,void *);
 
 struct DPfh;
+
+
+struct ImplicitPolicy;
+struct ImplicitPolicy * implicit_policy_alloc();
+void implicit_policy_free(struct ImplicitPolicy *);
+void implicit_policy_set_dp(struct ImplicitPolicy *, struct DPih *);
+int implicit_policy_controller(double, const double *, double *, void *);
 #endif

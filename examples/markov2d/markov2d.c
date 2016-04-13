@@ -23,7 +23,8 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
-int f1(double t, double * x, double * u, double * out,double *jac,void * args)
+int f1(double t, const double * x, const double * u,
+       double * out,double *jac,void * args)
 {
     (void)(t);
     (void)(args);

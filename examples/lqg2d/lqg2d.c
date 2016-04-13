@@ -6,6 +6,9 @@
 #include <getopt.h>
 
 #include "c3.h"
+#include "cdyn/src/simulate.h"
+#include "cdyn/src/integrate.h"
+
 #include "c3sc.h"
 
 static char * program_name;
@@ -53,34 +56,34 @@ void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * l
     free(ytest); ytest = NULL;
 }
 
-void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2,
-                  double * lb, double * ub)
-{
+/* void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2, */
+/*                   double * lb, double * ub) */
+/* { */
 
-    fprintf(fp2,"x y u1 u2\n");
-    double * xtest = linspace(lb[0],ub[0],N1);
-    double * ytest = linspace(lb[1],ub[1],N2);
+/*     fprintf(fp2,"x y u1 u2\n"); */
+/*     double * xtest = linspace(lb[0],ub[0],N1); */
+/*     double * ytest = linspace(lb[1],ub[1],N2); */
 
-    double pt3[2];
-    for (size_t zz = 0; zz < N1; zz++){
-        for (size_t jj = 0; jj < N2; jj++){
+/*     double pt3[2]; */
+/*     for (size_t zz = 0; zz < N1; zz++){ */
+/*         for (size_t jj = 0; jj < N2; jj++){ */
 
-            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
-            /* printf("\n\n\n\n\n\n"); */
-            /* printf("pt = "); dprint(2,pt3); */
-            struct Control * u = NULL;
-            policy_eval(pol,0.0,pt3,&u);
-//            assert (res == 0);
-            /* printf("done computing policy\n"); */
-            fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n",
-                    xtest[zz],ytest[jj],u->u[0],0.0);//u->u[1]);
-            control_free(u);
-        }
-        fprintf(fp2,"\n");
-    }
-    free(xtest); xtest = NULL;
-    free(ytest); ytest = NULL;
-}
+/*             pt3[0] = xtest[zz]; pt3[1] = ytest[jj]; */
+/*             /\* printf("\n\n\n\n\n\n"); *\/ */
+/*             /\* printf("pt = "); dprint(2,pt3); *\/ */
+/*             struct Control * u = NULL; */
+/*             policy_eval(pol,0.0,pt3,&u); */
+/* //            assert (res == 0); */
+/*             /\* printf("done computing policy\n"); *\/ */
+/*             fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
+/*                     xtest[zz],ytest[jj],u->u[0],0.0);//u->u[1]); */
+/*             control_free(u); */
+/*         } */
+/*         fprintf(fp2,"\n"); */
+/*     } */
+/*     free(xtest); xtest = NULL; */
+/*     free(ytest); ytest = NULL; */
+/* } */
 
 void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
                   double * lb, double * ub)
@@ -115,7 +118,7 @@ void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
     free(ytest); ytest = NULL;
 }
 
-int f1(double t, double * x, double * u, double * out,
+int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
 {
     (void)(t);
@@ -384,39 +387,45 @@ int main(int argc, char * argv[])
     print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
 
-    /* struct Policy * pol = dpih_iter_vi_pol(dp,verbose-1); */
-    /* sprintf(filename,"%s/%s.dat",dirout,"policy_approx"); */
-    /* fp2 =  fopen(filename, "w"); */
-    /* if (fp2 == NULL){ */
-    /*     fprintf(stderr, "cat: can't open %s\n", filename); */
-    /*     return 0; */
-    /* } */
-    /* printf("printing policy\n"); */
+    struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
+    printf("created policy\n");
+    char odename[256] = "rk4";
+    struct Integrator * ode_sys =
+        integrator_create_controlled(2,1,f1,NULL,implicit_policy_controller,pol);
+    integrator_set_type(ode_sys,odename);
+    integrator_set_dt(ode_sys,1e-2);
+//    integrator_set_adaptive_opts(ode_sys,dtmin,dtmax,tol);
+    integrator_set_verbose(ode_sys,0);
+    printf("initialized integrator\n");
+    // Initialize trajectories for filter and for observations
+    double time = 0.0;
+    double state[2] = {0.5, 0.5};
+    double con[1] = {0.0};
 
-    /* print_policy(fp2,pol,N1,N2,lb,ub); */
-    /* fclose(fp2); */
+    struct Trajectory * traj = NULL;
+    printf("add trajectory\n");
+    trajectory_add(&traj,2,1,time,state,con);
+    printf("initialized trajectory\n");
 
+    double final_time = 5e0;
+    double dt = 1e-2;
+    int res;
+    while (time < final_time){
+        printf("time = %G\n",time);
+        res = trajectory_step(traj,ode_sys,dt);
+        assert(res == 0);
+        time = time + dt;
+    }
 
-    /* c3opt_set_verbose(opt,2); */
-    /* double pttest[2] = {0.5,0.5}; */
-    /* double utest[1]; */
-    /* int res = dpih_pol_implicit(0.0,pttest,utest,dp); */
-    /* double ut = dpih_rhs_opt_pol(pttest,0,dp); */
-    /* printf("x = "); dprint(2,pttest); */
-    /* printf("u = %G\n", utest[0]); */
-    /* printf("u = %G\n", ut); */
-    /* assert (res > -1); */
-    /* return 1; */
-    
-    /* sprintf(filename,"%s/%s.dat",dirout,"policy_implicit"); */
-    /* fp2 =  fopen(filename, "w"); */
-    /* if (fp2 == NULL){ */
-    /*     fprintf(stderr, "cat: can't open %s\n", filename); */
-    /*     return 0; */
-    /* } */
-    /* printf("printing implicit policy\n"); */
-    /* print_policy_implict(fp2,dp,N1,N2,lb,ub); */
-    /* fclose(fp2); */
+    if (verbose == 1){
+        trajectory_print(traj,stdout,4);
+    }
+
+    sprintf(filename,"%s/%s.dat",dirout,"traj");
+    FILE * fp = fopen(filename,"w");
+    assert (fp != NULL);
+    trajectory_print(traj,fp,4);
+    fclose(fp);
 
 /*     double t0 = 0.0; */
 /*     double xs[2] = {0.3,0.2}; */

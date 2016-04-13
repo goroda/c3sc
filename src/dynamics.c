@@ -36,7 +36,7 @@ struct Drift
     double * lbu;
     double * ubu;
 
-    int (*b)(double,double *, double *, double *,double*,void *);
+    int (*b)(double,const double *,const double *, double *,double*,void *);
     void * bargs;
 };
 
@@ -72,7 +72,7 @@ void drift_free(struct Drift * drift)
 }
 
 void drift_add_func(struct Drift * dr,
-                    int (*b)(double,double*,double*,
+                    int (*b)(double,const double*,const double*,
                              double*,double*,void*),
                     void * bargs)
 {

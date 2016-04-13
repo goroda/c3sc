@@ -49,7 +49,7 @@ void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * l
     free(ytest); ytest = NULL;
 }
 
-int f1(double t, double * x, double * u, double * out, double * jac,
+int f1(double t, const double * x, const double * u, double * out, double * jac,
        void * args)
 {
     (void)(t);

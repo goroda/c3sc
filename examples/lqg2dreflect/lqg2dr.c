@@ -115,7 +115,7 @@ void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
     free(ytest); ytest = NULL;
 }
 
-int f1(double t, double * x, double * u, double * out,
+int f1(double t,const double * x,const double * u, double * out,
        double * jac, void * args)
 {
     (void)(t);
@@ -330,8 +330,8 @@ int main(int argc, char * argv[])
     c3sc_set_state_bounds(sc,lb,ub);
     c3sc_set_external_boundary(sc,0,"reflect");
     c3sc_set_external_boundary(sc,1,"reflect");
-    double center[2] = {0.0,0.0};
-    double width[2] = {0.5,0.5};
+    /* double center[2] = {0.0,0.0}; */
+    /* double width[2] = {0.5,0.5}; */
 //    c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);

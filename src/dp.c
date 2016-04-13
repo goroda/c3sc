@@ -142,7 +142,7 @@ void c3sc_add_obstacle(struct C3SC * sc, double * center, double * lengths)
     \param[in]     sargs - diffusion dynamics arguments
 **************************************************************/
 void c3sc_add_dynamics(struct C3SC * sc,  
-                       int (*b)(double,double*,double*,
+                       int (*b)(double,const double*,const double*,
                                 double*,double*,void*),
                        void * bargs,
                        int (*s)(double,double*,double*,
@@ -209,7 +209,6 @@ void c3sc_attach_opt(struct C3SC * sc, struct c3Opt * opt)
     sc->opt = opt;
 }
 
-
 /**********************************************************//**
     Attach (by reference )the optimization options and 
     algorithms to the problem
@@ -263,6 +262,21 @@ void * c3sc_get_dp(struct C3SC * sc)
     return sc->dpih;
 }
 
+/**********************************************************//**
+    Create an implicit policy
+                                                           
+    \note
+    This does it by reference when really should copy in case
+    stochastic controller changes
+**************************************************************/
+struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC * sc)
+{
+    assert (sc != NULL);
+    assert (sc->type == IH);
+    struct ImplicitPolicy * ip = implicit_policy_alloc();
+    implicit_policy_set_dp(ip,sc->dpih);
+    return ip;
+}
 
 /** \struct DPih
  *  \brief Infinite Horizon dynamic program
@@ -440,7 +454,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
     double out;
     int absorb = bound_info_absorb(bi);
     if (absorb == 1){
-        printf("MASSIVE ERROR!\n");
+//        printf("MASSIVE ERROR!\n");
         int in_obstacle = bound_info_get_in_obstacle(bi);
         if (in_obstacle < 0){
             int res = dp->boundcost(t,x,&out);
@@ -696,4 +710,112 @@ int dpih_pol_implicit(double t,double * x,double*u,void * dpin)
     /* memmove(u,ustart,du*sizeof(double)); */
     /* free(ustart); ustart = NULL; */
     return res;
+}
+
+
+/** \struct ImplicitPolicy
+ *  \brief Stores information needed to evaluate implicit control
+ *  \var ImplicitPolicy::dpalloc
+ *  flag to indicate whether need to free dp on cleanup
+ *  \var ImplicitPolicy::dp
+ *  infinite horizon dp problem
+ */
+struct ImplicitPolicy
+{
+    int dpalloc;
+    struct DPih * dp;
+};
+
+/**********************************************************//**
+   Allocate memory for policy
+**************************************************************/
+struct ImplicitPolicy * implicit_policy_alloc()
+{
+    struct ImplicitPolicy * ip = malloc(sizeof(struct ImplicitPolicy));
+    if (ip == NULL){
+        fprintf(stderr, "Failure allocating memory for implicit policy\n");
+        exit(1);
+    }
+    ip->dpalloc = 0;
+    ip->dp = NULL;
+    return ip;
+}
+
+/**********************************************************//**
+   Free policy
+**************************************************************/
+void implicit_policy_free(struct ImplicitPolicy * ip)
+{
+    if (ip != NULL){
+        if (ip->dpalloc == 1){
+            dpih_free_deep(ip->dp); ip->dp = NULL;
+        }
+        free(ip); ip = NULL;
+    }
+}
+
+/**********************************************************//**
+   SetDP
+**************************************************************/
+void implicit_policy_set_dp(struct ImplicitPolicy * ip, struct DPih * dp)
+{
+    ip->dp = dp;
+}
+
+/**********************************************************//**
+   Evaluate a policy
+   
+   \param[in]     ip - policy to evaluate
+   \param[in]     t  - time at which to evaluate
+   \param[in]     x  - location at which to evaluate
+   \param[in,out] u  - resulting control
+
+   \return 0 - success, else failure
+**************************************************************/
+int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
+                         const double * x, double * u)
+{
+    (void)(t);
+    struct DPX dpx;
+    
+    dpx.dp = ip->dp;
+    dpx.x = (double *) x;
+    
+    assert (dpx.dp->opt != NULL);
+
+    size_t du = mca_get_du(dpx.dp->mm);
+    double val = 0.0;
+    struct c3Opt * opt = dpx.dp->opt;
+    c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+
+    int res = c3opt_minimize(opt,u,&val);
+    if (res < -1){
+        printf("max iter reached in optimization res=%d\n",res);
+        size_t dx = mca_get_dx(dpx.dp->mm);
+        printf("x = ");
+        dprint(dx,dpx.x);
+        dprint(du,u);
+        for (size_t ii = 0; ii < du; ii++){
+            u[ii] = 0.0;
+        }
+        val = 0.0;
+        printf("restart with verbose\n");
+        c3opt_set_verbose(opt,2);
+        int res2 = c3opt_minimize(opt,u,&val);
+        printf("res2 = %d\n",res2);
+    }
+
+    int res_pol = 0;
+    return res_pol;
+}
+
+
+/**********************************************************//**
+   Interface for integrator
+**************************************************************/
+int implicit_policy_controller(double t,const double * x, double * u, void * args)
+{
+
+    struct ImplicitPolicy * ip = args;
+    return implicit_policy_eval(ip,t,x,u);
 }
