@@ -170,33 +170,6 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     return 0;
 }
 
-int trajboundcheck(double time, double * x, void * args)
-{
-    
-    // two boundaries
-    // outside of the box([-2,2]^2)
-    // and the inside box [-0.1,0.1]^2
-    (void)(time);
-    (void)(args);
-    
-    double bound = 2.0;
-    int out = 0;
-    for (size_t ii = 0; ii < 2; ii++){
-        if (x[ii] >= bound){
-            return 1;
-        }
-        else if (x[ii] <= -bound){
-            return 1;
-        }
-    }
-
-   if ( (fabs(x[0]) <= 2e-1) && (fabs(x[1]) <= 2e-1)){
-       return 1;
-   }
-    
-    return out;
-}
-
 int stagecost(double t, double * x, double * u, double * out, 
               double * grad)
 {
