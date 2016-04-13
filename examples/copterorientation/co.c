@@ -120,12 +120,15 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 36; ii++){
         out[ii] = 0.0;
     }
-    out[0] = 1e0;
-    out[7] = 1e0;
-    out[14] = 1e0;
-    out[21] = 1e0;
-    out[28] = 1e0;
-    out[35] = 1e0;
+    double vpos = 1e-2;
+    double vspeed = 1e0;
+
+    out[0] = vpos;
+    out[7] = vpos;
+    out[14] = vpos;
+    out[21] = vspeed;
+    out[28] = vspeed;
+    out[35] = vspeed;
 
     if (grad != NULL){
         for (size_t ii = 0; ii < 36*3; ii++){
@@ -150,9 +153,9 @@ int stagecost(double t, double * x, double * u, double * out,
                                         37.18 * 7.0 * pow(u[2],2);
     
     if (grad!= NULL){
-        grad[0] = 2.0 * 37.18;
-        grad[1] = 2.0 * 37.18;
-        grad[2] = 2.0 * 37.18 * 7.0;
+        grad[0] = 2.0 * 37.18 * u[0];
+        grad[1] = 2.0 * 37.18 * u[1];
+        grad[2] = 2.0 * 37.18 * 7.0 * u[2];
     }
     return 0;
 }
@@ -243,20 +246,25 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-5);
-    c3opt_set_relftol(opt,1e-5);
+    c3opt_set_absxtol(opt,1e-6);
+    c3opt_set_relftol(opt,1e-6);
     c3opt_set_gtol(opt,1e-7);
     c3opt_set_verbose(opt,0);
+    c3opt_ls_set_alpha(opt,0.1);
+    c3opt_ls_set_beta(opt,0.2);
     
     double beta = 0.1;
 
     double * xt = linspace(lb[4],ub[4],N);
     dprint(N,xt);
     free(xt);
-    exit(1);
+    //exit(1);
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
+    for (size_t ii = 0; ii < 6; ii++){
+//        c3sc_set_external_boundary(sc,ii,"reflect");
+    }
     double center[6] = {0.0,0.0,0.0,0.0,0.0};
     double width[6] = {0.2,0.2,0.2,0.2,0.06};
     c3sc_add_obstacle(sc,center,width);
