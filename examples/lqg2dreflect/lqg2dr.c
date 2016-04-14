@@ -53,35 +53,6 @@ void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * l
     free(ytest); ytest = NULL;
 }
 
-void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2,
-                  double * lb, double * ub)
-{
-
-    fprintf(fp2,"x y u1 u2\n");
-    double * xtest = linspace(lb[0],ub[0],N1);
-    double * ytest = linspace(lb[1],ub[1],N2);
-
-    double pt3[2];
-    for (size_t zz = 0; zz < N1; zz++){
-        for (size_t jj = 0; jj < N2; jj++){
-
-            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
-            /* printf("\n\n\n\n\n\n"); */
-            /* printf("pt = "); dprint(2,pt3); */
-            struct Control * u = NULL;
-            policy_eval(pol,0.0,pt3,&u);
-//            assert (res == 0);
-            /* printf("done computing policy\n"); */
-            fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n",
-                    xtest[zz],ytest[jj],u->u[0],0.0);//u->u[1]);
-            control_free(u);
-        }
-        fprintf(fp2,"\n");
-    }
-    free(xtest); xtest = NULL;
-    free(ytest); ytest = NULL;
-}
-
 void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
                   double * lb, double * ub)
 {

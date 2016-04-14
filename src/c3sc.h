@@ -4,9 +4,7 @@
 #include "c3.h"
 
 #include "util.h"
-#include "simulate.h"
 #include "dynamics.h"
-#include "control.h"
 #include "tensmarkov.h"
 #include "cost.h"
 #include "dp.h"

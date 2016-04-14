@@ -7,8 +7,6 @@
 #include "c3.h"
 
 #include "util.h"
-#include "simulate.h"
-#include "control.h"
 #include "cost.h"
 #include "dp.h"
 #include "tensmarkov.h"
@@ -45,7 +43,7 @@ struct C3SC
     struct Dyn * dyn;
     struct MCA * mca;
     struct Cost * cost;
-    struct Policy * pol;
+//    struct ImplictPolicy * pol;
     struct c3Opt * opt;
 };
 
@@ -78,7 +76,7 @@ struct C3SC * c3sc_create(enum SCTYPE type, size_t dx, size_t du, size_t dw)
     sc->dyn = NULL;
     sc->mca = NULL;
     sc->cost = NULL;
-    sc->pol = NULL;
+//    sc->pol = NULL;
     sc->opt = NULL;
     return sc;
 }
@@ -251,7 +249,6 @@ void c3sc_init_dp(struct C3SC * sc, double beta,
     sc->dpih = dpih_alloc(beta,s,b,o);
     dpih_attach_mca(sc->dpih, sc->mca);
     dpih_attach_cost(sc->dpih, sc->cost);
-    dpih_attach_policy(sc->dpih, sc->pol);
     dpih_attach_opt(sc->dpih,sc->opt);
 }
 
@@ -301,7 +298,7 @@ struct DPih
 {
     struct MCA * mm;
     struct Cost * cost;
-    struct Policy * pol;
+    //  struct Policy * pol;
 
     double beta; // discount factor
     int (*stagecost)(double,double*,double*,double*,double*);
@@ -337,7 +334,7 @@ dpih_alloc(double beta,
 
     dp->mm = NULL;
     dp->cost = NULL;
-    dp->pol = NULL;
+//    dp->pol = NULL;
     dp->beta = beta;
     dp->stagecost = s;
     dp->boundcost = b;
@@ -345,6 +342,22 @@ dpih_alloc(double beta,
 
     dp->opt = NULL;
     return dp;
+}
+
+struct DPih * dpih_copy_deep(struct DPih * dp)
+{
+    if (dp == NULL){
+        return NULL;
+    }
+
+    struct DPih * newdp = dpih_alloc(dp->beta,dp->stagecost,
+                                     dp->boundcost,dp->obscost);
+    
+    newdp->mm = mca_copy_deep(dp->mm);
+    newdp->cost = cost_copy_deep(dp->cost);
+    newdp->opt = c3opt_copy(dp->cost);
+    
+    return newdp;
 }
 
 /**********************************************************//**
@@ -364,7 +377,7 @@ void dpih_free(struct DPih * dp)
 void dpih_free_deep(struct DPih * dp)
 {
     if (dp != NULL){
-        policy_free(dp->pol); dp->pol = NULL;
+//        policy_free(dp->pol); dp->pol = NULL;
         mca_free_deep(dp->mm); dp->mm = NULL;
         cost_free(dp->cost); dp->cost = NULL;
         c3opt_free(dp->opt); dp->opt = NULL;
@@ -388,15 +401,6 @@ void dpih_attach_cost(struct DPih * dp, struct Cost * cost)
 {
     assert(dp != NULL);
     dp->cost = cost;
-}
-
-/**********************************************************//**
-   Attach a reference to a policy
-**************************************************************/
-void dpih_attach_policy(struct DPih * dp, struct Policy * pol)
-{
-    assert (dp != NULL);
-    dp->pol = pol;
 }
 
 /**********************************************************//**
@@ -507,42 +511,42 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
 /**********************************************************//**
    Use the DP policy to compute the rhs of Bellman equation
 **************************************************************/
-double dpih_rhs_pol(struct DPih * dp, double * x)
-{
-    struct Control * u = NULL;
-    double t = 0.0;
-    int res = policy_eval(dp->pol,t,x,&u);
-    assert (res == 0);
+/* double dpih_rhs_pol(struct DPih * dp, double * x) */
+/* { */
+/*     struct Control * u = NULL; */
+/*     double t = 0.0; */
+/*     int res = policy_eval(dp->pol,t,x,&u); */
+/*     assert (res == 0); */
 
-    double * uu = control_getu_ref(u);
-    double val = dpih_rhs(dp,x,uu,NULL);
+/*     double * uu = control_getu_ref(u); */
+/*     double val = dpih_rhs(dp,x,uu,NULL); */
     
-    control_free(u); u = NULL;
-    return val;    
-}
+/*     control_free(u); u = NULL; */
+/*     return val;     */
+/* } */
 
 /**********************************************************//**
    Helper function for sub iteration of policy iteration
 **************************************************************/
-double dpih_rhs_bb(double * x, void * dp)
-{
+/* double dpih_rhs_bb(double * x, void * dp) */
+/* { */
 
-    double ret = dpih_rhs_pol(dp,x);
-    return ret;
-}
+/*     double ret = dpih_rhs_pol(dp,x); */
+/*     return ret; */
+/* } */
 
 /**********************************************************//**
    Generate a new cost function by iterating Bellman equation
    with a *fixed* policy
 **************************************************************/
-struct Cost * dpih_iter_pol(struct DPih * dp,int verbose)
-{
-    struct Cost * oc = dp->cost;
-    struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
-    cost_init_discrete(cost,oc->N,oc->x);
-    cost_approx(cost,dpih_rhs_bb,dp,verbose);
-    return cost;
-}
+/* struct Cost * dpih_iter_pol(struct DPih * dp,int verbose) */
+/* { */
+/*     struct Cost * oc = dp->cost; */
+/*     struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub); */
+/*     cost_init_discrete(cost,oc->N,oc->x); */
+/*     cost_approx(cost,dpih_rhs_bb,dp,verbose); */
+/*     return cost; */
+/* } */
 
 struct DPX
 {
@@ -625,12 +629,14 @@ double dpih_rhs_opt_cost(double * x,void * dp)
    Generate a new cost function by iterating Bellman equation
    with an *optimal* policy
 **************************************************************/
-struct Cost * dpih_iter_vi(struct DPih * dp,int verbose)
+struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
+                           double cross_tol, double round_tol,
+                           size_t kickrank)
 {
     struct Cost * oc = dp->cost;
     struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
     cost_init_discrete(cost,oc->N,oc->x);
-    cost_approx(cost,dpih_rhs_opt_cost,dp,verbose);
+    cost_approx(cost,dpih_rhs_opt_cost,dp,verbose,cross_tol,round_tol,kickrank);
     return cost;
 }
 
@@ -661,27 +667,6 @@ double dpih_rhs_opt_pol(double * x,size_t ind,void * dpin)
 }
 
 /**********************************************************//**
-   Generate a new policy by iterating optimal Bellman equation
-**************************************************************/
-struct Policy * dpih_iter_vi_pol(struct DPih * dp,int verbose)
-{
-    assert (dp != NULL);
-    assert (dp->cost != NULL);
-
-    struct Cost * oc = dp->cost;
-    double * lb = cost_get_lb(oc);
-    double * ub = cost_get_ub(oc);
-    size_t dx = mca_get_dx(dp->mm);
-    size_t du = mca_get_du(dp->mm);
-
-    struct Policy * pol = policy_alloc(dx,du);
-    policy_set_bounds(pol,lb,ub);
-    policy_init_discrete(pol,oc->N,oc->x);
-    policy_approx(pol,dpih_rhs_opt_pol,dp,verbose);
-    return pol;
-}
-
-/**********************************************************//**
    For outputing all control
 **************************************************************/
 int dpih_pol_implicit(double t,double * x,double*u,void * dpin)
@@ -698,17 +683,6 @@ int dpih_pol_implicit(double t,double * x,double*u,void * dpin)
         u[ii] = dpih_rhs_opt_pol(x,ii,dpin);
     }
     int res = 0;
-    /* double * ustart = calloc_double(du); */
-    /* ustart[0] = 1.0; */
-    /* double val = 0.0; */
-    /* struct c3Opt * opt = dpx.dp->opt; */
-    /* c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx); */
-    
-    /* int res = c3opt_minimize(opt,ustart,&val); */
-    /* /\* printf("x = "); dprint(2,x); *\/ */
-    /* /\* printf("u = "); dprint(2,ustart); *\/ */
-    /* memmove(u,ustart,du*sizeof(double)); */
-    /* free(ustart); ustart = NULL; */
     return res;
 }
 

@@ -120,15 +120,16 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 36; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e-2;
+    double vpos = 1e0;
     double vspeed = 1e0;
+    double vspeed_last = 1e-1;
 
     out[0] = vpos;
     out[7] = vpos;
     out[14] = vpos;
     out[21] = vspeed;
     out[28] = vspeed;
-    out[35] = vspeed;
+    out[35] = vspeed_last;
 
     if (grad != NULL){
         for (size_t ii = 0; ii < 36*3; ii++){
@@ -142,6 +143,7 @@ int stagecost(double t, double * x, double * u, double * out,
               double * grad)
 {
     (void)(t);
+    (void)(u);
     *out = 0.0;
 
     // states
@@ -149,13 +151,18 @@ int stagecost(double t, double * x, double * u, double * out,
     *out = *out + 0.04 * pow(x[3],2) + 0.04 * pow(x[4],2) + 0.04 * pow(x[5],2);
 
     // controls
-    *out = *out + 37.18 * pow(u[0],2) + 37.18 * pow(u[1],2) + 
-                                        37.18 * 7.0 * pow(u[2],2);
+//    double c = 37.18;
+    /* double c = 37.18; */
+    /* *out = *out + c * pow(u[0],2) + c * pow(u[1],2) +  */
+    /*                                     c * 7.0 * pow(u[2],2); */
     
     if (grad!= NULL){
-        grad[0] = 2.0 * 37.18 * u[0];
-        grad[1] = 2.0 * 37.18 * u[1];
-        grad[2] = 2.0 * 37.18 * 7.0 * u[2];
+        /* grad[0] = 2.0 * 37.18 * u[0]; */
+        /* grad[1] = 2.0 * 37.18 * u[1]; */
+        /* grad[2] = 2.0 * 37.18 * 7.0 * u[2]; */
+        grad[0] = 0.0;
+        grad[1] = 0.0;
+        grad[2] = 0.0;
     }
     return 0;
 }
@@ -166,13 +173,14 @@ int boundcost(double t, double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 100.0;
+    *out = 20.0;
     return 0;
 }
 
 int ocost(double * x,double * out)
 {
-    (void)(x);
+    dprint(6,x);
+    //(void)(x);
     *out = 0.0;
     return 0;
 }
@@ -181,12 +189,7 @@ double startcost(double * x, void * args)
 {
     (void)(args);
     (void)(x);
-    if ((fabs(x[0]) <= 2e-1) && (fabs(x[1]) < 2e-1)){
-        return 0.2;
-    }
-    else{
-        return 0.2;
-    }
+    return 10.0;
 }
 
 int main(int argc, char * argv[])
@@ -241,17 +244,32 @@ int main(int argc, char * argv[])
     double ub[6] = {M_PI/2.0, M_PI/3.0, M_PI/3.0, 2.0, 2.0, 0.5};
     size_t Narr[6] = {N, N, N, N, N, N};
 
-    double lbu[3] = {-0.1, -0.1, -0.01};
-    double ubu[3] = {0.1, 0.1, 0.01};
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,lbu);
-    c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-6);
-    c3opt_set_relftol(opt,1e-6);
-    c3opt_set_gtol(opt,1e-7);
-    c3opt_set_verbose(opt,0);
-    c3opt_ls_set_alpha(opt,0.1);
-    c3opt_ls_set_beta(opt,0.2);
+
+    double uopts[8*3] = 
+        { -0.1, -0.1, -0.01, 
+          -0.1, -0.1,  0.01,
+          -0.1,  0.1, -0.01,
+          -0.1,  0.1,  0.01,
+           0.1, -0.1, -0.01,
+           0.1, -0.1,  0.01,
+           0.1,  0.1, -0.01,
+           0.1,  0.1,  0.01
+        };
+
+    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
+    c3opt_set_brute_force_vals(opt,8,uopts);
+
+    /* double lbu[3] = {-0.1, -0.1, -0.01}; */
+    /* double ubu[3] = {0.1, 0.1, 0.01}; */
+    /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
+    /* c3opt_add_lb(opt,lbu); */
+    /* c3opt_add_ub(opt,ubu); */
+    /* c3opt_set_absxtol(opt,1e-6); */
+    /* c3opt_set_relftol(opt,1e-6); */
+    /* c3opt_set_gtol(opt,1e-7); */
+    /* c3opt_set_verbose(opt,0); */
+    /* c3opt_ls_set_alpha(opt,0.1); */
+    /* c3opt_ls_set_beta(opt,0.2); */
     
     double beta = 0.1;
 
@@ -262,11 +280,11 @@ int main(int argc, char * argv[])
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
-    for (size_t ii = 0; ii < 6; ii++){
-//        c3sc_set_external_boundary(sc,ii,"reflect");
-    }
+    /* for (size_t ii = 0; ii < 6; ii++){ */
+    /*     c3sc_set_external_boundary(sc,ii,"reflect"); */
+    /* } */
     double center[6] = {0.0,0.0,0.0,0.0,0.0};
-    double width[6] = {0.2,0.2,0.2,0.2,0.06};
+    double width[6] = {0.8,0.8,0.8,0.8,0.24};
     c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
@@ -294,7 +312,7 @@ int main(int argc, char * argv[])
             
         }
         if (diff_track[ii] < 1e-3){
-            break;
+            //   break;
         }
     }
     free(diff_track);
@@ -321,13 +339,16 @@ int main(int argc, char * argv[])
     trajectory_add(&traj,6,3,time,state,con);
     printf("initialized trajectory\n");
 
-    double final_time = 1e0;
+    double final_time = 5e-1;
     double dt = 1e-2;
     int res;
     while (time < final_time){
         printf("time = %G\n",time);
         res = trajectory_step(traj,ode_sys,dt);
-        assert(res == 0);
+        if (res != 0){
+            break;
+        }
+//        assert(res == 0);
         time = time + dt;
     }
 

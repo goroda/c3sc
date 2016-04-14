@@ -1,17 +1,15 @@
 #ifndef TENS_MARKOV_H
 #define TENS_MARKOV_H
 
-#include "c3sc_elements.h"
-
 #include "dynamics.h"
 #include "boundary.h"
 #include "cost.h"
-
 
 enum NodeType {INBOUNDS,OUTBOUNDS,ONBOUNDS};
 
 struct MCNode;
 struct MCNode * mcnode_alloc(size_t);
+struct MCA * mca_copy_deep(struct MCA *);
 /* struct MCNode ** mcnode_alloc_array(size_t); */
 /* void mcnode_free_array(struct MCNode **, size_t); */
 void mcnode_free(struct MCNode *);

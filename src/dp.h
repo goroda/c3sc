@@ -1,12 +1,9 @@
 #ifndef DP_H
 #define DP_H
 
-#include "c3sc_elements.h"
-
-#include "boundary.h"
 #include "cost.h"
+#include "dynamics.h"
 #include "tensmarkov.h"
-#include "control.h"
 
 enum SCTYPE {IH,FH};
 struct C3SC;
@@ -46,7 +43,6 @@ void dpih_free(struct DPih *);
 void dpih_free_deep(struct DPih *);
 void dpih_attach_mca(struct DPih *, struct MCA *);
 void dpih_attach_cost(struct DPih *, struct Cost *);
-void dpih_attach_policy(struct DPih *, struct Policy *);
 void dpih_attach_opt(struct DPih *, struct c3Opt *);
 
 struct Cost * dpih_get_cost(struct DPih *);
@@ -55,12 +51,10 @@ struct Dyn * dpih_get_dyn(struct DPih *);
 double dpih_rhs(struct DPih *,double *,double *,double *);
 double dpih_rhs_opt_pol(double *,size_t,void *);
 struct Cost * dpih_iter_pol(struct DPih *,int);
-struct Cost * dpih_iter_vi(struct DPih *,int);
-struct Policy * dpih_iter_vi_pol(struct DPih *,int);
+struct Cost * dpih_iter_vi(struct DPih *,int,double,double,size_t);
 int dpih_pol_implicit(double,double *,double*,void *);
 
 struct DPfh;
-
 
 struct ImplicitPolicy;
 struct ImplicitPolicy * implicit_policy_alloc();

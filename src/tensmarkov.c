@@ -7,7 +7,6 @@
 #include "c3.h"
 #include "tensmarkov.h"
 #include "util.h"
-#include "simulate.h"
 #include "dynamics.h"
 #include "cost.h"
 
@@ -411,15 +410,35 @@ struct MCA * mca_alloc(size_t d, size_t du, size_t dw, double * h)
             mca->minh = h[ii];
         }
     }
-    mca->dyn = NULL;
-    mca->bound = NULL;
-
+    
+    // workspace
     mca->drift = calloc_double(d);
     mca->gdrift = calloc_double(d * du);
     mca->diff = calloc_double(d*dw);
     mca->gdiff = calloc_double(d * dw * du);
     
+    mca->dyn = NULL;
+    mca->bound = NULL;
+
     return mca;
+}
+
+/**********************************************************//**
+    Copy a markov model
+**************************************************************/
+struct MCA * mca_copy_deep(struct MCA * mca)
+{
+    if (mca == NULL){
+        return NULL;
+    }
+
+    struct MCA * newm = mca_alloc(mca->d,mca->du,mca->dw,mca->h);
+    
+    newm->dyn = dyn_copy_deep(mca->dyn);
+    newm->bound = boundary_copy_deep(mca->bound);
+
+    return newm;
+    
 }
 
 /**********************************************************//**

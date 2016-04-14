@@ -24,10 +24,10 @@ struct Cost
 
     size_t * N;
     double ** x;
-
 };
 
 struct Cost * cost_alloc(size_t, double *, double *);
+struct Cost * cost_copy_deep(struct Cost *);
 void cost_free(struct Cost *);
 double * cost_get_lb(struct Cost *);
 double * cost_get_ub(struct Cost *);
@@ -36,7 +36,7 @@ size_t * cost_get_ranks(struct Cost *);
 void cost_init_discrete(struct Cost *,size_t *,double **);
 void cost_approx(struct Cost *,
                  double (*)(double *, void *),
-                 void *, int);
+                 void *, int,double,double,size_t);
 
 int cost_eval(struct Cost *, double, double *, double *);
 //void cost_eval_bb(size_t,double *,double **,double *,void *);

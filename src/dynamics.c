@@ -44,6 +44,16 @@ struct Drift * drift_alloc(size_t dx, size_t du)
     return b;
 }
 
+struct Drift * drift_copy(struct Drift * old)
+{
+    if (old == NULL){
+        return NULL;
+    }
+    
+    struct Drift * newd = drift_alloc(old->dx,old->du);
+    drift_add_func(newd,old->b,old->bargs);
+}
+
 void drift_free(struct Drift * drift)
 {
     if (drift != NULL){
@@ -117,11 +127,7 @@ struct Diff
     size_t dx;
     size_t du;
     size_t dw;
-    double * lbx;
-    double * ubx;
-    double * lbu;
-    double * ubu;
-
+ 
     int (*s)(double,double*,double*,double*,double*,void*);
     void * sargs;
 };
@@ -138,23 +144,27 @@ struct Diff * diff_alloc(size_t dx, size_t du, size_t dw)
     s->dx = dx;
     s->du = du;
     s->dw = dw;
-    s->lbx = NULL;
-    s->ubx = NULL;
-    s->lbu = NULL;
-    s->ubu = NULL;
+ 
     s->s = NULL;
     s->sargs = NULL;
 
     return s;
 }
 
+struct Diff * diff_copy(struct Diff * old)
+{
+    if (old == NULL){
+        return NULL;
+    }
+    
+    struct Diff * newd = diff_alloc(old->dx,old->du,old->dw);
+    diff_add_func(newd,old->s,old->sargs);
+}
+
 void diff_free(struct Diff * diff)
 {
     if (diff != NULL){
-        free(diff->lbx); diff->lbx = NULL;
-        free(diff->ubx); diff->ubx = NULL;
-        free(diff->lbu); diff->lbu = NULL;
-        free(diff->ubu); diff->ubu = NULL;
+ 
         free(diff); diff = NULL;
     }
 }
@@ -218,6 +228,18 @@ struct Dyn * dyn_alloc(struct Drift * drift, struct Diff * diff)
     dyn->diff = diff;
 
     return dyn;
+}
+
+struct Dyn * dyn_copy_deep(struct Dyn * old)
+{
+    if (old == NULL){
+        return NULL;
+    }
+    struct Dyn * newdyn = dyn_alloc(NULL,NULL);
+    newdyn->drift = drift_copy(old->drift);
+    newdyn->diff = diff_copy(old->diff);
+    
+    return newdyn;
 }
 
 void dyn_free(struct Dyn * dyn)

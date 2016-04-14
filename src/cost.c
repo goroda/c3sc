@@ -29,6 +29,31 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
 }
 
 /**********************************************************//**
+    Copy a cost function
+**************************************************************/
+struct Cost * cost_copy_deep(struct Cost * old)
+{
+    if (old == NULL){
+        return NULL;
+    }
+
+    struct Cost * newc = cost_alloc(old->d,old->bds->lb,old->bds->ub);
+    if (old->N != NULL){
+        newc->N = calloc_size_t(newc->d);
+        memmove(newc->N,old->N,newc->d*sizeof(size_t));
+    }
+    if (old->x != NULL){
+        newc->x = malloc_dd(newc->d);
+        for (size_t ii = 0; ii < newc->d; ii++){
+            newc->x[ii] = calloc_double(newc->N[ii]);
+            memmove(newc->x[ii],old->x[ii],newc->N[ii]*sizeof(double));
+        }
+    }
+    
+    return newc;
+}
+
+/**********************************************************//**
     Free a cost function
 **************************************************************/
 void cost_free(struct Cost * c)
@@ -100,17 +125,20 @@ void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
     Set cost function to an approximation of some input
     function
 
-    \param[in,out] c       - cost structure
-    \param[in]     f       - function
-    \param[in]     args    - function arguments
-    \param[in]     verbose - verbosity level for approximation
-
+    \param[in,out] c         - cost structure
+    \param[in]     f         - function
+    \param[in]     args      - function arguments
+    \param[in]     verbose   - verbosity level for approximation
+    \param[in]     cross_tol - cross approximation tolerance
+    \param[in]     round_tol - rounding tolerance
+    \param[in]     kickrank  - rank increase level
     \note
     c->cost should be NULL
 **************************************************************/
 void cost_approx(struct Cost * c,
                  double (*f)(double *, void *),
-                 void * args, int verbose)
+                 void * args, int verbose,double cross_tol,
+                 double round_tol, size_t kickrank)
 {
     assert (c != NULL);
     assert (c->bds != NULL);
@@ -126,15 +154,15 @@ void cost_approx(struct Cost * c,
     c3approx_init_cross(c3a,init_rank,verbose);
     c3approx_set_fiber_opt_brute_force(c3a,c->N,c->x);
     
-    c3approx_set_cross_tol(c3a,1e-7);
+    c3approx_set_cross_tol(c3a,cross_tol);
     c3approx_set_cross_maxiter(c3a,10);
-    c3approx_set_round_tol(c3a,1e-7);
-    c3approx_set_adapt_kickrank(c3a,5);
+    c3approx_set_round_tol(c3a,round_tol);
+    c3approx_set_adapt_kickrank(c3a,kickrank);
     size_t minN = c->N[0];
     for (size_t ii = 0; ii < c->d; ii++){
         if (c->N[ii] < minN){ minN = c->N[ii];}
     }
-    c3approx_set_adapt_maxiter(c3a,(minN-5)/5);
+    c3approx_set_adapt_maxrank_all(c3a,minN);
 
     // determine starting nodes
 //    printf("x[0] = "); dprint(c->N[0],c->x[0]);
@@ -145,12 +173,12 @@ void cost_approx(struct Cost * c,
         assert (c->N[ii] > 5);
         size_t mid = c->N[ii]/2;
         start[ii] = calloc_double(nstart[ii]);
-        start[ii][0] = c->x[ii][0];
+        start[ii][3] = c->x[ii][0];
         start[ii][1] = c->x[ii][1];
-        start[ii][2] = c->x[ii][mid];
-        start[ii][3] = c->x[ii][c->N[ii]-2];
+        start[ii][0] = c->x[ii][mid];
+        start[ii][2] = c->x[ii][c->N[ii]-2];
         start[ii][4] = c->x[ii][c->N[ii]-1];
-//        printf("start = "); dprint(5,start[ii]);
+        //printf("start mid = %G\n",start[ii][0]); 
     }
     c3approx_set_start(c3a,nstart,start);
 

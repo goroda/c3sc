@@ -1,8 +1,13 @@
 #ifndef DYNAMICS_H
 #define DYNAMICS_H
 
-#include "c3sc_elements.h"
+struct Drift;
+struct Diff;
+struct Dyn;
+
 struct Drift * drift_alloc(size_t, size_t);
+struct Drift * drift_copy(struct Drift *);
+
 void drift_free(struct Drift *);
 void drift_add_func(struct Drift *,
                     int (*)(double,const double*,const double*,
@@ -14,6 +19,7 @@ int drift_eval(struct Drift *,double,double*,double*,
 
 ////////////////////////////////////
 struct Diff * diff_alloc(size_t, size_t, size_t);
+struct Diff * diff_copy(struct Diff *);
 void diff_free(struct Diff *);
 void diff_add_func(struct Diff *,
                    int (*)(double,double*,double*,
@@ -27,6 +33,7 @@ size_t diff_get_dw(struct Diff *);
 ///////////////////////////////////////////////////////////
 
 struct Dyn * dyn_alloc(struct Drift *, struct Diff *);
+struct Dyn * dyn_copy_deep(struct Dyn *);
 void dyn_free(struct Dyn *);
 void dyn_free_deep(struct Dyn *);
 

@@ -290,6 +290,7 @@ int main(int argc, char * argv[])
     double ub[2] = {2.0, 2.0};
     size_t Narr[2] = {N, N};
 
+    // optimization arguments
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
@@ -298,13 +299,18 @@ int main(int argc, char * argv[])
     c3opt_set_gtol(opt,1e-10);
     c3opt_set_verbose(opt,0);
     
-    double beta = 0.1;
+
+    // cross approximation tolerances
+    double cross_tol = 1e-7;
+    double round_tol = 1e-7;
+    size_t kickrank = 5;
 
     // setup problem
+    double beta = 0.1; 
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
     double center[2] = {0.0,0.0};
-    double width[2] = {0.5,0.5};
+    double width[2] = {0.2,0.2};
     c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
@@ -314,9 +320,13 @@ int main(int argc, char * argv[])
     size_t N1 = N, N2 = N;
     struct DPih * dp = c3sc_get_dp(sc);
     struct Cost * cost = dpih_get_cost(dp);
-    cost_approx(cost,startcost,NULL,verbose-1);
+    cost_approx(cost,startcost,NULL,verbose-1,cross_tol,round_tol,kickrank);
 
-    double * diff_track = calloc_double(niter+1);
+
+    // keep track of 1) Norm 2) Diff 3) rank
+    struct Trajectory * diagnostics = NULL;
+    double track[3];
+
     for (size_t ii = 0; ii < niter+1; ii++){
 
         FILE *fp2;
@@ -332,8 +342,13 @@ int main(int argc, char * argv[])
         fclose(fp2);
         
         //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
-        struct Cost * newcost = dpih_iter_vi(dp,verbose-1);
-        diff_track[ii] = function_train_relnorm2diff(newcost->cost,cost->cost);
+        struct Cost * newcost = dpih_iter_vi(dp,verbose-1,
+                                             cross_tol,round_tol,kickrank);
+        track[0] = function_train_norm2(newcost->cost);
+        track[1] = function_train_relnorm2diff(newcost->cost,cost->cost);
+        track[2] = cost->cost->ranks[1];
+        trajectory_add(&diagnostics,3,0,(double)(ii+1),track,NULL);
+
         cost_free(cost);
         cost = newcost;
         dpih_attach_cost(dp,cost);
@@ -341,13 +356,13 @@ int main(int argc, char * argv[])
 
     /*     delta = dpih_pi_iter_approx(&prob,verbose); */
         if (verbose != 0){
-            printf("ii=%zu diff =%G\n",ii,diff_track[ii]);
+            printf("ii=%zu diff =%G\n",ii,track[1]);
         }
-        if (diff_track[ii] < 1e-3){
+        if (track[1] < 1e-3){
             break;
         }
     }
-    free(diff_track);
+
     FILE *fp2;
     char filename[256];
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
@@ -359,6 +374,12 @@ int main(int argc, char * argv[])
     }
     print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
+
+    sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
+    FILE * fp = fopen(filename,"w");
+    assert (fp != NULL);
+    trajectory_print(diagnostics,fp,4);
+    fclose(fp);
 
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
     printf("created policy\n");
@@ -384,92 +405,25 @@ int main(int argc, char * argv[])
     double dt = 1e-2;
     int res;
     while (time < final_time){
-        printf("time = %G\n",time);
+        // printf("time = %G\n",time);
         res = trajectory_step(traj,ode_sys,dt);
         assert(res == 0);
         time = time + dt;
     }
 
-    if (verbose == 1){
-        trajectory_print(traj,stdout,4);
-    }
+    /* if (verbose == 1){ */
+    /*     trajectory_print(traj,stdout,4); */
+    /* } */
 
     sprintf(filename,"%s/%s.dat",dirout,"traj");
-    FILE * fp = fopen(filename,"w");
+    fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
     fclose(fp);
 
-/*     double t0 = 0.0; */
-/*     double xs[2] = {0.3,0.2}; */
-/* //    double us[2] = {0.0,0.0}; */
-/*     double us[1] = {0.0}; */
-
-/*     struct State * state = state_alloc(); */
-/*     state_init(state,dx,t0,xs); */
-
-/*     struct Control * control = control_alloc(); */
-/*     control_init(control,du,us); */
-
-/*     struct Trajectory * traj = NULL; */
-/*     trajectory_add(&traj,state,control); */
-
-/*     struct Dyn * dyn = dpih_get_dyn(dp); */
-
-/*     size_t nsteps = 1000; */
-/*     double space[2 + 4]; */
-/*     double dt = 1e-2; */
-/*     // double noise[2]; */
-/*     int res; */
-/*     for (size_t ii = 0; ii < nsteps; ii++){ */
-/*         //noise[0] = randn()*sqrt(dt); */
-/*         //noise[1] = randn()*sqrt(dt); */
-/*         res = trajectory_step(traj,pol,dyn,dt,"euler", */
-/*                                space,NULL,NULL); */
-/*         if (res != 0){ */
-/*             break; */
-/*         } */
-/*         struct State * scheck = trajectory_last_state(traj); */
-/*         double * xcheck = state_getx_ref(scheck); */
-/*         double tcheck = state_gett(scheck); */
-
-/*         res = trajboundcheck(tcheck,xcheck,NULL); */
-/*         /\* res = trajectory_step(traj,pol,dyn,dt, *\/ */
-/*         /\*                       "euler-maruyama", *\/ */
-/*         /\*                       space,noise,NULL); *\/ */
-/*         if (res != 0){ */
-/*             break; */
-/*         } */
-/*     } */
-
-/*     if (verbose == 1){ */
-/*         trajectory_print(traj,stdout,4); */
-/*     } */
-
-/* //    char filename[256]; */
-/*     sprintf(filename,"%s/%s.dat",dirout,"traj"); */
-/*     FILE * fp = fopen(filename,"w"); */
-/*     assert (fp != NULL); */
-/*     trajectory_print(traj,fp,4); */
-/*     fclose(fp); */
-
-    
     printf("cost ranks are ");
     size_t * ranks = cost_get_ranks(cost);
     iprint_sz(dx+1,ranks);
-
-    /* printf("policy ranks are \n"); */
-    /* for (size_t ii = 0; ii < du; ii++){ */
-    /*     ranks = policy_get_ranks(pol,ii); */
-    /*     iprint_sz(dx+1,ranks); */
-
-    /* } */
-
-    /* state_free(state); state = NULL; */
-    /* control_free(control); control = NULL; */
-    /* trajectory_free(traj); traj = NULL; */
-
-    /* policy_free(pol); */
 
     c3sc_destroy(sc);
     return 0;

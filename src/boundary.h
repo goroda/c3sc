@@ -9,12 +9,11 @@ enum EBTYPE {
 };
 
 struct Boundary;
-struct Boundary *
-boundary_alloc(size_t,double *,double*);
+struct Boundary * boundary_alloc(size_t,double *,double*);
+struct Boundary * boundary_copy_deep(struct Boundary *);
 void boundary_free(struct Boundary *);
 void boundary_external_set_type(struct Boundary *,size_t,char *);
 struct BoundInfo * boundary_type(const struct Boundary *,double,const double *);
-
 
 enum BOUNDRESULT {
     IN,

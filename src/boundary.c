@@ -60,6 +60,27 @@ external_boundary_alloc(double left, double right, char * type)
 }
 
 /**********************************************************//**
+    Copy External boundary
+**************************************************************/
+struct ExternalBoundary *
+external_boundary_copy(struct ExternalBoundary * old)
+{
+    if (old == NULL){
+        return NULL;
+    }
+    struct ExternalBoundary * db = malloc(sizeof(struct ExternalBoundary));
+    if (db == NULL){
+        fprintf(stderr,"Mem error allocating ExternalBoundary\n");
+        exit(1);
+    }
+    db->left = old->left;
+    db->right = old->right;
+    db->type = old->type;
+
+    return db;
+}
+
+/**********************************************************//**
     Free External boundary
 **************************************************************/
 void external_boundary_free(struct ExternalBoundary * db)
@@ -209,6 +230,29 @@ struct BoundRect * bound_rect_init(size_t dim, double * center, double * lengths
     return br;
 }
 
+struct BoundRect * bound_rect_copy(struct BoundRect * old)
+{
+    if (old == NULL){
+        return NULL;
+    }
+
+    struct BoundRect * br;
+    br = malloc(sizeof(struct BoundRect));
+    if (br == NULL){
+        fprintf(stderr, "Error allocating BoundRect\n");
+        exit(1);
+    }
+    br->dim = old->dim;
+    br->center = calloc_double(old->dim);
+    br->lb = calloc_double(old->dim);
+    br->ub = calloc_double(old->dim);
+    memmove(br->center,old->center,old->dim*sizeof(double));
+    memmove(br->lb,old->lb,old->dim*sizeof(double));
+    memmove(br->ub,old->ub,old->dim*sizeof(double));
+
+    return br;
+}
+
 struct BoundRect ** bound_rect_alloc_array(size_t N)
 {
     struct BoundRect ** br;
@@ -306,6 +350,33 @@ boundary_alloc(size_t d,double * lb, double * ub)
     bound->nalloc = 10;
     bound->br = bound_rect_alloc_array(bound->nalloc);
     
+    return bound;
+}
+
+/**********************************************************//**
+    Copy a boundary
+**************************************************************/
+struct Boundary * boundary_copy_deep(struct Boundary * old)
+{
+    if (old == NULL){
+        return old;
+    }
+
+    struct Boundary * bound;
+    bound = malloc(sizeof(struct Boundary));
+    assert (bound != NULL);
+
+    bound->d = old->d;    
+    bound->eb = external_boundary_alloc_array(old->d);
+    for (size_t ii = 0; ii < old->d; ii++){
+        bound->eb[ii] = external_boundary_copy(old->eb[ii]);
+    }
+    bound->n = old->n;
+    bound->nalloc = old->nalloc;
+    bound->br = bound_rect_alloc_array(bound->nalloc);
+    for (size_t ii = 0; ii < old->n; ii++){
+        bound->br[ii] = bound_rect_copy(old->br[ii]);
+    }
     return bound;
 }
 
@@ -465,8 +536,11 @@ struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const
     }
 
     for (size_t ii = 0; ii < bound->n; ii++){
+
         int inobs = bound_rect_inside(bound->br[ii],x);
+//        dprint(6,x);
         if (inobs == 1){
+            //          printf("in obstacle! \n");
             bi->in_obstacle = (int) ii;
             bi->absorb_overall = 1;
             break;
