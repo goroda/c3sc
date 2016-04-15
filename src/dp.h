@@ -5,8 +5,12 @@
 #include "dynamics.h"
 #include "tensmarkov.h"
 
+// prototypes of structures
 enum SCTYPE {IH,FH};
 struct C3SC;
+struct ImplicitPolicy;
+struct DPih;
+
 typedef struct C3SC* c3sc;
 
 struct C3SC * c3sc_create(enum SCTYPE, size_t, size_t, size_t);
@@ -29,16 +33,16 @@ void c3sc_init_dp(struct C3SC *, double,
                   int (*)(double*,double*));
 
 void * c3sc_get_dp(struct C3SC *);
-struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC *);
+
 ////////////////////////////////////////////////////
 
-struct DPih;
+
 struct DPih * 
 dpih_alloc(double,
            int (*)(double,double*,double*,double*,double*),
            int (*)(double,double*,double*),
            int (*)(double*,double*));
-
+struct DPih * dpih_copy_deep(struct DPih *);
 void dpih_free(struct DPih *);
 void dpih_free_deep(struct DPih *);
 void dpih_attach_mca(struct DPih *, struct MCA *);
@@ -49,16 +53,18 @@ struct Cost * dpih_get_cost(struct DPih *);
 struct Dyn * dpih_get_dyn(struct DPih *);
 
 double dpih_rhs(struct DPih *,double *,double *,double *);
-double dpih_rhs_opt_pol(double *,size_t,void *);
-struct Cost * dpih_iter_pol(struct DPih *,int);
 struct Cost * dpih_iter_vi(struct DPih *,int,double,double,size_t);
-int dpih_pol_implicit(double,double *,double*,void *);
+struct Cost * dpih_iter_pol(struct DPih *, struct ImplicitPolicy *,
+                            int, double, double, size_t);
 
 struct DPfh;
 
-struct ImplicitPolicy;
 struct ImplicitPolicy * implicit_policy_alloc();
+struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC *);
 void implicit_policy_free(struct ImplicitPolicy *);
 void implicit_policy_set_dp(struct ImplicitPolicy *, struct DPih *);
+int implicit_policy_eval(struct ImplicitPolicy *,double,const double *, double *);
 int implicit_policy_controller(double, const double *, double *, void *);
+
+
 #endif

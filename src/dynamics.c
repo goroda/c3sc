@@ -52,6 +52,8 @@ struct Drift * drift_copy(struct Drift * old)
     
     struct Drift * newd = drift_alloc(old->dx,old->du);
     drift_add_func(newd,old->b,old->bargs);
+
+    return newd;
 }
 
 void drift_free(struct Drift * drift)
@@ -159,6 +161,7 @@ struct Diff * diff_copy(struct Diff * old)
     
     struct Diff * newd = diff_alloc(old->dx,old->du,old->dw);
     diff_add_func(newd,old->s,old->sargs);
+    return newd;
 }
 
 void diff_free(struct Diff * diff)

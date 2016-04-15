@@ -38,6 +38,7 @@ struct Cost * cost_copy_deep(struct Cost * old)
     }
 
     struct Cost * newc = cost_alloc(old->d,old->bds->lb,old->bds->ub);
+    newc->cost = function_train_copy(old->cost);
     if (old->N != NULL){
         newc->N = calloc_size_t(newc->d);
         memmove(newc->N,old->N,newc->d*sizeof(size_t));

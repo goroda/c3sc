@@ -85,8 +85,9 @@ void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * l
 /*     free(ytest); ytest = NULL; */
 /* } */
 
-void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
-                  double * lb, double * ub)
+void print_policy_implict(FILE * fp2, struct ImplicitPolicy * pol,
+                          size_t N1, size_t N2,
+                          double * lb, double * ub)
 {
 
     fprintf(fp2,"x y u1 u2\n");
@@ -103,7 +104,7 @@ void print_policy_implict(FILE * fp2, struct DPih * dp, size_t N1, size_t N2,
             /* printf("\n\n\n\n\n\n"); */
             /* printf("pt = "); dprint(2,pt3); */
 
-            int res = dpih_pol_implicit(0.0,pt3,u,dp);
+            int res = implicit_policy_eval(pol,0.0,pt3,u);
             assert (res >-1);
             /* printf("done computing policy\n"); */
             /* fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
@@ -326,7 +327,8 @@ int main(int argc, char * argv[])
     // keep track of 1) Norm 2) Diff 3) rank
     struct Trajectory * diagnostics = NULL;
     double track[3];
-
+    size_t npol = 20;
+    struct Cost * tcost = NULL;;
     for (size_t ii = 0; ii < niter+1; ii++){
 
         FILE *fp2;
@@ -340,6 +342,18 @@ int main(int argc, char * argv[])
 
         print_cost(fp2,cost,N1,N2,lb,ub);
         fclose(fp2);
+
+        struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
+        for (size_t jj = 0; jj < npol; jj++){
+//            printf("jj = %zu\n",jj);
+            tcost = dpih_iter_pol(dp,pol,verbose-1,
+                                  cross_tol,round_tol,kickrank);
+            cost_free(cost); cost = NULL;
+            cost = tcost;
+            dpih_attach_cost(dp,cost);
+        }
+        implicit_policy_free(pol);
+
         
         //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
         struct Cost * newcost = dpih_iter_vi(dp,verbose-1,
@@ -358,7 +372,7 @@ int main(int argc, char * argv[])
         if (verbose != 0){
             printf("ii=%zu diff =%G\n",ii,track[1]);
         }
-        if (track[1] < 1e-3){
+        if (track[1] < 1e-5){
             break;
         }
     }
@@ -425,6 +439,10 @@ int main(int argc, char * argv[])
     size_t * ranks = cost_get_ranks(cost);
     iprint_sz(dx+1,ranks);
 
-    c3sc_destroy(sc);
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
+    trajectory_free(diagnostics); diagnostics = NULL;
+    implicit_policy_free(pol); pol = NULL;
+    c3sc_destroy(sc); sc= NULL;
     return 0;
 }
