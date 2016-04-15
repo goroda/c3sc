@@ -204,6 +204,7 @@ int boundcost(double t, double * x, double * out)
 int ocost(double * x,double * out)
 {
     (void)(x);
+    //printf("got ocost!!\n");
     *out = 0.0;
     return 0;
 }
@@ -300,7 +301,6 @@ int main(int argc, char * argv[])
     c3opt_set_gtol(opt,1e-10);
     c3opt_set_verbose(opt,0);
     
-
     // cross approximation tolerances
     double cross_tol = 1e-7;
     double round_tol = 1e-7;
@@ -311,7 +311,7 @@ int main(int argc, char * argv[])
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
     double center[2] = {0.0,0.0};
-    double width[2] = {0.2,0.2};
+    double width[2] = {0.4,0.4};
     c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
