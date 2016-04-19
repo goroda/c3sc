@@ -395,6 +395,33 @@ void boundary_free(struct Boundary * bound)
 }
 
 /**********************************************************//**
+    Get number of obstacles
+**************************************************************/
+size_t boundary_get_nobs(struct Boundary * bound)
+{
+    assert (bound != NULL);
+    return bound->n;
+}
+
+/**********************************************************//**
+    Get lower bound of obstacle
+**************************************************************/
+double * boundary_obstacle_get_lb(struct Boundary * bound, size_t ind)
+{
+    assert (bound != NULL);
+    return bound->br[ind]->lb;
+}
+
+/**********************************************************//**
+    Get upper bound of obstacle
+**************************************************************/
+double * boundary_obstacle_get_ub(struct Boundary * bound, size_t ind)
+{
+    assert (bound != NULL);
+    return bound->br[ind]->ub;
+}
+
+/**********************************************************//**
     Add a rectangular obstacle
 **************************************************************/
 void boundary_add_obstacle(struct Boundary * bound, double * center, double * lengths)

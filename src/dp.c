@@ -128,6 +128,7 @@ void c3sc_set_external_boundary(struct C3SC * sc, size_t dim,
 void c3sc_add_obstacle(struct C3SC * sc, double * center, double * lengths)
 {
     boundary_add_obstacle(sc->bound,center,lengths);
+    
 }
 
 /**********************************************************//**
@@ -184,6 +185,14 @@ void c3sc_init_mca(struct C3SC * sc, size_t * N)
         h[ii] = x[ii][1] - x[ii][0];
     }
     cost_init_discrete(sc->cost,N,x);
+
+    size_t nobs = boundary_get_nobs(sc->bound);
+    for (size_t jj = 0; jj < nobs; jj++){
+        double * lb = boundary_obstacle_get_lb(sc->bound,jj);
+        double * ub = boundary_obstacle_get_ub(sc->bound,jj);
+        cost_add_nodes(sc->cost,lb,ub,3);
+    }
+
 
     sc->mca = mca_alloc(sc->dx,sc->du,sc->dw,h);
     mca_attach_dyn(sc->mca,sc->dyn);
@@ -388,6 +397,16 @@ void dpih_attach_cost(struct DPih * dp, struct Cost * cost)
 {
     assert(dp != NULL);
     dp->cost = cost;
+}
+
+/**********************************************************//**
+   Overwrite a previous cost function
+**************************************************************/
+void dpih_attach_cost_ow(struct DPih * dp, struct Cost * cost)
+{
+    assert(dp != NULL);
+    cost_free(dp->cost);
+    dp->cost = cost_copy_deep(cost);
 }
 
 /**********************************************************//**
@@ -609,9 +628,11 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
                            double cross_tol, double round_tol,
                            size_t kickrank)
 {
-    struct Cost * oc = dp->cost;
-    struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
-    cost_init_discrete(cost,oc->N,oc->x);
+    
+    struct Cost * cost = cost_copy_deep(dp->cost);
+
+//    struct Cost * cost = cost_alloc(d,lb,ub);
+//    cost_init_discrete(cost,oc->N,oc->x);
     cost_approx(cost,dpih_rhs_opt_cost,dp,verbose,cross_tol,round_tol,kickrank);
     return cost;
 }
@@ -628,10 +649,49 @@ struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
     dppol.dp = dp;
     dppol.pol = pol;
     struct Cost * oc = dp->cost;
-    struct Cost * cost = cost_alloc(oc->d,oc->bds->lb,oc->bds->ub);
-    cost_init_discrete(cost,oc->N,oc->x);
+
+    /* size_t d = cost_get_d(oc); */
+    /* double * lb = cost_get_lb(oc); */
+    /* double * ub = cost_get_ub(oc); */
+    /* struct Cost * cost = cost_alloc(d,lb,ub); */
+    /* cost_init_discrete(cost,oc->N,oc->x); */
+
+    struct Cost * cost = cost_copy_deep(oc);
     cost_approx(cost,dpih_rhs_pol_cost,&dppol,verbose,cross_tol,round_tol,kickrank);
     return cost;
+}
+
+/**********************************************************//**
+   Solve for the cost of a particular policy  
+**************************************************************/
+void
+dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
+                    size_t max_solve_iter, double solve_tol,
+                    int verbose, double cross_tol, double round_tol,
+                    size_t kickrank)
+{
+    double normprev = 0.0;
+
+    struct Cost * tcost = NULL;
+    for (size_t jj = 0; jj < max_solve_iter; jj++){
+        tcost = dpih_iter_pol(dp,pol,verbose-1,
+                              cross_tol,round_tol,kickrank);
+        double normval = cost_norm2(tcost);
+        double rat = fabs(normprev/normval);
+        struct Cost * cost = dpih_get_cost(dp);
+        double diff = cost_norm2_diff(tcost,cost);
+        if ((jj+1) % 1 == 0){
+            printf("\t jj=%zu, normval=%G, ratio=%G\n",jj,diff/normval,rat);
+        }
+        normprev = normval;
+        dpih_attach_cost_ow(dp,tcost);
+        cost_free(tcost);
+        if (diff/normval <  solve_tol){
+            break;
+        }
+    }
+    
+//    return tcost;
 }
 
 

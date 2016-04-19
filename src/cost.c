@@ -7,6 +7,35 @@
 #include "util.h"
 #include "cost.h"
 
+/** \struct Cost
+ *  \brief Cost function
+ *  \var Cost::d
+ *  dimension of state space
+ *  \var Cost::bds
+ *  bounding box
+ *  \var Cost::cost
+ *  function train cost
+ *  \var Cost::N
+ *  Number of nodes of discretization in each dimension
+ *  \var Cost::x
+ *  discretization in each dimension
+ *  \var Cost::Nobs
+ *  Number of nodes that describes any obstacles
+ *  \var Cost::xobs
+ *  discretization of obstacles
+ */
+struct Cost 
+{
+    size_t d;
+    struct BoundingBox * bds;
+    struct FunctionTrain * cost;
+
+    size_t * N;
+    double ** x;
+
+    size_t * Nobs;
+    double ** xobs;
+};
 /**********************************************************//**
     Allocate the cost
 **************************************************************/
@@ -24,6 +53,8 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     
     cost->N = NULL;
     cost->x = NULL;
+    cost->Nobs = NULL;
+    cost->xobs = NULL;
 
     return cost;
 }
@@ -50,6 +81,17 @@ struct Cost * cost_copy_deep(struct Cost * old)
             memmove(newc->x[ii],old->x[ii],newc->N[ii]*sizeof(double));
         }
     }
+    if (old->Nobs != NULL){
+        newc->Nobs = calloc_size_t(newc->d);
+        memmove(newc->Nobs,old->Nobs,newc->d*sizeof(size_t));
+    }
+    if (old->xobs != NULL){
+        newc->xobs = malloc_dd(newc->d);
+        for (size_t ii = 0; ii < newc->d; ii++){
+            newc->xobs[ii] = calloc_double(newc->Nobs[ii]);
+            memmove(newc->xobs[ii],old->xobs[ii],newc->Nobs[ii]*sizeof(double));
+        }
+    }
     
     return newc;
 }
@@ -64,10 +106,20 @@ void cost_free(struct Cost * c)
         function_train_free(c->cost); c->cost = NULL;
         free_dd(c->d,c->x); c->x = NULL;
         free(c->N); c->N = NULL;
-        free(c); c= NULL;
+        free_dd(c->d,c->xobs); c->xobs = NULL;
+        free(c->Nobs); c->Nobs = NULL;
+        free(c); c = NULL;
     }
 }
 
+/**********************************************************//**
+    Return the dimension of a cost function
+**************************************************************/
+size_t cost_get_d(struct Cost * c)
+{
+    assert (c != NULL);
+    return c->d;
+}
 /**********************************************************//**
     Return a reference to cost funciton lower bounds
 **************************************************************/
@@ -102,6 +154,25 @@ size_t * cost_get_ranks(struct Cost * c)
 }
 
 /**********************************************************//**
+    Get cost norm
+**************************************************************/
+double cost_norm2(struct Cost * c)
+{
+    assert (c != NULL);
+    return function_train_norm2(c->cost);
+}
+
+/**********************************************************//**
+    Get norm2 difference between cost functions
+**************************************************************/
+double cost_norm2_diff(struct Cost * c, struct Cost * nc)
+{
+    assert (c != NULL);
+    assert (nc != NULL);
+    return function_train_norm2diff(c->cost,nc->cost);
+}
+
+/**********************************************************//**
     Initialize the cost of a discrete cost function
 
     \param[in,out] cost - allocated cost
@@ -119,7 +190,27 @@ void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
         cost->x[ii] = calloc_double(N[ii]);
         memmove(cost->x[ii],x[ii],N[ii]*sizeof(double));
     }
+}
 
+/**********************************************************//**
+    Add obstacle nodes                                                        
+
+    \param[in,out] cost - allocated cost
+    \param[in]     lb   - lower bounds of obstacles
+    \param[in]     ub   - upper bounds of obstacles
+    \param[in]     N    - number of nodes with which to represent obstacle
+**************************************************************/
+void cost_add_nodes(struct Cost * cost, double *lb, double *ub, size_t N)
+{
+    assert (cost != NULL);
+    assert (cost->xobs == NULL);
+    assert (cost->Nobs == NULL);
+    cost->xobs = malloc_dd(cost->d);
+    cost->Nobs = calloc_size_t(cost->d);
+    for (size_t ii = 0; ii < cost->d; ii++){
+        cost->Nobs[ii] = N;
+        cost->xobs[ii] = linspace(lb[ii],ub[ii],N);
+    }
 }
 
 /**********************************************************//**
@@ -143,42 +234,68 @@ void cost_approx(struct Cost * c,
 {
     assert (c != NULL);
     assert (c->bds != NULL);
-    assert (c->cost == NULL);
     assert (c->N != NULL);
     assert (c->x != NULL);
+    if (c->cost != NULL){
+        function_train_free(c->cost); c->cost = NULL;
+    }
 
     struct C3Approx * c3a = c3approx_create(CROSS,c->d,c->bds->lb,c->bds->ub);
+    double ** xuse = malloc_dd(c->d);
+    size_t * Nuse = calloc_size_t(c->d);
+    for (size_t ii = 0; ii < c->d; ii++){
+        if (c->Nobs != NULL){
+            xuse[ii] = c3sc_combine_and_sort(c->N[ii],c->x[ii],
+                                             c->Nobs[ii],c->xobs[ii],Nuse+ii);
+            
+        }
+        else{
+            xuse[ii] = calloc_double(c->N[ii]);
+            memmove(xuse[ii],c->x[ii],c->N[ii]*sizeof(double));
+            Nuse[ii] = c->N[ii];
+        }
+    }
+    
     c3approx_init_lin_elem(c3a);
-    c3approx_set_lin_elem_fixed(c3a,c->N,c->x);
+    c3approx_set_lin_elem_fixed(c3a,Nuse,xuse);
 
     size_t init_rank = 5;
     c3approx_init_cross(c3a,init_rank,verbose);
-    c3approx_set_fiber_opt_brute_force(c3a,c->N,c->x);
+    c3approx_set_fiber_opt_brute_force(c3a,Nuse,xuse);
     
     c3approx_set_cross_tol(c3a,cross_tol);
     c3approx_set_cross_maxiter(c3a,10);
     c3approx_set_round_tol(c3a,round_tol);
     c3approx_set_adapt_kickrank(c3a,kickrank);
-    size_t minN = c->N[0];
+    size_t minN = Nuse[0];
     for (size_t ii = 0; ii < c->d; ii++){
-        if (c->N[ii] < minN){ minN = c->N[ii];}
+        if (c->N[ii] < minN){ minN = Nuse[ii];}
     }
     c3approx_set_adapt_maxrank_all(c3a,minN);
 
     // determine starting nodes
-//    printf("x[0] = "); dprint(c->N[0],c->x[0]);
+
     double ** start = malloc_dd(c->d);
     size_t * nstart = calloc_size_t(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
+        /* printf("x[0] = "); dprint(Nuse[ii],xuse[ii]); */
         nstart[ii] = 5;
-        assert (c->N[ii] > 5);
-        size_t mid = c->N[ii]/2;
+        assert (Nuse[ii] > 5);
+        size_t mid = Nuse[ii]/2;
+        if (c->Nobs != NULL){
+            mid = c->Nobs[ii]/2;
+        }
         start[ii] = calloc_double(nstart[ii]);
-        start[ii][3] = c->x[ii][0];
-        start[ii][1] = c->x[ii][1];
-        start[ii][0] = c->x[ii][mid];
-        start[ii][2] = c->x[ii][c->N[ii]-2];
-        start[ii][4] = c->x[ii][c->N[ii]-1];
+        start[ii][3] = xuse[ii][0];
+        start[ii][1] = xuse[ii][1];
+        if (c->Nobs != NULL){
+            start[ii][0] = c->xobs[ii][mid];
+        }
+        else{
+            start[ii][0] = xuse[ii][mid];
+        }
+        start[ii][2] = xuse[ii][Nuse[ii]-2];
+        start[ii][4] = xuse[ii][Nuse[ii]-1];
         //printf("start mid = %G\n",start[ii][0]); 
     }
     c3approx_set_start(c3a,nstart,start);
@@ -187,6 +304,8 @@ void cost_approx(struct Cost * c,
     
     free(nstart); nstart = NULL;
     free_dd(c->d,start); start = NULL;
+    free_dd(c->d,xuse); xuse = NULL;
+    free(Nuse); Nuse = NULL;
     c3approx_destroy(c3a); c3a = NULL;
 }
 

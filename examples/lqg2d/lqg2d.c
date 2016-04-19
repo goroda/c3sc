@@ -302,16 +302,18 @@ int main(int argc, char * argv[])
     c3opt_set_verbose(opt,0);
     
     // cross approximation tolerances
-    double cross_tol = 1e-7;
-    double round_tol = 1e-7;
+    double cross_tol = 1e-10;
+    double round_tol = 1e-10;
     size_t kickrank = 5;
 
     // setup problem
     double beta = 0.1; 
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
+    /* c3sc_set_external_boundary(sc,0,"reflect"); */
+    /* c3sc_set_external_boundary(sc,1,"reflect"); */
     double center[2] = {0.0,0.0};
-    double width[2] = {0.4,0.4};
+    double width[2] = {0.1,0.1};
     c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
@@ -324,11 +326,12 @@ int main(int argc, char * argv[])
     cost_approx(cost,startcost,NULL,verbose-1,cross_tol,round_tol,kickrank);
 
 
+    
     // keep track of 1) Norm 2) Diff 3) rank
     struct Trajectory * diagnostics = NULL;
     double track[3];
-    size_t npol = 20;
-    struct Cost * tcost = NULL;;
+    size_t npol = 1000;
+//    struct Cost * tcost = NULL;
     for (size_t ii = 0; ii < niter+1; ii++){
 
         FILE *fp2;
@@ -343,40 +346,41 @@ int main(int argc, char * argv[])
         print_cost(fp2,cost,N1,N2,lb,ub);
         fclose(fp2);
 
-        struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
-        for (size_t jj = 0; jj < npol; jj++){
-//            printf("jj = %zu\n",jj);
-            tcost = dpih_iter_pol(dp,pol,verbose-1,
-                                  cross_tol,round_tol,kickrank);
-            cost_free(cost); cost = NULL;
-            cost = tcost;
-            dpih_attach_cost(dp,cost);
+        if (ii > 14){
+            struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
+            dpih_iter_pol_solve(dp,pol,npol,cross_tol,
+                                verbose,cross_tol,
+                                round_tol,kickrank);
+            printf("done here!\n");
+            implicit_policy_free(pol);
         }
-        implicit_policy_free(pol);
-
+        cost = dpih_get_cost(dp);
+        printf("lets continue\n");
         
         //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
         struct Cost * newcost = dpih_iter_vi(dp,verbose-1,
                                              cross_tol,round_tol,kickrank);
-        track[0] = function_train_norm2(newcost->cost);
-        track[1] = function_train_relnorm2diff(newcost->cost,cost->cost);
-        track[2] = cost->cost->ranks[1];
+        printf("got new cost\n");
+        track[0] = cost_norm2(newcost);
+        track[1] = cost_norm2_diff(newcost,cost);
+        size_t * ranks = cost_get_ranks(newcost);
+        track[2] = ranks[1];
         trajectory_add(&diagnostics,3,0,(double)(ii+1),track,NULL);
 
         cost_free(cost);
         cost = newcost;
         dpih_attach_cost(dp,cost);
-        
+        printf("attached new cost\n");
 
     /*     delta = dpih_pi_iter_approx(&prob,verbose); */
         if (verbose != 0){
-            printf("ii=%zu diff =%G\n",ii,track[1]);
+            printf("ii=%zu diff = %G, norm=%G\n",ii,track[1],track[0]);
         }
         if (track[1] < 1e-5){
             break;
         }
     }
-
+//    printf("here!?\n");
     FILE *fp2;
     char filename[256];
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",

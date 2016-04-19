@@ -3,37 +3,19 @@
 
 #include "c3.h"
 
-/** \struct Cost
- *  \brief Cost function
- *  \var Cost::d
- *  dimension of state space
- *  \var Cost::bds
- *  bounding box
- *  \var Cost::cost
- *  function train cost
- *  \var Cost::N
- *  Number of nodes of discretization in each dimension
- *  \var Cost::x
- *  discretization in each dimension
- */
-struct Cost 
-{
-    size_t d;
-    struct BoundingBox * bds;
-    struct FunctionTrain * cost;
-
-    size_t * N;
-    double ** x;
-};
-
+struct Cost;
 struct Cost * cost_alloc(size_t, double *, double *);
 struct Cost * cost_copy_deep(struct Cost *);
 void cost_free(struct Cost *);
+size_t cost_get_d(struct Cost *);
 double * cost_get_lb(struct Cost *);
 double * cost_get_ub(struct Cost *);
 size_t * cost_get_ranks(struct Cost *);
+double cost_norm2(struct Cost *);
+double cost_norm2_diff(struct Cost *,struct Cost *);
 
 void cost_init_discrete(struct Cost *,size_t *,double **);
+void cost_add_nodes(struct Cost *, double *, double *, size_t);
 void cost_approx(struct Cost *,
                  double (*)(double *, void *),
                  void *, int,double,double,size_t);

@@ -10,6 +10,10 @@ enum EBTYPE {
 
 struct Boundary;
 struct Boundary * boundary_alloc(size_t,double *,double*);
+double * boundary_obstacle_get_lb(struct Boundary *, size_t);
+double * boundary_obstacle_get_ub(struct Boundary *, size_t);
+
+size_t boundary_get_nobs(struct Boundary *);
 struct Boundary * boundary_copy_deep(struct Boundary *);
 void boundary_free(struct Boundary *);
 void boundary_external_set_type(struct Boundary *,size_t,char *);

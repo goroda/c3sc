@@ -47,6 +47,7 @@ void dpih_free(struct DPih *);
 void dpih_free_deep(struct DPih *);
 void dpih_attach_mca(struct DPih *, struct MCA *);
 void dpih_attach_cost(struct DPih *, struct Cost *);
+void dpih_attach_cost_ow(struct DPih *, struct Cost *);
 void dpih_attach_opt(struct DPih *, struct c3Opt *);
 
 struct Cost * dpih_get_cost(struct DPih *);
@@ -56,6 +57,10 @@ double dpih_rhs(struct DPih *,double *,double *,double *);
 struct Cost * dpih_iter_vi(struct DPih *,int,double,double,size_t);
 struct Cost * dpih_iter_pol(struct DPih *, struct ImplicitPolicy *,
                             int, double, double, size_t);
+void
+dpih_iter_pol_solve(struct DPih *, struct ImplicitPolicy *,
+                    size_t, double,
+                    int,double,double,size_t);
 
 struct DPfh;
 

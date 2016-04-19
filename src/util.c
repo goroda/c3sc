@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
+#include <math.h>
+#include <string.h>
 
 #include "util.h"
 
@@ -20,6 +23,40 @@ int c3sc_check_bounds(size_t dx, double * lbx,
     }
     return 0;
 }
+
+static int compareDouble (const void * a, const void * b)
+{
+    if (*(double*)a < *(double*)b){
+        return -1;
+    }
+    else if (*(double*)a > *(double*)b){
+        return 1;
+    }
+    return 0;
+}
+
+double * c3sc_combine_and_sort(size_t Nx, double * x, size_t Ny, double * y,
+                               size_t * Ntot)
+{
+    double * temp = malloc( (Nx+Ny)*sizeof(double));
+    assert (temp != NULL);
+    memmove(temp,x,Nx*sizeof(double));
+    memmove(temp+Nx,y,Ny*sizeof(double));
+    qsort(temp,Nx+Ny,sizeof(double),compareDouble);
+
+    double * out = calloc(Nx+Ny,sizeof(double));
+    *Ntot = 1;
+    out[0] = temp[0];
+    for (size_t ii = 1; ii < Nx+Ny; ii++){
+        if (fabs(temp[ii]-out[*Ntot-1]) > 1e-15){
+            out[*Ntot] = temp[ii];
+            *Ntot = *Ntot + 1;
+        }
+    }
+    free(temp); temp = NULL;
+    return out;
+}
+
 
 struct c3sc_SortCouple
 {
