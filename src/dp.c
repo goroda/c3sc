@@ -193,7 +193,6 @@ void c3sc_init_mca(struct C3SC * sc, size_t * N)
         cost_add_nodes(sc->cost,lb,ub,3);
     }
 
-
     sc->mca = mca_alloc(sc->dx,sc->du,sc->dw,h);
     mca_attach_dyn(sc->mca,sc->dyn);
     mca_attach_bound(sc->mca,sc->bound);
@@ -261,11 +260,46 @@ void c3sc_init_dp(struct C3SC * sc, double beta,
     dpih_attach_opt(sc->dpih,sc->opt);
 }
 
+
+/**********************************************************//**
+    Load a cost function
+**************************************************************/
+int c3sc_cost_load(struct C3SC * sc, char * filename )
+{
+    assert (sc != NULL);
+    assert (sc->cost != NULL);
+    int load_success = cost_load(sc->cost,filename);
+    return load_success;
+}
+
+/**********************************************************//**
+    Approximate a cost function
+**************************************************************/
+/* int c3sc_cost_approx(struct C3SC * sc, char * filename ) */
+/* { */
+/*     assert (sc != NULL); */
+/*     assert (sc->cost != NULL); */
+/*     int load_success = cost_load(sc->cost,filename); */
+/*     return load_success; */
+/* } */
+
+/**********************************************************//**
+    Get a reference to the dynamic programming problem
+**************************************************************/
 void * c3sc_get_dp(struct C3SC * sc)
 {
     assert (sc != NULL);
     assert (sc->type == IH);
     return sc->dpih;
+}
+
+/**********************************************************//**
+    Get the control size
+**************************************************************/
+size_t c3sc_get_du(struct C3SC * sc)
+{
+    assert (sc != NULL);
+    return sc->du;
 }
 
 /** \struct DPih
@@ -405,7 +439,7 @@ void dpih_attach_cost(struct DPih * dp, struct Cost * cost)
 void dpih_attach_cost_ow(struct DPih * dp, struct Cost * cost)
 {
     assert(dp != NULL);
-    cost_free(dp->cost);
+    cost_free(dp->cost); dp->cost = NULL;
     dp->cost = cost_copy_deep(cost);
 }
 
@@ -633,7 +667,15 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
 
 //    struct Cost * cost = cost_alloc(d,lb,ub);
 //    cost_init_discrete(cost,oc->N,oc->x);
-    cost_approx(cost,dpih_rhs_opt_cost,dp,verbose,cross_tol,round_tol,kickrank);
+
+    size_t d = cost_get_d(cost);
+    struct FunctionMonitor * fm = NULL;
+    fm = function_monitor_initnd(dpih_rhs_opt_cost,dp,d,1000*d);
+    cost_approx(cost,function_monitor_eval,fm,
+                verbose,cross_tol,round_tol,kickrank);
+    function_monitor_free(fm); fm = NULL;
+
+//    cost_approx(cost,dpih_rhs_opt_cost,dp,verbose,cross_tol,round_tol,kickrank);
     return cost;
 }
 
@@ -673,6 +715,7 @@ dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
     double normprev = 0.0;
 
     struct Cost * tcost = NULL;
+    double prevrat = 0;
     for (size_t jj = 0; jj < max_solve_iter; jj++){
         tcost = dpih_iter_pol(dp,pol,verbose-1,
                               cross_tol,round_tol,kickrank);
@@ -680,9 +723,20 @@ dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
         double rat = fabs(normprev/normval);
         struct Cost * cost = dpih_get_cost(dp);
         double diff = cost_norm2_diff(tcost,cost);
-        if ((jj+1) % 1 == 0){
-            printf("\t jj=%zu, normval=%G, ratio=%G\n",jj,diff/normval,rat);
+        if (verbose > 0){
+            if ((jj+1) % 1 == 0){
+                printf("\t jj=%zu, normval=%G, ratio=%G\n",jj,diff/normval,rat);
+            }
         }
+        if (jj > 1){
+            if ((prevrat < 1) && (rat > 1)){
+                break;
+            }
+            if ((prevrat > 1) && (rat < 1)){
+                break;
+            }
+        }
+        prevrat = rat;
         normprev = normval;
         dpih_attach_cost_ow(dp,tcost);
         cost_free(tcost);
@@ -701,11 +755,17 @@ dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
  *  flag to indicate whether need to free dp on cleanup
  *  \var ImplicitPolicy::dp
  *  infinite horizon dp problem
+ *  \var ImplicitPolicy::du
+ *  size of control
+ *  \var ImplicitPolicy::fm
+ *  store previously calculated controls
  */
 struct ImplicitPolicy
 {
     int dpalloc;
     struct DPih * dp;
+    size_t du;
+    struct FunctionMonitor ** fm;
 };
 
 /**********************************************************//**
@@ -720,6 +780,7 @@ struct ImplicitPolicy * implicit_policy_alloc()
     }
     ip->dpalloc = 0;
     ip->dp = NULL;
+    ip->fm = NULL;
     return ip;
 }
 
@@ -734,6 +795,11 @@ struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC * sc)
     struct ImplicitPolicy * ip = implicit_policy_alloc();
     struct DPih * dp = dpih_copy_deep(sc->dpih);
     implicit_policy_set_dp(ip,dp);
+
+    /* ip->du = c3sc_get_du(dp); */
+    /* ip->fm = malloc(ip->du * sizeof(struct FunctionMonitor * fm)); */
+    
+
     return ip;
    
 }

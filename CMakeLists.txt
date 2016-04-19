@@ -17,7 +17,7 @@ if (APPLE)
     set(compiler_flags "-std=c99 -O3 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn")
     set(CMAKE_C_COMPILER "clang")
 else ()
-    set(compiler_flags "-Og -Wall -Wextra -std=c99")
+    set(compiler_flags "-g -O2 -Wall -Wextra -std=c99")
     # test coverage
     #set(compiler_flags "-g -O0 -W -Wall -Wextra -std=c99 -fprofile-arcs -ftest-coverage")
     set(CMAKE_C_COMPILER "gcc")

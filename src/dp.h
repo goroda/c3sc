@@ -31,8 +31,9 @@ void c3sc_init_dp(struct C3SC *, double,
                   int (*)(double,double*,double*,double*,double*),
                   int (*)(double,double*,double*),
                   int (*)(double*,double*));
-
+int c3sc_cost_load(struct C3SC * sc, char *);
 void * c3sc_get_dp(struct C3SC *);
+size_t c3sc_get_du(struct C3SC *);
 
 ////////////////////////////////////////////////////
 

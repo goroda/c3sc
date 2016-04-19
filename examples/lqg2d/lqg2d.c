@@ -184,7 +184,7 @@ int stagecost(double t, double * x, double * u, double * out,
     /*     grad[1] = 4 * u[1]; */
     /* } */
 
-    *out += pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
+    *out += 10.0*pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
     if (grad!= NULL){
         grad[0] = 2 * u[0];
     }
@@ -204,7 +204,8 @@ int boundcost(double t, double * x, double * out)
 int ocost(double * x,double * out)
 {
     (void)(x);
-    //printf("got ocost!!\n");
+    /* printf("got ocost!!\n"); */
+    /* dprint(2,x); */
     *out = 0.0;
     return 0;
 }
@@ -320,18 +321,31 @@ int main(int argc, char * argv[])
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
 
+    //load_success = c3sc_cost_load("cost_N=10.dat");
+    
     size_t N1 = N, N2 = N;
     struct DPih * dp = c3sc_get_dp(sc);
     struct Cost * cost = dpih_get_cost(dp);
-    cost_approx(cost,startcost,NULL,verbose-1,cross_tol,round_tol,kickrank);
+    struct Cost * cost_old = cost_alloc(dx,lb,ub);
+    int load_success = cost_load(cost_old,"cost_N=10.dat");
+    if (load_success == 0){
+        cost_interpolate_new(cost,cost_old);
+    }
+    else if (load_success == 1){
+        cost_approx(cost,startcost,NULL,0,cross_tol,round_tol,kickrank);
+    }
+    cost_free(cost_old); cost_old = NULL;
 
-
-    
+    double solve_tol = 1e-4;
     // keep track of 1) Norm 2) Diff 3) rank
     struct Trajectory * diagnostics = NULL;
     double track[3];
-    size_t npol = 1000;
+    size_t npol = 500;
 //    struct Cost * tcost = NULL;
+    printf("\n\n\n\n\n\n\n\n\n\n");
+    printf("Start Solver Iterations\n");
+    printf("\n\n\n\n\n\n\n\n\n\n");
+    struct Cost * newcost = NULL;
     for (size_t ii = 0; ii < niter+1; ii++){
 
         FILE *fp2;
@@ -346,33 +360,31 @@ int main(int argc, char * argv[])
         print_cost(fp2,cost,N1,N2,lb,ub);
         fclose(fp2);
 
-        if (ii > 14){
+        if (ii > 5){
             struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
-            dpih_iter_pol_solve(dp,pol,npol,cross_tol,
+            dpih_iter_pol_solve(dp,pol,npol,solve_tol,
                                 verbose,cross_tol,
                                 round_tol,kickrank);
-            printf("done here!\n");
+            //printf("done here!\n");
             implicit_policy_free(pol);
         }
         cost = dpih_get_cost(dp);
-        printf("lets continue\n");
+//        printf("lets continue\n");
         
-        //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
-        struct Cost * newcost = dpih_iter_vi(dp,verbose-1,
-                                             cross_tol,round_tol,kickrank);
-        printf("got new cost\n");
+        newcost = dpih_iter_vi(dp,verbose-1,
+                               cross_tol,round_tol,kickrank);
+//        printf("got new cost\n");
         track[0] = cost_norm2(newcost);
         track[1] = cost_norm2_diff(newcost,cost);
         size_t * ranks = cost_get_ranks(newcost);
         track[2] = ranks[1];
         trajectory_add(&diagnostics,3,0,(double)(ii+1),track,NULL);
 
-        cost_free(cost);
-        cost = newcost;
-        dpih_attach_cost(dp,cost);
-        printf("attached new cost\n");
+        dpih_attach_cost_ow(dp,newcost);
+        cost_free(newcost); newcost = NULL;
+        cost = dpih_get_cost(dp);
 
-    /*     delta = dpih_pi_iter_approx(&prob,verbose); */
+
         if (verbose != 0){
             printf("ii=%zu diff = %G, norm=%G\n",ii,track[1],track[0]);
         }
@@ -380,6 +392,15 @@ int main(int argc, char * argv[])
             break;
         }
     }
+    cost = dpih_get_cost(dp);
+    printf("cost ranks dim = %zu\n",cost_get_d(cost));
+    printf("cost is null=%d\n",cost == NULL);
+    size_t * ranks = cost_get_ranks(cost);
+    iprint_sz(dx+1,ranks);
+
+    int saved = cost_save(cost,"cost_N=10.dat");
+    assert (saved == 0);
+
 //    printf("here!?\n");
     FILE *fp2;
     char filename[256];
@@ -402,14 +423,15 @@ int main(int argc, char * argv[])
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
     printf("created policy\n");
     char odename[256] = "rk4";
-    struct Integrator * ode_sys =
-        integrator_create_controlled(2,1,f1,NULL,implicit_policy_controller,pol);
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(2,1,f1,NULL,
+                                           implicit_policy_controller,pol);
     integrator_set_type(ode_sys,odename);
     integrator_set_dt(ode_sys,1e-2);
-//    integrator_set_adaptive_opts(ode_sys,dtmin,dtmax,tol);
     integrator_set_verbose(ode_sys,0);
-    printf("initialized integrator\n");
-    // Initialize trajectories for filter and for observations
+//    printf("initialized integrator\n");
+
+    // Initialize trajectories for state
     double time = 0.0;
     double state[2] = {0.5, 0.5};
     double con[1] = {0.0};
@@ -420,33 +442,24 @@ int main(int argc, char * argv[])
     printf("initialized trajectory\n");
 
     double final_time = 5e0;
-    double dt = 1e-2;
+    double dt = 1e-1;
     int res;
     while (time < final_time){
-        // printf("time = %G\n",time);
         res = trajectory_step(traj,ode_sys,dt);
         assert(res == 0);
         time = time + dt;
     }
-
-    /* if (verbose == 1){ */
-    /*     trajectory_print(traj,stdout,4); */
-    /* } */
-
     sprintf(filename,"%s/%s.dat",dirout,"traj");
     fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
     fclose(fp);
 
-    printf("cost ranks are ");
-    size_t * ranks = cost_get_ranks(cost);
-    iprint_sz(dx+1,ranks);
-
     integrator_destroy(ode_sys); ode_sys = NULL;
     trajectory_free(traj); traj = NULL;
-    trajectory_free(diagnostics); diagnostics = NULL;
+
     implicit_policy_free(pol); pol = NULL;
+    trajectory_free(diagnostics); diagnostics = NULL;
     c3sc_destroy(sc); sc= NULL;
     return 0;
 }

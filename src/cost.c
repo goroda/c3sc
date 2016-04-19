@@ -60,6 +60,35 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
 }
 
 /**********************************************************//**
+    Save a cost function
+**************************************************************/
+int cost_save(struct Cost * cost, char *filename)
+{
+    assert (cost->cost != NULL);
+    int res = function_train_save(cost->cost,filename);
+    if (res == 1){
+        // 0 should be good according to unix but haven't updated
+        // function train code!!
+        return 0; 
+    }
+    return 1;
+}
+
+/**********************************************************//**
+    Load a cost function
+**************************************************************/
+int cost_load(struct Cost * cost, char * filename)
+{
+    assert (cost != NULL);
+    function_train_free(cost->cost); cost->cost = NULL;
+    cost->cost = function_train_load(filename);
+    if (cost->cost != NULL){
+        return 0;
+    }
+    return 1;
+}
+
+/**********************************************************//**
     Copy a cost function
 **************************************************************/
 struct Cost * cost_copy_deep(struct Cost * old)
@@ -150,6 +179,7 @@ double * cost_get_ub(struct Cost * c)
 size_t * cost_get_ranks(struct Cost * c)
 {
     assert (c != NULL);
+    assert (c->cost != NULL);
     return c->cost->ranks;
 }
 
@@ -214,6 +244,42 @@ void cost_add_nodes(struct Cost * cost, double *lb, double *ub, size_t N)
 }
 
 /**********************************************************//**
+    Interpolate a new cost function from an old one
+
+    \param[in,out] cnew - new cost function with allocated nodes and such
+    \param[in]     cold - old cost function
+
+    \note
+    c->cost should be NULL
+**************************************************************/
+void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
+{
+    assert (cold->cost != NULL);
+    assert (cnew->N != NULL);
+    assert (cnew->x != NULL);
+    function_train_free(cnew->cost); cnew->cost = NULL;
+    double ** xuse = malloc_dd(cnew->d);
+    size_t * Nuse = calloc_size_t(cnew->d);
+    for (size_t ii = 0; ii < cnew->d; ii++){
+        if (cnew->Nobs != NULL){
+            xuse[ii] = c3sc_combine_and_sort(cnew->N[ii],cnew->x[ii],
+                                             cnew->Nobs[ii],cnew->xobs[ii],
+                                             Nuse+ii);
+            
+        }
+        else{
+            xuse[ii] = calloc_double(cnew->N[ii]);
+            memmove(xuse[ii],cnew->x[ii],cnew->N[ii]*sizeof(double));
+            Nuse[ii] = cnew->N[ii];
+        }
+    }
+
+    cnew->cost = function_train_create_nodal(cold->cost,Nuse,xuse);
+    free_dd(cnew->d,xuse); xuse = NULL;
+    free(Nuse); Nuse = NULL;
+}
+
+/**********************************************************//**
     Set cost function to an approximation of some input
     function
 
@@ -274,7 +340,6 @@ void cost_approx(struct Cost * c,
     c3approx_set_adapt_maxrank_all(c3a,minN);
 
     // determine starting nodes
-
     double ** start = malloc_dd(c->d);
     size_t * nstart = calloc_size_t(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
@@ -337,7 +402,6 @@ int cost_eval(struct Cost * cost,
                                 cost->bds->lb,
                                 cost->bds->ub,
                                 x);
-
     double * xuse = NULL;
     if (res != 0){
         xuse = calloc_double(cost->bds->dim);
