@@ -2,6 +2,7 @@
 #define C3SC_COST_H
 
 #include "c3.h"
+#include "util.h"
 
 struct Cost;
 struct Cost * cost_alloc(size_t, double *, double *);
@@ -18,10 +19,11 @@ double cost_norm2_diff(struct Cost *,struct Cost *);
 
 void cost_init_discrete(struct Cost *,size_t *,double **);
 void cost_add_nodes(struct Cost *, double *, double *, size_t);
+size_t cost_get_size(const struct Cost *);
 void cost_interpolate_new(struct Cost *, struct Cost *);
 void cost_approx(struct Cost *,
                  double (*)(double *, void *),
-                 void *, int,double,double,size_t);
+                 void *,int,const struct ApproxArgs *);
 
 int cost_eval(struct Cost *, double, double *, double *);
 //void cost_eval_bb(size_t,double *,double **,double *,void *);

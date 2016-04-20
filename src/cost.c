@@ -244,6 +244,37 @@ void cost_add_nodes(struct Cost * cost, double *lb, double *ub, size_t N)
 }
 
 /**********************************************************//**
+    Get the total discretization could be quite large and result
+    in overflow!!
+**************************************************************/
+size_t cost_get_size(const struct Cost * cost)
+{
+    assert (cost->N != NULL);
+    assert (cost->x != NULL);
+    double ** xuse = malloc_dd(cost->d);
+    size_t * Nuse = calloc_size_t(cost->d);
+    for (size_t ii = 0; ii < cost->d; ii++){
+        if (cost->Nobs != NULL){
+            xuse[ii] = c3sc_combine_and_sort(cost->N[ii],cost->x[ii],
+                                             cost->Nobs[ii],cost->xobs[ii],
+                                             Nuse+ii);
+        }
+        else{
+            xuse[ii] = calloc_double(cost->N[ii]);
+            memmove(xuse[ii],cost->x[ii],cost->N[ii]*sizeof(double));
+            Nuse[ii] = cost->N[ii];
+        }
+    }
+    size_t ntot = 1;
+    for (size_t ii = 0; ii < cost->d; ii++){
+        ntot *= Nuse[ii];
+    }
+    free_dd(cost->d,xuse); xuse = NULL;
+    free(Nuse); Nuse = NULL;
+    return ntot;
+}
+
+/**********************************************************//**
     Interpolate a new cost function from an old one
 
     \param[in,out] cnew - new cost function with allocated nodes and such
@@ -283,10 +314,11 @@ void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
     Set cost function to an approximation of some input
     function
 
-    \param[in,out] c         - cost structure
-    \param[in]     f         - function
-    \param[in]     args      - function arguments
-    \param[in]     verbose   - verbosity level for approximation
+    \param[in,out] c       - cost structure
+    \param[in]     f       - function
+    \param[in]     args    - function arguments
+    \param[in]     verbose - verbosity level for approximation
+    \param[in]     aargs   - approximation arguments
     \param[in]     cross_tol - cross approximation tolerance
     \param[in]     round_tol - rounding tolerance
     \param[in]     kickrank  - rank increase level
@@ -295,8 +327,8 @@ void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
 **************************************************************/
 void cost_approx(struct Cost * c,
                  double (*f)(double *, void *),
-                 void * args, int verbose,double cross_tol,
-                 double round_tol, size_t kickrank)
+                 void * args, int verbose,
+                 const struct ApproxArgs * aargs)
 {
     assert (c != NULL);
     assert (c->bds != NULL);
@@ -305,6 +337,10 @@ void cost_approx(struct Cost * c,
     if (c->cost != NULL){
         function_train_free(c->cost); c->cost = NULL;
     }
+
+    double cross_tol = approx_args_get_cross_tol(aargs);
+    double round_tol = approx_args_get_round_tol(aargs);
+    size_t kickrank  = approx_args_get_kickrank(aargs);
 
     struct C3Approx * c3a = c3approx_create(CROSS,c->d,c->bds->lb,c->bds->ub);
     double ** xuse = malloc_dd(c->d);

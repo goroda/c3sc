@@ -5,6 +5,72 @@
 #include <string.h>
 
 #include "util.h"
+#include "cdyn/src/simulate.h"
+
+struct ApproxArgs
+{
+    double cross_tol;
+    double round_tol;
+    size_t kickrank;
+};
+
+struct ApproxArgs * approx_args_init()
+{
+    struct ApproxArgs * aargs = malloc(sizeof(struct ApproxArgs));
+    if (aargs == NULL){
+        fprintf(stderr,"Failure allocating approximation arguments\n");
+        exit(1);
+    }
+    
+    aargs->cross_tol = 1e-10;
+    aargs->round_tol = 1e-10;
+    aargs->kickrank = 5;
+
+    return aargs;
+}
+
+void approx_args_free(struct ApproxArgs * aargs)
+{
+    if (aargs != NULL){
+        free(aargs); aargs = NULL;
+    }
+}
+
+void approx_args_set_cross_tol(struct ApproxArgs * aargs, double cross_tol)
+{
+    assert (aargs != NULL);
+    aargs->cross_tol = cross_tol;
+}
+
+double approx_args_get_cross_tol(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->cross_tol;
+
+}
+void approx_args_set_round_tol(struct ApproxArgs * aargs, double round_tol)
+{
+    assert (aargs != NULL);
+    aargs->round_tol = round_tol;
+}
+
+double approx_args_get_round_tol(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->round_tol;
+}
+
+void approx_args_set_kickrank(struct ApproxArgs * aargs, size_t kickrank)
+{
+    assert (aargs != NULL);
+    aargs->kickrank = kickrank;
+}
+
+size_t approx_args_get_kickrank(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->kickrank;
+}
 
 int c3sc_check_bounds(size_t dx, double * lbx,
                       double * ubx, double * x)

@@ -5,11 +5,13 @@
 #include <math.h>
 
 #include "c3.h"
+#include "cdyn/src/simulate.h"
 
 #include "util.h"
 #include "cost.h"
 #include "dp.h"
 #include "tensmarkov.h"
+
 
 /** \struct C3SC
  *  \brief Stochastic control problem
@@ -255,9 +257,9 @@ void c3sc_init_dp(struct C3SC * sc, double beta,
     
     assert (sc->type == IH);
     sc->dpih = dpih_alloc(beta,s,b,o);
-    dpih_attach_mca(sc->dpih, sc->mca);
-    dpih_attach_cost(sc->dpih, sc->cost);
-    dpih_attach_opt(sc->dpih,sc->opt);
+    dpih_attach_mca(sc->dpih, &(sc->mca));
+    dpih_attach_cost(sc->dpih, &(sc->cost));
+    dpih_attach_opt(sc->dpih, &(sc->opt));
 }
 
 
@@ -275,18 +277,47 @@ int c3sc_cost_load(struct C3SC * sc, char * filename )
 /**********************************************************//**
     Approximate a cost function
 **************************************************************/
-/* int c3sc_cost_approx(struct C3SC * sc, char * filename ) */
-/* { */
-/*     assert (sc != NULL); */
-/*     assert (sc->cost != NULL); */
-/*     int load_success = cost_load(sc->cost,filename); */
-/*     return load_success; */
-/* } */
+int c3sc_cost_approx(struct C3SC * sc, double (*f)(double *, void *),
+                     void * args, int verbose,
+                     const struct ApproxArgs * aargs)
+{
+    assert (sc != NULL);
+    assert (sc->cost != NULL);
+    cost_approx(sc->cost,f,args,verbose,aargs);
+    return 0;
+}
+
+
+/**********************************************************//**
+    Update the cost function to be that corresponding 
+    to the currently stored implicit policy
+**************************************************************/
+void c3sc_pol_solve(struct C3SC * sc, size_t max_solve_iter, double solve_tol,
+                    int verbose, const struct ApproxArgs * aargs)
+{
+    struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
+    dpih_iter_pol_solve(sc->dpih,pol,max_solve_iter,solve_tol,verbose,aargs);
+    implicit_policy_free(pol);
+}
+
+/**********************************************************//**
+   Take a step of value iteration        
+**************************************************************/
+double c3sc_iter_vi(struct C3SC * sc,int verbose,const struct ApproxArgs * aargs,
+                    struct C3SCDiagnostic * diag)
+{
+    struct Cost * newcost = dpih_iter_vi(sc->dpih,verbose-1,aargs,diag);
+    struct Cost * oldcost = dpih_get_cost(sc->dpih);
+    double diff = cost_norm2_diff(newcost,oldcost);
+    dpih_attach_cost_ow(sc->dpih,newcost);
+    cost_free(newcost); newcost = NULL;
+    return diff;
+}
 
 /**********************************************************//**
     Get a reference to the dynamic programming problem
 **************************************************************/
-void * c3sc_get_dp(struct C3SC * sc)
+void * c3sc_get_dp(const struct C3SC * sc)
 {
     assert (sc != NULL);
     assert (sc->type == IH);
@@ -294,9 +325,18 @@ void * c3sc_get_dp(struct C3SC * sc)
 }
 
 /**********************************************************//**
+    Get a reference to the cost
+**************************************************************/
+struct Cost * c3sc_get_cost(const struct C3SC * sc)
+{
+    assert (sc != NULL);
+    return sc->cost;
+}
+
+/**********************************************************//**
     Get the control size
 **************************************************************/
-size_t c3sc_get_du(struct C3SC * sc)
+size_t c3sc_get_du(const struct C3SC * sc)
 {
     assert (sc != NULL);
     return sc->du;
@@ -418,19 +458,19 @@ void dpih_free_deep(struct DPih * dp)
 /**********************************************************//**
     Attach a reference to a markov chain approximation
 **************************************************************/
-void dpih_attach_mca(struct DPih * dp, struct MCA * mm)
+void dpih_attach_mca(struct DPih * dp, struct MCA ** mm)
 {
     assert(dp!= NULL);
-    dp->mm = mm;
+    dp->mm = *mm;
 }
 
 /**********************************************************//**
    Attach a reference to a cost function 
 **************************************************************/
-void dpih_attach_cost(struct DPih * dp, struct Cost * cost)
+void dpih_attach_cost(struct DPih * dp, struct Cost ** cost)
 {
     assert(dp != NULL);
-    dp->cost = cost;
+    dp->cost = *cost;
 }
 
 /**********************************************************//**
@@ -446,10 +486,10 @@ void dpih_attach_cost_ow(struct DPih * dp, struct Cost * cost)
 /**********************************************************//**
    Attach an optimization routine
 **************************************************************/
-void dpih_attach_opt(struct DPih * dp, struct c3Opt * opt)
+void dpih_attach_opt(struct DPih * dp, struct c3Opt ** opt)
 {
     assert (dp != NULL);
-    dp->opt = opt;
+    dp->opt = *opt;
 }
 
 /**********************************************************//**
@@ -659,8 +699,8 @@ double dpih_rhs_pol_cost(double * x,void * dp)
    with an *optimal* policy
 **************************************************************/
 struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
-                           double cross_tol, double round_tol,
-                           size_t kickrank)
+                           const struct ApproxArgs * aargs,
+                           struct C3SCDiagnostic * diag)
 {
     
     struct Cost * cost = cost_copy_deep(dp->cost);
@@ -671,8 +711,13 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
     size_t d = cost_get_d(cost);
     struct FunctionMonitor * fm = NULL;
     fm = function_monitor_initnd(dpih_rhs_opt_cost,dp,d,1000*d);
-    cost_approx(cost,function_monitor_eval,fm,
-                verbose,cross_tol,round_tol,kickrank);
+    cost_approx(cost,function_monitor_eval,fm,verbose,aargs);
+    
+    if (diag != NULL)
+    {
+        c3sc_diagnostic_vi_update(diag,cost,dp,fm);
+    }
+    
     function_monitor_free(fm); fm = NULL;
 
 //    cost_approx(cost,dpih_rhs_opt_cost,dp,verbose,cross_tol,round_tol,kickrank);
@@ -684,8 +729,7 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
    with an *optimal* policy
 **************************************************************/
 struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
-                            int verbose, double cross_tol, double round_tol,
-                            size_t kickrank)
+                            int verbose, const struct ApproxArgs * aargs)
 {
     struct DPPOL dppol;
     dppol.dp = dp;
@@ -699,7 +743,7 @@ struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
     /* cost_init_discrete(cost,oc->N,oc->x); */
 
     struct Cost * cost = cost_copy_deep(oc);
-    cost_approx(cost,dpih_rhs_pol_cost,&dppol,verbose,cross_tol,round_tol,kickrank);
+    cost_approx(cost,dpih_rhs_pol_cost,&dppol,verbose,aargs);
     return cost;
 }
 
@@ -709,16 +753,14 @@ struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
 void
 dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
                     size_t max_solve_iter, double solve_tol,
-                    int verbose, double cross_tol, double round_tol,
-                    size_t kickrank)
+                    int verbose, const struct ApproxArgs * aargs)
 {
     double normprev = 0.0;
 
     struct Cost * tcost = NULL;
     double prevrat = 0;
     for (size_t jj = 0; jj < max_solve_iter; jj++){
-        tcost = dpih_iter_pol(dp,pol,verbose-1,
-                              cross_tol,round_tol,kickrank);
+        tcost = dpih_iter_pol(dp,pol,verbose-1,aargs);
         double normval = cost_norm2(tcost);
         double rat = fabs(normprev/normval);
         struct Cost * cost = dpih_get_cost(dp);
@@ -887,3 +929,81 @@ int implicit_policy_controller(double t,const double * x, double * u, void * arg
     struct ImplicitPolicy * ip = args;
     return implicit_policy_eval(ip,t,x,u);
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////
+// diagnostic stuff
+////////////////////////////////////////////////////////////////////////
+struct C3SCDiagnostic
+{
+    size_t itervi;
+    size_t iterpi;
+    struct Trajectory * traj_vi;
+};
+
+struct C3SCDiagnostic * c3sc_diagnostic_init()
+{
+    struct C3SCDiagnostic * diag = malloc(sizeof(struct C3SCDiagnostic));
+    if (diag == NULL){
+        fprintf(stderr,"Failure allocating diagnostic arguments\n");
+        exit(1);
+    }
+    diag->itervi = 0;
+    diag->iterpi = 0;
+    diag->traj_vi = NULL;
+
+    return diag;
+}
+
+void c3sc_diagnostic_free(struct C3SCDiagnostic * diag)
+{
+    if (diag != NULL){
+        trajectory_free(diag->traj_vi); diag->traj_vi = NULL;
+        free(diag); diag = NULL;
+    }
+}
+
+int c3sc_diagnostic_save(struct C3SCDiagnostic * diag, 
+                         char * filename, size_t nprec)
+{
+    FILE * fp = fopen(filename,"w");
+    if (fp == NULL){
+        return 1;
+    }
+    trajectory_print(diag->traj_vi,fp,nprec);
+    fclose(fp);
+    return 0;
+}
+
+void c3sc_diagnostic_vi_update(struct C3SCDiagnostic * diag,
+                               struct Cost * newcost,
+                               struct DPih * dp,
+                               struct FunctionMonitor * fm)
+{
+    struct Cost * old = dpih_get_cost(dp);
+    size_t d = cost_get_d(old);
+
+    double norm = cost_norm2(newcost);
+    double diff = cost_norm2_diff(old,newcost);
+    size_t * ranks = cost_get_ranks(newcost);
+    size_t ntot = cost_get_size(newcost);
+    size_t nevals = nstored_hashtable_cp(fm->evals);
+    double frac = (double) nevals / ntot;
+
+    size_t ndim = d+1+3;
+    double * pt = calloc_double(ndim);
+    pt[0] = norm;
+    pt[1] = diff;
+    pt[2] = frac;
+    for (size_t ii = 0; ii < d+1; ii++){
+        pt[ii+3] = (double) ranks[ii];
+    }
+    
+    diag->itervi += 1;
+    trajectory_add(&(diag->traj_vi),ndim,0,(double)(diag->itervi),pt,NULL);
+
+    free(pt); pt = NULL;
+
+}
+

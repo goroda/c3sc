@@ -303,9 +303,10 @@ int main(int argc, char * argv[])
     c3opt_set_verbose(opt,0);
     
     // cross approximation tolerances
-    double cross_tol = 1e-10;
-    double round_tol = 1e-10;
-    size_t kickrank = 5;
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-10);
+    approx_args_set_round_tol(aargs,1e-10);
+    approx_args_set_kickrank(aargs,5);
 
     // setup problem
     double beta = 0.1; 
@@ -320,36 +321,23 @@ int main(int argc, char * argv[])
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
-
-    //load_success = c3sc_cost_load("cost_N=10.dat");
-    
-    size_t N1 = N, N2 = N;
-    struct DPih * dp = c3sc_get_dp(sc);
-    struct Cost * cost = dpih_get_cost(dp);
-    struct Cost * cost_old = cost_alloc(dx,lb,ub);
-    int load_success = cost_load(cost_old,"cost_N=10.dat");
-    if (load_success == 0){
-        cost_interpolate_new(cost,cost_old);
+    int load_success = c3sc_cost_load(sc,"cost_N=10.dat");
+    if (load_success != 0){
+        c3sc_cost_approx(sc,startcost,NULL,0,aargs);
     }
-    else if (load_success == 1){
-        cost_approx(cost,startcost,NULL,0,cross_tol,round_tol,kickrank);
-    }
-    cost_free(cost_old); cost_old = NULL;
 
     double solve_tol = 1e-4;
-    // keep track of 1) Norm 2) Diff 3) rank
-    struct Trajectory * diagnostics = NULL;
-    double track[3];
     size_t npol = 500;
-//    struct Cost * tcost = NULL;
+
+    struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
+    char filename[256];
+    FILE *fp, *fp2;
+
     printf("\n\n\n\n\n\n\n\n\n\n");
     printf("Start Solver Iterations\n");
     printf("\n\n\n\n\n\n\n\n\n\n");
-    struct Cost * newcost = NULL;
     for (size_t ii = 0; ii < niter+1; ii++){
 
-        FILE *fp2;
-        char filename[256];
         sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii);
         fp2 =  fopen(filename, "w");
         if (fp2 == NULL){
@@ -357,53 +345,38 @@ int main(int argc, char * argv[])
             return 0;
         }
 
+        size_t N1 = N, N2 = N;
+        struct Cost * cost = c3sc_get_cost(sc);
         print_cost(fp2,cost,N1,N2,lb,ub);
         fclose(fp2);
 
         if (ii > 5){
-            struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
-            dpih_iter_pol_solve(dp,pol,npol,solve_tol,
-                                verbose,cross_tol,
-                                round_tol,kickrank);
-            //printf("done here!\n");
-            implicit_policy_free(pol);
+            c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
         }
-        cost = dpih_get_cost(dp);
-//        printf("lets continue\n");
-        
-        newcost = dpih_iter_vi(dp,verbose-1,
-                               cross_tol,round_tol,kickrank);
-//        printf("got new cost\n");
-        track[0] = cost_norm2(newcost);
-        track[1] = cost_norm2_diff(newcost,cost);
-        size_t * ranks = cost_get_ranks(newcost);
-        track[2] = ranks[1];
-        trajectory_add(&diagnostics,3,0,(double)(ii+1),track,NULL);
-
-        dpih_attach_cost_ow(dp,newcost);
-        cost_free(newcost); newcost = NULL;
-        cost = dpih_get_cost(dp);
-
+        double diff = c3sc_iter_vi(sc,verbose-1,aargs,diag);
 
         if (verbose != 0){
-            printf("ii=%zu diff = %G, norm=%G\n",ii,track[1],track[0]);
+            printf("ii=%zu diff = %G\n",ii,diff);
         }
-        if (track[1] < 1e-5){
+        if (diff < 1e-5){
             break;
         }
     }
-    cost = dpih_get_cost(dp);
-    printf("cost ranks dim = %zu\n",cost_get_d(cost));
-    printf("cost is null=%d\n",cost == NULL);
-    size_t * ranks = cost_get_ranks(cost);
-    iprint_sz(dx+1,ranks);
 
+
+    sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
+    int dres = c3sc_diagnostic_save(diag,filename,4);
+    assert (dres == 0);
+
+    struct DPih * dp   = c3sc_get_dp(sc);
+    struct Cost * cost = dpih_get_cost(dp);
+    struct Cost * cdir = c3sc_get_cost(sc);
+    double difff = cost_norm2_diff(cost,cdir);
+    printf("difff=%G\n",difff);
     int saved = cost_save(cost,"cost_N=10.dat");
     assert (saved == 0);
 
-//    printf("here!?\n");
-    FILE *fp2;
-    char filename[256];
+
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
             dirout,lbu[0],ubu[0],ss[0],ss[1],"cost");
     fp2 =  fopen(filename, "w");
@@ -411,14 +384,9 @@ int main(int argc, char * argv[])
         fprintf(stderr, "cat: can't open %s\n", filename);
         return 0;
     }
+    size_t N1 = N, N2 = N;
     print_cost(fp2,cost,N1,N2,lb,ub);
     fclose(fp2);
-
-    sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
-    FILE * fp = fopen(filename,"w");
-    assert (fp != NULL);
-    trajectory_print(diagnostics,fp,4);
-    fclose(fp);
 
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
     printf("created policy\n");
@@ -429,37 +397,40 @@ int main(int argc, char * argv[])
     integrator_set_type(ode_sys,odename);
     integrator_set_dt(ode_sys,1e-2);
     integrator_set_verbose(ode_sys,0);
-//    printf("initialized integrator\n");
+
 
     // Initialize trajectories for state
     double time = 0.0;
     double state[2] = {0.5, 0.5};
     double con[1] = {0.0};
-
+    // Integrate
     struct Trajectory * traj = NULL;
-    printf("add trajectory\n");
     trajectory_add(&traj,2,1,time,state,con);
-    printf("initialized trajectory\n");
-
     double final_time = 5e0;
     double dt = 1e-1;
     int res;
+    printf("Integrating Trajectory\n");
     while (time < final_time){
         res = trajectory_step(traj,ode_sys,dt);
         assert(res == 0);
         time = time + dt;
     }
+    printf("Saving Trajectory\n");
     sprintf(filename,"%s/%s.dat",dirout,"traj");
     fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
     fclose(fp);
 
+    // cleanup integrator stuff
     integrator_destroy(ode_sys); ode_sys = NULL;
     trajectory_free(traj); traj = NULL;
-
     implicit_policy_free(pol); pol = NULL;
-    trajectory_free(diagnostics); diagnostics = NULL;
+
+    
+    //cleanup solver stuff
+    c3sc_diagnostic_init(diag); diag = NULL;
+    approx_args_free(aargs); aargs = NULL;
     c3sc_destroy(sc); sc= NULL;
     return 0;
 }
