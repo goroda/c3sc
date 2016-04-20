@@ -327,7 +327,7 @@ int main(int argc, char * argv[])
     }
 
     double solve_tol = 1e-4;
-    size_t npol = 500;
+    size_t npol = 100;
 
     struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
     char filename[256];
@@ -358,11 +358,10 @@ int main(int argc, char * argv[])
         if (verbose != 0){
             printf("ii=%zu diff = %G\n",ii,diff);
         }
-        if (diff < 1e-5){
+        if (diff < 1e-2){
             break;
         }
     }
-
 
     sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
     int dres = c3sc_diagnostic_save(diag,filename,4);

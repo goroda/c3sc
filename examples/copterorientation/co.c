@@ -270,6 +270,13 @@ int main(int argc, char * argv[])
     /* c3opt_set_verbose(opt,0); */
     /* c3opt_ls_set_alpha(opt,0.1); */
     /* c3opt_ls_set_beta(opt,0.2); */
+
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-10);
+    approx_args_set_round_tol(aargs,1e-10);
+    approx_args_set_kickrank(aargs,5);
+
     
     double beta = 0.1;
 
@@ -283,52 +290,67 @@ int main(int argc, char * argv[])
     /* for (size_t ii = 0; ii < 6; ii++){ */
     /*     c3sc_set_external_boundary(sc,ii,"reflect"); */
     /* } */
-    double center[6] = {0.0,0.0,0.0,0.0,0.0};
-    double width[6] = {0.8,0.8,0.8,0.8,0.24};
-    c3sc_add_obstacle(sc,center,width);
+    /* double center[6] = {0.0,0.0,0.0,0.0,0.0}; */
+    /* double width[6] = {0.8,0.8,0.8,0.8,0.24}; */
+    /* c3sc_add_obstacle(sc,center,width); */
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
+    int load_success = c3sc_cost_load(sc,"saved_cost.dat");
+    if (load_success != 0){
+        c3sc_cost_approx(sc,startcost,NULL,0,aargs);
+    }
 
-    struct DPih * dp = c3sc_get_dp(sc);
-    struct Cost * cost = dpih_get_cost(dp);
-    cost_approx(cost,startcost,NULL,verbose-1);
+    double solve_tol = 1e-4;
+    size_t npol = 10;
 
-    double * diff_track = calloc_double(niter+1);
+    struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
+    char filename[256];
+    FILE *fp;//, *fp2;
+
+
+
+    printf("\n\n\n\n\n\n\n\n\n\n");
+    printf("Start Solver Iterations\n");
+    printf("\n\n\n\n\n\n\n\n\n\n");
     for (size_t ii = 0; ii < niter+1; ii++){
 
-        //struct Cost * newwhcost = dpih_iter_pol(dp,verbose-1);
-        struct Cost * newcost = dpih_iter_vi(dp,verbose-1);
-        diff_track[ii] = function_train_relnorm2diff(newcost->cost,cost->cost);
-        cost_free(cost);
-        cost = newcost;
-        dpih_attach_cost(dp,cost);
-        
-    /*     delta = dpih_pi_iter_approx(&prob,verbose); */
-        if (verbose != 0){
-            printf("ii=%zu diff =%G ranks=",ii,diff_track[ii]);
-            iprint_sz(7,cost->cost->ranks);
-            
+        if (ii > 1){
+            c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
         }
-        if (diff_track[ii] < 1e-3){
-            //   break;
+        double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
+
+        struct Cost * cost = c3sc_get_cost(sc);
+        int saved = cost_save(cost,"saved_cost.dat");
+        assert (saved == 0);
+
+        if (verbose != 0){
+            printf("ii=%zu diff = %G\n",ii,diff);
+        }
+        if (diff < 1e-2){
+            break;
         }
     }
-    free(diff_track);
 
+    struct Cost * cost = c3sc_get_cost(sc);
+    int saved = cost_save(cost,"saved_cost.dat");
+    assert (saved == 0);
+
+
+    sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
+    int dres = c3sc_diagnostic_save(diag,filename,4);
+    assert (dres == 0);
 
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
-    printf("created policy\n");
+//    printf("created policy\n");
     char odename[256] = "rk4";
     struct Integrator * ode_sys =
         integrator_create_controlled(6,3,f1,NULL,implicit_policy_controller,pol);
     integrator_set_type(ode_sys,odename);
     integrator_set_dt(ode_sys,1e-2);
-//    integrator_set_adaptive_opts(ode_sys,dtmin,dtmax,tol);
     integrator_set_verbose(ode_sys,0);
-    printf("initialized integrator\n");
-    // Initialize trajectories for filter and for observations
+//    printf("initialized integrator\n");
 
     double time = 0.0;
     double state[6] = {0.4, 0.4, 0.4, 0.5, 0.5, 0.1};
@@ -356,9 +378,8 @@ int main(int argc, char * argv[])
         trajectory_print(traj,stdout,4);
     }
     
-    char filename[256];
     sprintf(filename,"%s/%s.dat",dirout,"traj");
-    FILE * fp = fopen(filename,"w");
+    fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
     fclose(fp);

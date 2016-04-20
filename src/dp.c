@@ -493,6 +493,14 @@ void dpih_attach_opt(struct DPih * dp, struct c3Opt ** opt)
 }
 
 /**********************************************************//**
+   Get the state dimension
+**************************************************************/
+size_t dpih_get_d(const struct DPih * dp)
+{
+    assert (dp != NULL);
+    return mca_get_dx(dp->mm);
+}
+/**********************************************************//**
    Get the cost function
 **************************************************************/
 struct Cost * dpih_get_cost(struct DPih * dp)
@@ -743,6 +751,7 @@ struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
     /* cost_init_discrete(cost,oc->N,oc->x); */
 
     struct Cost * cost = cost_copy_deep(oc);
+//    printf("got first one!\n");
     cost_approx(cost,dpih_rhs_pol_cost,&dppol,verbose,aargs);
     return cost;
 }
@@ -807,7 +816,7 @@ struct ImplicitPolicy
     int dpalloc;
     struct DPih * dp;
     size_t du;
-    struct FunctionMonitor ** fm;
+    struct HashtableCpair ** fm;
 };
 
 /**********************************************************//**
@@ -838,9 +847,19 @@ struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC * sc)
     struct DPih * dp = dpih_copy_deep(sc->dpih);
     implicit_policy_set_dp(ip,dp);
 
-    /* ip->du = c3sc_get_du(dp); */
-    /* ip->fm = malloc(ip->du * sizeof(struct FunctionMonitor * fm)); */
-    
+
+    ip->du = c3sc_get_du(sc);
+    ip->fm = malloc(ip->du * sizeof(struct HashtableCpair *));
+    if (ip->fm == NULL){
+        fprintf(stderr,"Cannot allocate memory for implicit policy\n");
+        exit(1);
+    }
+    size_t d = dpih_get_d(dp);
+    for (size_t ii = 0; ii < ip->du; ii++)
+    {
+        ip->fm[ii] = create_hashtable_cp(d*1000);
+    }
+    printf("created implicit policy!\n");
 
     return ip;
    
@@ -854,6 +873,10 @@ void implicit_policy_free(struct ImplicitPolicy * ip)
         if (ip->dpalloc == 1){
             dpih_free_deep(ip->dp); ip->dp = NULL;
         }
+        for (size_t ii = 0; ii < ip->du; ii++){
+            free_hashtable_cp(ip->fm[ii]); ip->fm[ii] = 0;
+        }
+        free(ip->fm); ip->fm = NULL;
         free(ip); ip = NULL;
     }
 }
@@ -886,35 +909,57 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
                          const double * x, double * u)
 {
     (void)(t);
+
     struct DPX dpx;
-    
     dpx.dp = ip->dp;
     dpx.x = (double *) x;
-    
-    assert (dpx.dp->opt != NULL);
-
+    size_t dx = mca_get_dx(dpx.dp->mm);
     size_t du = mca_get_du(dpx.dp->mm);
-    double val = 0.0;
-    struct c3Opt * opt = dpx.dp->opt;
-    c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
-    int res = c3opt_minimize(opt,u,&val);
 
-    if (res < -1){
-        printf("max iter reached in optimization res=%d\n",res);
-        size_t dx = mca_get_dx(dpx.dp->mm);
-        printf("x = ");
-        dprint(dx,dpx.x);
-        dprint(du,u);
-        for (size_t ii = 0; ii < du; ii++){
-            u[ii] = 0.0;
+    char * ser = serialize_darray_to_text(dx,dpx.x);
+    char * sval = lookup_key(ip->fm[0],ser);
+    /* if (1 == 0){ */
+    if (sval != NULL){
+        u[0] = deserialize_double_from_text(sval);
+        for (size_t ii = 1; ii < du; ii++){
+            char * sval2 = lookup_key(ip->fm[ii],ser);
+            u[ii] = deserialize_double_from_text(sval2);
+            free(sval2); sval2 = NULL;
         }
-        val = 0.0;
-        printf("restart with verbose\n");
-        c3opt_set_verbose(opt,2);
-        int res2 = c3opt_minimize(opt,u,&val);
-        printf("res2 = %d\n",res2);
     }
+    else{
+        assert (dpx.dp->opt != NULL);
+        double val = 0.0;
+        struct c3Opt * opt = dpx.dp->opt;
+        c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+        int res = c3opt_minimize(opt,u,&val);
 
+        if (res < -1){
+            printf("max iter reached in optimization res=%d\n",res);
+
+            printf("x = ");
+            dprint(dx,dpx.x);
+            dprint(du,u);
+            for (size_t ii = 0; ii < du; ii++){
+                u[ii] = 0.0;
+            }
+            val = 0.0;
+            printf("restart with verbose\n");
+            c3opt_set_verbose(opt,2);
+            int res2 = c3opt_minimize(opt,u,&val);
+            printf("res2 = %d\n",res2);
+        }
+
+        for (size_t ii = 0; ii < du; ii++){
+            char * sval2 = serialize_double_to_text(u[ii]);
+            struct Cpair * cp = cpair_create(ser,sval2);
+            add_cpair(ip->fm[ii],cp);
+            cpair_free(cp); cp = NULL;
+            free(sval2);
+        }
+    }
+    free(ser); ser = NULL;
+    free(sval); sval = NULL;
     int res_pol = 0;
     return res_pol;
 }

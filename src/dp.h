@@ -63,6 +63,7 @@ void dpih_attach_opt(struct DPih *, struct c3Opt **);
 
 struct Cost * dpih_get_cost(struct DPih *);
 struct Dyn * dpih_get_dyn(struct DPih *);
+size_t dpih_get_d(const struct DPih *);
 
 double dpih_rhs(struct DPih *,double *,double *,double *);
 struct Cost * dpih_iter_vi(struct DPih *,int,const struct ApproxArgs *,
