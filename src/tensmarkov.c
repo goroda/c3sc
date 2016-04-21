@@ -442,6 +442,47 @@ struct MCA * mca_copy_deep(struct MCA * mca)
 }
 
 /**********************************************************//**
+    Set a new discretization level for MCA
+**************************************************************/
+void mca_set_newh(struct MCA * mca, const double * h)
+{
+    free(mca->h); mca->h = NULL;
+    mca->h = calloc_double(mca->d);
+    mca->minh = h[0];
+    for (size_t ii = 0; ii < mca->d; ii++){
+        mca->h[ii] = h[ii];
+        if (h[ii] < mca->minh){
+            mca->minh = h[ii];
+        }
+    }
+}
+
+/**********************************************************//**
+    Generate a new markov model by either cutting h in half (*inhalf=1*)
+    or multiplying it by 2 (*inhalf=0*)
+**************************************************************/
+struct MCA * mca_interp2(struct MCA * old, int inhalf)
+{
+
+    double * h = calloc_double(old->d);
+    if (inhalf == 1){
+        for (size_t ii = 0;ii < old->d; ii++){
+            h[ii] = old->h[ii] / 2.0;
+        }
+    }
+    else{
+        for (size_t ii = 0; ii < old->d; ii++){
+            h[ii] = h[ii] * 2.0;
+        }
+    }
+
+    struct MCA * mnew = mca_copy_deep(old);
+    mca_set_newh(mnew,h);
+    free(h); h = NULL;
+    return NULL;
+}
+
+/**********************************************************//**
     Free memory allocated to an MCA
 **************************************************************/
 void mca_free(struct MCA * mca)

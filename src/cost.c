@@ -149,6 +149,7 @@ size_t cost_get_d(struct Cost * c)
     assert (c != NULL);
     return c->d;
 }
+
 /**********************************************************//**
     Return a reference to cost funciton lower bounds
 **************************************************************/
@@ -171,6 +172,17 @@ double * cost_get_ub(struct Cost * c)
         return NULL;
     }
     return bounding_box_get_ub(c->bds);
+}
+
+/**********************************************************//**
+   Get spacing between nodes
+**************************************************************/
+void cost_get_h(const struct Cost * c, double * h)
+{
+    assert (c != NULL);
+    for (size_t ii = 0; ii < c->d; ii++){
+        h[ii] = c->x[ii][1] - c->x[ii][0];
+    }
 }
 
 /**********************************************************//**
@@ -309,6 +321,55 @@ void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
     free_dd(cnew->d,xuse); xuse = NULL;
     free(Nuse); Nuse = NULL;
 }
+
+/**********************************************************//**
+    Divide the number of nodes in half
+**************************************************************/
+void cost_interp_inhalf(struct Cost * cnew, int inhalf)
+{
+ 
+    assert (cnew->N != NULL);
+    assert (cnew->x != NULL);
+
+    double * lb = cost_get_lb(cnew);
+    double * ub = cost_get_ub(cnew);
+    double ** xuse = malloc_dd(cnew->d);
+    size_t * Nuse = calloc_size_t(cnew->d);
+    for (size_t ii = 0; ii < cnew->d; ii++){
+        if (inhalf == 1){
+            cnew->N[ii] = cnew->N[ii]/2;
+        }
+        else{
+            cnew->N[ii] = cnew->N[ii]*2;
+        }
+        free(cnew->x[ii]);
+        cnew->x[ii] = linspace(lb[ii],ub[ii],cnew->N[ii]);
+
+        if (cnew->Nobs != NULL){
+            xuse[ii] = c3sc_combine_and_sort(cnew->N[ii],cnew->x[ii],
+                                             cnew->Nobs[ii],cnew->xobs[ii],
+                                             Nuse+ii);
+        }
+        else{
+            xuse[ii] = calloc_double(cnew->N[ii]);
+            memmove(xuse[ii],cnew->x[ii],cnew->N[ii]*sizeof(double));
+            Nuse[ii] = cnew->N[ii];
+        }
+
+    }
+
+    if (cnew->cost != NULL){
+        struct FunctionTrain * newcost = 
+            function_train_create_nodal(cnew->cost,Nuse,xuse);
+        function_train_free(cnew->cost);
+        cnew->cost = function_train_copy(newcost);
+        function_train_free(newcost); newcost = NULL;
+    }
+
+    free_dd(cnew->d,xuse); xuse = NULL;
+    free(Nuse); Nuse = NULL;
+}
+
 
 /**********************************************************//**
     Set cost function to an approximation of some input

@@ -120,9 +120,9 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 36; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e0;
-    double vspeed = 1e0;
-    double vspeed_last = 1e-1;
+    double vpos = 1e-1;
+    double vspeed = 1e-1;
+    double vspeed_last = 1e-2;
 
     out[0] = vpos;
     out[7] = vpos;
@@ -147,7 +147,7 @@ int stagecost(double t, double * x, double * u, double * out,
     *out = 0.0;
 
     // states
-    *out = 0.41*pow(x[0],2) + 0.91*pow(x[1],2) + 0.91 * pow(x[2],2);
+    *out = 5.0*0.41*pow(x[0],2) + 0.91*pow(x[1],2) + 0.91 * pow(x[2],2);
     *out = *out + 0.04 * pow(x[3],2) + 0.04 * pow(x[4],2) + 0.04 * pow(x[5],2);
 
     // controls
@@ -268,13 +268,13 @@ int main(int argc, char * argv[])
     /* c3opt_set_relftol(opt,1e-6); */
     /* c3opt_set_gtol(opt,1e-7); */
     /* c3opt_set_verbose(opt,0); */
-    /* c3opt_ls_set_alpha(opt,0.1); */
+    /* c3opt_ls_set_alpha(opt,0.1); */ 
     /* c3opt_ls_set_beta(opt,0.2); */
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-10);
-    approx_args_set_round_tol(aargs,1e-10);
+    approx_args_set_cross_tol(aargs,1e-3);
+    approx_args_set_round_tol(aargs,1e-7);
     approx_args_set_kickrank(aargs,5);
 
     

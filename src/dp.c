@@ -412,6 +412,30 @@ dpih_alloc(double beta,
 }
 
 /**********************************************************//**
+    Interpolate a dynamic program
+**************************************************************/
+struct DPih * dpih_interp2(struct DPih * dp, int inhalf)
+{
+    struct DPih * newdp = dpih_alloc(dp->beta,dp->stagecost,
+                                     dp->boundcost,dp->obscost);
+    newdp->opt = c3opt_copy(dp->opt);
+
+    newdp->cost = cost_copy_deep(dp->cost);
+    cost_interp_inhalf(newdp->cost,inhalf);
+    size_t d = cost_get_d(dp->cost); 
+   
+    double * newh = calloc_double(d);
+    cost_get_h(newdp->cost,newh);
+    
+    newdp->mm = mca_copy_deep(dp->mm);
+    mca_set_newh(newdp->mm,newh);
+        
+    free(newh); newh = NULL;
+
+    return newdp;
+}
+
+/**********************************************************//**
     Copy dynamic program
 **************************************************************/
 struct DPih * dpih_copy_deep(struct DPih * dp)
@@ -679,6 +703,7 @@ struct DPPOL
 {
     struct DPih * dp;
     struct ImplicitPolicy * pol;
+    double weight;
 };
     
 /**********************************************************//**
@@ -697,6 +722,30 @@ double dpih_rhs_pol_cost(double * x,void * dp)
     int res = implicit_policy_eval(dppol->pol,0.0,x,u);
     assert (res == 0);
     double val = dpih_rhs(dppol->dp,x,u,NULL);
+    free(u); u = NULL;
+    return val;
+}
+
+/**********************************************************//**
+      Bellman RHS with fixed policy
+**************************************************************/
+double dpih_rhs_pol_cost_weight(double * x,void * dp)
+{
+
+    struct DPPOL * dppol = dp;
+    struct DPX dpx;
+    dpx.dp = dppol->dp;
+    dpx.x = x;
+
+    size_t du = mca_get_du(dpx.dp->mm);
+    double * u = calloc_double(du);
+    int res = implicit_policy_eval(dppol->pol,0.0,x,u);
+    assert (res == 0);
+    double val = dpih_rhs(dppol->dp,x,u,NULL);
+    double oldval = 0;
+    res = cost_eval(dpx.dp->cost,0,x,&oldval);
+    assert (res == 0);
+    val = dppol->weight * val + (1.0 - dppol->weight)*oldval;
     free(u); u = NULL;
 
     return val;
@@ -734,7 +783,7 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
 
 /**********************************************************//**
    Generate a new cost function by iterating Bellman equation
-   with an *optimal* policy
+   with a fixed policy
 **************************************************************/
 struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
                             int verbose, const struct ApproxArgs * aargs)
@@ -757,6 +806,33 @@ struct Cost * dpih_iter_pol(struct DPih * dp, struct ImplicitPolicy * pol,
 }
 
 /**********************************************************//**
+   Generate a new cost function by iterating a weighted
+   version of the Bellman equation with a fixed policy
+**************************************************************/
+struct Cost * 
+dpih_iter_pol_weight(struct DPih * dp, struct ImplicitPolicy * pol, 
+                     double weight,
+                     int verbose, const struct ApproxArgs * aargs)
+{
+    struct DPPOL dppol;
+    dppol.dp = dp;
+    dppol.pol = pol;
+    dppol.weight = weight;
+    struct Cost * oc = dp->cost;
+
+    /* size_t d = cost_get_d(oc); */
+    /* double * lb = cost_get_lb(oc); */
+    /* double * ub = cost_get_ub(oc); */
+    /* struct Cost * cost = cost_alloc(d,lb,ub); */
+    /* cost_init_discrete(cost,oc->N,oc->x); */
+
+    struct Cost * cost = cost_copy_deep(oc);
+//    printf("got first one!\n");
+    cost_approx(cost,dpih_rhs_pol_cost_weight,&dppol,verbose,aargs);
+    return cost;
+}
+
+/**********************************************************//**
    Solve for the cost of a particular policy  
 **************************************************************/
 void
@@ -769,7 +845,9 @@ dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
     struct Cost * tcost = NULL;
     double prevrat = 0;
     for (size_t jj = 0; jj < max_solve_iter; jj++){
+
         tcost = dpih_iter_pol(dp,pol,verbose-1,aargs);
+
         double normval = cost_norm2(tcost);
         double rat = fabs(normprev/normval);
         struct Cost * cost = dpih_get_cost(dp);
