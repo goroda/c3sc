@@ -319,9 +319,6 @@ void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
     \param[in]     args    - function arguments
     \param[in]     verbose - verbosity level for approximation
     \param[in]     aargs   - approximation arguments
-    \param[in]     cross_tol - cross approximation tolerance
-    \param[in]     round_tol - rounding tolerance
-    \param[in]     kickrank  - rank increase level
     \note
     c->cost should be NULL
 **************************************************************/
