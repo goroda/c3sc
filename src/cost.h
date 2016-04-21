@@ -13,6 +13,7 @@ void cost_free(struct Cost *);
 size_t cost_get_d(struct Cost *);
 double * cost_get_lb(struct Cost *);
 double * cost_get_ub(struct Cost *);
+void cost_get_h(const struct Cost *, double *);
 size_t * cost_get_ranks(struct Cost *);
 double cost_norm2(struct Cost *);
 double cost_norm2_diff(struct Cost *,struct Cost *);
@@ -21,6 +22,7 @@ void cost_init_discrete(struct Cost *,size_t *,double **);
 void cost_add_nodes(struct Cost *, double *, double *, size_t);
 size_t cost_get_size(const struct Cost *);
 void cost_interpolate_new(struct Cost *, struct Cost *);
+void cost_interp_inhalf(struct Cost *, int);
 void cost_approx(struct Cost *,
                  double (*)(double *, void *),
                  void *,int,const struct ApproxArgs *);

@@ -9,7 +9,7 @@ enum NodeType {INBOUNDS,OUTBOUNDS,ONBOUNDS};
 
 struct MCNode;
 struct MCNode * mcnode_alloc(size_t);
-struct MCA * mca_copy_deep(struct MCA *);
+
 /* struct MCNode ** mcnode_alloc_array(size_t); */
 /* void mcnode_free_array(struct MCNode **, size_t); */
 void mcnode_free(struct MCNode *);
@@ -63,6 +63,8 @@ void mcnode_print(struct MCNode *, FILE *, int);
 /////////////////////////////////////////////////
 struct MCA;
 struct MCA * mca_alloc(size_t, size_t, size_t,double *);
+struct MCA * mca_copy_deep(struct MCA *);
+void mca_set_newh(struct MCA *, const double *);
 void mca_free(struct MCA *);
 void mca_free_deep(struct MCA *);
 void mca_attach_dyn(struct MCA *, struct Dyn *);
