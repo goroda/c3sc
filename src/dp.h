@@ -78,6 +78,7 @@ struct DPfh;
 
 struct ImplicitPolicy * implicit_policy_alloc();
 struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC *);
+void implicit_policy_add_transform(struct ImplicitPolicy *,size_t, void (*)(size_t, const double *, double *));
 void implicit_policy_free(struct ImplicitPolicy *);
 void implicit_policy_set_dp(struct ImplicitPolicy *, struct DPih *);
 int implicit_policy_eval(struct ImplicitPolicy *,double,const double *, double *);

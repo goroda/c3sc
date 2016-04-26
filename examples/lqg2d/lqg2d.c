@@ -344,7 +344,6 @@ int main(int argc, char * argv[])
             fprintf(stderr, "cat: can't open %s\n", filename);
             return 0;
         }
-
         size_t N1 = N, N2 = N;
         struct Cost * cost = c3sc_get_cost(sc);
         print_cost(fp2,cost,N1,N2,lb,ub);

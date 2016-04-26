@@ -82,6 +82,7 @@ struct C3SC * c3sc_create(enum SCTYPE type, size_t dx, size_t du, size_t dw)
     sc->opt = NULL;
     return sc;
 }
+
 /**********************************************************//**
     Free memory allocated to stochastic control problem
 **************************************************************/
@@ -185,6 +186,8 @@ void c3sc_init_mca(struct C3SC * sc, size_t * N)
     for (size_t ii = 0; ii < sc->dx; ii++){
         x[ii] = linspace(sc->lbx[ii],sc->ubx[ii],N[ii]);
         h[ii] = x[ii][1] - x[ii][0];
+        /* printf("x[%zu] = ",ii);dprint(N[ii],x[ii]); */
+        /* printf("(%G,%G)\n",sc->lbx[ii],sc->ubx[ii]); */
     }
     cost_init_discrete(sc->cost,N,x);
 
@@ -292,11 +295,14 @@ int c3sc_cost_approx(struct C3SC * sc, double (*f)(double *, void *),
     Update the cost function to be that corresponding 
     to the currently stored implicit policy
 **************************************************************/
-void c3sc_pol_solve(struct C3SC * sc, size_t max_solve_iter, double solve_tol,
-                    int verbose, const struct ApproxArgs * aargs)
+void c3sc_pol_solve(struct C3SC * sc, size_t max_solve_iter,
+                    double solve_tol,
+                    int verbose,
+                    const struct ApproxArgs * aargs)
 {
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
     dpih_iter_pol_solve(sc->dpih,pol,max_solve_iter,solve_tol,verbose,aargs);
+    sc->cost = dpih_get_cost(sc->dpih);
     implicit_policy_free(pol);
 }
 
@@ -310,6 +316,7 @@ double c3sc_iter_vi(struct C3SC * sc,int verbose,const struct ApproxArgs * aargs
     struct Cost * oldcost = dpih_get_cost(sc->dpih);
     double diff = cost_norm2_diff(newcost,oldcost);
     dpih_attach_cost_ow(sc->dpih,newcost);
+    sc->cost = dpih_get_cost(sc->dpih);
     cost_free(newcost); newcost = NULL;
     return diff;
 }
@@ -548,27 +555,48 @@ struct Dyn * dpih_get_dyn(struct DPih * dp)
 **************************************************************/
 double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
 {
-//    printf("eval rhs\n");
+    size_t du = mca_get_du(dp->mm);
+    size_t dx = mca_get_dx(dp->mm);
+    /* printf("eval rhs\n"); */
+    /* printf("x = "); dprint(mca_get_dx(dp->mm),x); */
+    /* printf("u = "); dprint(du,u); */
     double dt;
     double * gdt = NULL;
     double t = 0.0;
     struct BoundInfo * bi = NULL;
     double val;
-    size_t du = mca_get_du(dp->mm);
+
+    /* printf("get expectation \n"); */
+
+    int info;
     if (grad == NULL){
         val = mca_expectation(dp->mm,t,x,u,&dt,NULL,
                               cost_eval_bb,dp->cost,
-                              &bi,grad);
+                              &bi,grad,&info);
     }
     else{
-//        printf("get expectation\n");
         gdt = calloc_double(du);
         val = mca_expectation(dp->mm,t,x,u,&dt,gdt,
                               cost_eval_bb,dp->cost,
-                              &bi,grad);
-//        printf("got expectation\n");
+                              &bi,grad,&info);
     }
-
+    if (info != 0){
+        fprintf(stderr, "Warning: mca_expectation call from dpih_rhs");
+        fprintf(stderr, " resulted in an error\n");
+        fprintf(stderr, "\tx = ");
+        for (size_t ii = 0; ii < dx; ii++ ){
+            fprintf(stderr,"%G ",x[ii]);
+        }
+        fprintf(stderr,"\n\tControl = ");
+        for (size_t ii = 0; ii < du; ii++){
+            fprintf(stderr,"%G ",u[ii]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"\tBoundary info is ?????\n");
+        exit(1);
+    }
+    
+    /* printf("got expectation\n"); */
     double out;
     int absorb = bound_info_absorb(bi);
     if (absorb == 1){
@@ -619,6 +647,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
     }
     free(gdt); gdt = NULL;
     bound_info_free(bi); bi = NULL;
+    /* printf("evaluated it\n"); */
     return out;
 }
 
@@ -678,7 +707,7 @@ double dpih_rhs_opt_cost(double * x,void * dp)
         dprint(dx,x);
         dprint(du,ustart);
         for (size_t ii = 0; ii < du; ii++){
-            ustart[ii] = 0.0;
+            ustart[ii] = 0.001;
         }
         val = 0.0;
         printf("restart with verbose\n");
@@ -759,9 +788,10 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
                            const struct ApproxArgs * aargs,
                            struct C3SCDiagnostic * diag)
 {
-    
-    struct Cost * cost = cost_copy_deep(dp->cost);
 
+//    printf("do iter vi\n");
+    struct Cost * cost = cost_copy_deep(dp->cost);
+//    printf("done\n");
 //    struct Cost * cost = cost_alloc(d,lb,ub);
 //    cost_init_discrete(cost,oc->N,oc->x);
 
@@ -836,9 +866,11 @@ dpih_iter_pol_weight(struct DPih * dp, struct ImplicitPolicy * pol,
    Solve for the cost of a particular policy  
 **************************************************************/
 void
-dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
+dpih_iter_pol_solve(struct DPih * dp,
+                    struct ImplicitPolicy * pol,
                     size_t max_solve_iter, double solve_tol,
-                    int verbose, const struct ApproxArgs * aargs)
+                    int verbose,
+                    const struct ApproxArgs * aargs)
 {
     double normprev = 0.0;
 
@@ -868,7 +900,7 @@ dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
         prevrat = rat;
         normprev = normval;
         dpih_attach_cost_ow(dp,tcost);
-        cost_free(tcost);
+        cost_free(tcost); tcost = NULL;
         if (diff/normval <  solve_tol){
             break;
         }
@@ -888,6 +920,8 @@ dpih_iter_pol_solve(struct DPih * dp, struct ImplicitPolicy * pol,
  *  size of control
  *  \var ImplicitPolicy::fm
  *  store previously calculated controls
+ *  \var ImplicitPolicy::transform
+ *  transformation function in case need to perform state transformation before evaluating policy
  */
 struct ImplicitPolicy
 {
@@ -895,6 +929,9 @@ struct ImplicitPolicy
     struct DPih * dp;
     size_t du;
     struct HashtableCpair ** fm;
+
+    size_t dx;
+    void (*transform)(size_t,const double*,double*);
 };
 
 /**********************************************************//**
@@ -910,12 +947,14 @@ struct ImplicitPolicy * implicit_policy_alloc()
     ip->dpalloc = 0;
     ip->dp = NULL;
     ip->fm = NULL;
+
+    ip->dx = 0;
+    ip->transform = NULL;
     return ip;
 }
 
 /**********************************************************//**
     Create an implicit policy
-                                                           
 **************************************************************/
 struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC * sc)
 {
@@ -937,11 +976,21 @@ struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC * sc)
     {
         ip->fm[ii] = create_hashtable_cp(d*1000);
     }
-    printf("created implicit policy!\n");
+    /* printf("created implicit policy!\n"); */
 
     return ip;
-   
 }
+
+/**********************************************************//**
+    Add transform to the policy
+**************************************************************/
+void implicit_policy_add_transform(struct ImplicitPolicy * pol,size_t dx, void (*f)(size_t, const double *, double *))
+{
+    pol->dx = dx;
+    pol->transform = f;
+}
+
+
 /**********************************************************//**
    Free policy
 **************************************************************/
@@ -976,21 +1025,33 @@ void implicit_policy_set_dp(struct ImplicitPolicy * ip, struct DPih * dp)
 /**********************************************************//**
    Evaluate a policy
    
-   \param[in]     ip - policy to evaluate
-   \param[in]     t  - time at which to evaluate
-   \param[in]     x  - location at which to evaluate
-   \param[in,out] u  - resulting control
+   \param[in]     ip  - policy to evaluate
+   \param[in]     t   - time at which to evaluate
+   \param[in]     xin - location at which to evaluate
+   \param[in,out] u   - resulting control
 
    \return 0 - success, else failure
 **************************************************************/
 int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
-                         const double * x, double * u)
+                         const double * xin, double * u)
 {
     (void)(t);
 
+    /* printf("here\n"); */
     struct DPX dpx;
     dpx.dp = ip->dp;
-    dpx.x = (double *) x;
+    if (ip->transform == NULL){
+        dpx.x = (double *) xin;
+    }
+    else{
+        dpx.x = calloc_double(ip->dx);
+        ip->transform(ip->dx,xin,dpx.x);
+        /* printf("transformed!\n"); */
+        /* printf("ip->dx = "); */
+        /* dprint(ip->dx,dpx.x); */
+    }
+
+
     size_t dx = mca_get_dx(dpx.dp->mm);
     size_t du = mca_get_du(dpx.dp->mm);
 
@@ -998,6 +1059,7 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
     char * sval = lookup_key(ip->fm[0],ser);
     /* if (1 == 0){ */
     if (sval != NULL){
+        /* printf("sval exists\n"); */
         u[0] = deserialize_double_from_text(sval);
         for (size_t ii = 1; ii < du; ii++){
             char * sval2 = lookup_key(ip->fm[ii],ser);
@@ -1006,12 +1068,16 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
         }
     }
     else{
+        /* printf("sval doesnt exists\n"); */
         assert (dpx.dp->opt != NULL);
+        assert (dpx.dp->cost != NULL);
+        assert (dpx.dp->mm != NULL);
         double val = 0.0;
         struct c3Opt * opt = dpx.dp->opt;
         c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx);
+        /* printf("minimize \n"); */
         int res = c3opt_minimize(opt,u,&val);
-
+        /* printf("minimized!\n"); */
         if (res < -1){
             printf("max iter reached in optimization res=%d\n",res);
 
@@ -1038,6 +1104,11 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
     }
     free(ser); ser = NULL;
     free(sval); sval = NULL;
+
+//    printf("we are done!\n");
+    if (ip->transform != NULL){
+        free(dpx.x); dpx.x = NULL;
+    }
     int res_pol = 0;
     return res_pol;
 }

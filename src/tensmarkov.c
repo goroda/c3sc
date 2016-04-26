@@ -835,7 +835,25 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
                        NULL,mca->diff,NULL);
     }
 
-    assert(res == 0);
+    if (res != 0){
+        fprintf(stderr, "Warning: exiting mca_reflect_node with NULL ");
+        fprintf(stderr, "because dynamics evaluated to an error\n");
+        fprintf(stderr, "\t x = ");
+        for (size_t ii = 0; ii < mca->d; ii++ ){
+            fprintf(stderr,"%G ",x[ii]);
+        }
+        fprintf(stderr,"\n\tControl = ");
+        for (size_t ii = 0; ii < du; ii++){
+            fprintf(stderr,"%G ",u[ii]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"\tBoundary info is ?????\n");
+        free(dQ); dQ = NULL;
+        mcnode_free(mcn); mcn = NULL;
+        return mcn;
+//        exit(1);
+    }
+
     
 //    printf("got through first part\n");
     /* printf("this node is reflecting "); */
@@ -1197,23 +1215,41 @@ mca_get_node(struct MCA * mca, double time, double * x,
     \param[in,out] arg  - function arguments
     \param[in,out] bi   - boundary information
     \param[in,out] grad - gradient
+    \param[in,out] info - 0 if successfull 1 if error
+
+    \return expectation of f
 **************************************************************/
 double
 mca_expectation(struct MCA * mca, double time,
                 double * x, double * u, double * dt, double * gdt,
 //                void (*f)(size_t,double *,double **,double*,void*),
                 double (*f)(double,double *,void*),
-                void * arg, struct BoundInfo ** bi, double * grad)
+                void * arg, struct BoundInfo ** bi, double * grad,
+                int * info)
 {
 
 //    printf("compute expectation\n");
     struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,bi,grad);
-
-//    printf("before onbound=%zu ",bound_info_onbound(*bi)); dprint(mca->d, x);
-    double val = mcnode_expectation(mcn,f,arg,grad);
-//    printf("after\n");
-    mcnode_free(mcn); mcn = NULL;
-//    printf("computed\n");
+    double val = 0.0;
+    if (mcn == NULL){
+        fprintf(stderr, "Warning: MCNode obtained in mca_expectation is NULL\n");
+        fprintf(stderr, "\tx = ");
+        for (size_t ii = 0; ii < mca->d; ii++ ){
+            fprintf(stderr,"%G ",x[ii]);
+        }
+        fprintf(stderr,"\n\tControl = ");
+        for (size_t ii = 0; ii < mca->du; ii++){
+            fprintf(stderr,"%G ",u[ii]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"\tBoundary info is ?????\n");
+        *info = 1;
+    }
+    else{
+        val = mcnode_expectation(mcn,f,arg,grad);
+        mcnode_free(mcn); mcn = NULL;
+        *info = 0;
+    }
     return val;
 }
 

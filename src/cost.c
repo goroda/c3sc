@@ -437,7 +437,7 @@ void cost_approx(struct Cost * c,
     double ** start = malloc_dd(c->d);
     size_t * nstart = calloc_size_t(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
-        /* printf("x[0] = "); dprint(Nuse[ii],xuse[ii]); */
+        /* printf("x[%zu] = ",ii); dprint(Nuse[ii],xuse[ii]); */
         nstart[ii] = 5;
         assert (Nuse[ii] > 5);
         size_t mid = Nuse[ii]/2;
@@ -445,17 +445,18 @@ void cost_approx(struct Cost * c,
             mid = c->Nobs[ii]/2;
         }
         start[ii] = calloc_double(nstart[ii]);
-        start[ii][3] = xuse[ii][0];
-        start[ii][1] = xuse[ii][1];
         if (c->Nobs != NULL){
             start[ii][0] = c->xobs[ii][mid];
         }
         else{
             start[ii][0] = xuse[ii][mid];
         }
+        start[ii][1] = xuse[ii][1];
         start[ii][2] = xuse[ii][Nuse[ii]-2];
+        start[ii][3] = xuse[ii][0];
         start[ii][4] = xuse[ii][Nuse[ii]-1];
-        //printf("start mid = %G\n",start[ii][0]); 
+        /* printf("start[%zu] = ",ii); dprint(nstart[ii],start[ii]); */
+//        printf("start mid = %G\n",start[ii][0]); 
     }
     c3approx_set_start(c3a,nstart,start);
 

@@ -77,7 +77,7 @@ mca_expectation(struct MCA *,double,double *,double *,double *,
                 double *,
 //                void(*)(size_t,double*,double**,double*,void*),
                 double(*)(double,double*,void*),
-                void *,struct BoundInfo **,double*);
+                void *,struct BoundInfo **,double*,int*);
 
 struct MCNode *
 mca_inbound_node(struct MCA*,double,double*,
