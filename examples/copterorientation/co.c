@@ -312,8 +312,9 @@ int main(int argc, char * argv[])
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-5);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,6);
+    approx_args_set_maxrank(aargs,10);
 
     double beta = 0.0;
 
