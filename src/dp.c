@@ -570,14 +570,20 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
 
     int info;
     if (grad == NULL){
-        val = mca_expectation(dp->mm,t,x,u,&dt,NULL,
-                              cost_eval_bb,dp->cost,
+        /* val = mca_expectation(dp->mm,t,x,u,&dt,NULL, */
+        /*                       cost_eval_bb,dp->cost, */
+        /*                       &bi,grad,&info); */
+        val = mca_expectation_cost(dp->mm,t,x,u,&dt,NULL,
+                              dp->cost,
                               &bi,grad,&info);
     }
     else{
         gdt = calloc_double(du);
-        val = mca_expectation(dp->mm,t,x,u,&dt,gdt,
-                              cost_eval_bb,dp->cost,
+        /* val = mca_expectation(dp->mm,t,x,u,&dt,gdt, */
+        /*                       cost_eval_bb,dp->cost, */
+        /*                       &bi,grad,&info); */
+        val = mca_expectation_cost(dp->mm,t,x,u,&dt,gdt,
+                              dp->cost,
                               &bi,grad,&info);
     }
     if (info != 0){

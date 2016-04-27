@@ -23,6 +23,8 @@
  *  Number of nodes that describes any obstacles
  *  \var Cost::xobs
  *  discretization of obstacles
+ *  \var Cost::fm
+ *  function monitor
  */
 struct Cost 
 {
@@ -35,6 +37,8 @@ struct Cost
 
     size_t * Nobs;
     double ** xobs;
+
+    struct FunctionMonitor * fm; // for storing evaluations
 };
 /**********************************************************//**
     Allocate the cost
@@ -55,6 +59,7 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     cost->x = NULL;
     cost->Nobs = NULL;
     cost->xobs = NULL;
+    cost->fm = NULL;
 
     return cost;
 }
@@ -137,6 +142,7 @@ void cost_free(struct Cost * c)
         free(c->N); c->N = NULL;
         free_dd(c->d,c->xobs); c->xobs = NULL;
         free(c->Nobs); c->Nobs = NULL;
+        function_monitor_free(c->fm); c->fm = NULL;
         free(c); c = NULL;
     }
 }
@@ -486,12 +492,8 @@ int cost_eval(struct Cost * cost,
               double * eval)
 {
 
+
     (void)(time);
-//    printf("cost bounds are\n");
-//    dprint(cost->bds->dim, cost->bds->lb);
-//    dprint(cost->bds->dim, cost->bds->ub);
-//    printf("x is \n");
-//    dprint(cost->bds->dim,x);
 
     int res = c3sc_check_bounds(cost->bds->dim,
                                 cost->bds->lb,
@@ -515,13 +517,6 @@ int cost_eval(struct Cost * cost,
     else{
         xuse = x;
     }
-//    printf("res = %d\n",res);
-
-    /* if (res != 0){ */
-    /*     printf("point is not in bounds for cost evaluation \n"); */
-    /*     dprint(cost->bds->dim,x); */
-    /*     return res; */
-    /* } */
     
     *eval = function_train_eval(cost->cost,xuse);
     if (res != 0){
@@ -529,7 +524,23 @@ int cost_eval(struct Cost * cost,
     }
 
     return 0;
-    
+}
+
+/**********************************************************//**
+    Evaluate a cost function
+
+    \param[in] x    - location in space at which to evaluate
+    \param[in] eval - pointer to evaluation location
+
+**************************************************************/
+double cost_eval_to_wrap(double * x,void * arg)
+{
+    struct Cost * cost = arg;
+    double out;
+    double t = 0.0;
+    int res = cost_eval(cost,t,x,&out);
+    assert (res == 0);
+    return out;
 }
 
 /**********************************************************//**
@@ -543,7 +554,9 @@ int cost_eval(struct Cost * cost,
 **************************************************************/
 double cost_eval_bb(double t,double * x,void * args)
 {
+    (void)(t);
     struct Cost * c = args;
+
     double out;
     int res = cost_eval(c,t,x,&out);
     assert (res == 0);
@@ -567,25 +580,10 @@ double cost_eval_bb(double t,double * x,void * args)
 int cost_eval_neigh(struct Cost * cost,
                     double time,
                     double * x,
-                    size_t ii,
-                    double pt[2],
-                    double evals[2])
+                    double * eval,
+                    double * points,
+                    double * evals)
 {
-    // need special function train eval;
-
-    // slow for now
-    size_t d = cost->bds->dim;
-    double * x2 = calloc_double(d);
-    memmove(x2,x,d*sizeof(double));
-    x2[ii] = pt[0];
-    int res = cost_eval(cost,time,x2,evals);
-    if (res != 0){
-        free(x2); x2 = NULL;
-        return res;
-    }
-    x2[ii] = pt[1];
-    res = cost_eval(cost,time,x2,evals+1);
-    free(x2); x2 = NULL;
-    return res;
-    
+    *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
+    return 0;
 }

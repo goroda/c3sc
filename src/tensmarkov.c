@@ -301,12 +301,117 @@ double mcnode_expectation(
             eval = f(time,point2,arg);
             avg += temp->p * eval;
             if (grad != NULL){
-                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);  
-            } 
+                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);
+            }
             point2[temp->dir] = mc->x[temp->dir];
             temp = temp->next;
         }
+
+
+        /* mcnlist_to_coordinate_pert(temp,pert); */
+
     }
+    free(point2); point2 = NULL;
+    return avg;
+}
+
+/**********************************************************//**
+    Compute the expectation of a function around a node
+
+    \param[in]     mc   - node
+    \param[in]     f    - function(nvals,times,states,evas,arg)
+    \param[in]     arg  - additional function arguments
+    \param[in,out] grad - If (!NULL) return gradient
+
+    \return average
+**************************************************************/
+double mcnode_expectation_cost(
+    const struct MCNode * mc,
+    struct Cost * cost,
+    //void (*f)(size_t,double*,double**x,double*,void*),
+    /* double (*f)(double,double*,void*), */
+    /* void * arg, */
+    double * grad)
+{
+
+    if (grad!= NULL){
+        for (size_t ii = 0; ii < mc->du; ii++){
+            grad[ii] = 0.0;
+        }
+    }
+
+    double * point2 = calloc_double(mc->d);
+    memmove(point2,mc->x,mc->d * sizeof(double));
+
+    double avg = 0.0;
+    double time = 0.0;
+
+    /* printf("here!\n"); */
+    // take care of transitions to neighbors
+    if (mc->neigh != NULL){
+        double * pert = calloc_double(2 * mc->d);
+        // default
+        for (size_t ii = 0; ii < mc->d; ii++){
+            pert[2*ii] = mc->x[ii];
+            pert[2*ii+1] = mc->x[ii];
+        }
+        struct MCNList * temp = mc->neigh;
+        /* printf("fill in pert\n"); */
+        while (temp != NULL){
+            int dir = temp->dir;
+            if (temp->val > mc->x[dir]){
+                pert[2*temp->dir+1] = temp->val;
+            }
+            else{
+                pert[2*temp->dir] = temp->val;
+            }
+            temp = temp->next;
+        }
+        /* printf("got pert\n"); */
+        double * evals = calloc_double(2*mc->d);
+        double peval = 0.0;
+        int res = cost_eval_neigh(cost,time,point2,&peval,pert,evals);
+        /* printf("evalueted cost\n"); */
+        assert (res == 0);
+        temp = mc->neigh;
+        while (temp != NULL){
+            int dir = temp->dir;
+            double eval;
+            if (temp->val > mc->x[dir]){
+                eval = evals[2*temp->dir+1];
+            }
+            else{
+                eval = evals[2*temp->dir];
+            }
+            avg += temp->p * eval;
+            if (grad != NULL){
+                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);
+            }
+            temp = temp->next;
+        }
+
+        // take care of self transition
+        if (mc->pself > 0.0){
+            assert (res == 0);
+            avg += mc->pself * peval;
+            if (grad != NULL){
+                cblas_daxpy(mc->du,peval,mc->gpself,1,grad,1);
+            }
+        }
+        
+        free(pert); 
+        free(evals);
+    }
+    else{
+        double eval;
+        int res = cost_eval(cost,time,point2,&eval);
+        assert (res == 0);
+        avg += mc->pself * eval;
+        if (grad != NULL){
+            cblas_daxpy(mc->du,eval,mc->gpself,1,grad,1);
+        }
+    }
+    /* printf("finished!\n"); */
     free(point2); point2 = NULL;
     return avg;
 }
@@ -1247,6 +1352,54 @@ mca_expectation(struct MCA * mca, double time,
     }
     else{
         val = mcnode_expectation(mcn,f,arg,grad);
+        mcnode_free(mcn); mcn = NULL;
+        *info = 0;
+    }
+    return val;
+}
+
+/**********************************************************//**
+    Compute expectation of a cost function
+    
+    \param[in]     mca  - markov chain approximation 
+    \param[in]     time - time
+    \param[in]     x    - current state
+    \param[in]     u    - current control
+    \param[in,out] dt   - time step
+    \param[in]     cost - 
+    \param[in,out] bi   - boundary information
+    \param[in,out] grad - gradient
+    \param[in,out] info - 0 if successfull 1 if error
+
+    \return expectation of f
+**************************************************************/
+double
+mca_expectation_cost(struct MCA * mca, double time,
+                double * x, double * u, double * dt, double * gdt,
+//                void (*f)(size_t,double *,double **,double*,void*),
+                struct Cost * cost, struct BoundInfo ** bi, double * grad,
+                int * info)
+{
+
+//    printf("compute expectation\n");
+    struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,bi,grad);
+    double val = 0.0;
+    if (mcn == NULL){
+        fprintf(stderr, "Warning: MCNode obtained in mca_expectation is NULL\n");
+        fprintf(stderr, "\tx = ");
+        for (size_t ii = 0; ii < mca->d; ii++ ){
+            fprintf(stderr,"%G ",x[ii]);
+        }
+        fprintf(stderr,"\n\tControl = ");
+        for (size_t ii = 0; ii < mca->du; ii++){
+            fprintf(stderr,"%G ",u[ii]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"\tBoundary info is ?????\n");
+        *info = 1;
+    }
+    else{
+        val = mcnode_expectation_cost(mcn,cost,grad);
         mcnode_free(mcn); mcn = NULL;
         *info = 0;
     }

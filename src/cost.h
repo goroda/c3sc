@@ -30,8 +30,13 @@ void cost_approx(struct Cost *,
 int cost_eval(struct Cost *, double, double *, double *);
 //void cost_eval_bb(size_t,double *,double **,double *,void *);
 double cost_eval_bb(double,double *,void *);
-int cost_eval_neigh(struct Cost *, double, double *,
-                    size_t, double[],double []);
-
+/* int cost_eval_neigh(struct Cost *, double, double *, */
+/*                     size_t, double[],double []); */
+int cost_eval_neigh(struct Cost *,
+                    double,
+                    double *,
+                    double *,
+                    double *,
+                    double *);
 
 #endif
