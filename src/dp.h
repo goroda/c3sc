@@ -25,17 +25,17 @@ void c3sc_add_dynamics(struct C3SC *,
                        int (*)(double,const double*,const double*,
                                double*,double*,void*),
                        void *,
-                       int (*)(double,double*,double*,
+                       int (*)(double,const double*,const double*,
                                 double*,double*,void*),
                        void *);
 void c3sc_init_mca(struct C3SC *, size_t *);
 void c3sc_attach_opt(struct C3SC *, struct c3Opt *);
 void c3sc_init_dp(struct C3SC *, double,
-                  int (*)(double,double*,double*,double*,double*),
-                  int (*)(double,double*,double*),
-                  int (*)(double*,double*));
+                  int (*)(double,const double*,const double*,double*,double*),
+                  int (*)(double,const double*,double*),
+                  int (*)(const double*,double*));
 int c3sc_cost_load(struct C3SC * sc, char *);
-int c3sc_cost_approx(struct C3SC *, double (*)(double *, void *),
+int c3sc_cost_approx(struct C3SC *, double (*)(const double *, void *),
                      void *, int, const struct ApproxArgs *);
 void c3sc_pol_solve(struct C3SC *,size_t, double,
                     int, const struct ApproxArgs *);
@@ -50,9 +50,9 @@ size_t c3sc_get_du(const struct C3SC *);
 
 struct DPih * 
 dpih_alloc(double,
-           int (*)(double,double*,double*,double*,double*),
-           int (*)(double,double*,double*),
-           int (*)(double*,double*));
+           int (*)(double,const double*,const double*,double*,double*),
+           int (*)(double,const double*,double*),
+           int (*)(const double*,double*));
 struct DPih * dpih_copy_deep(struct DPih *);
 void dpih_free(struct DPih *);
 void dpih_free_deep(struct DPih *);
@@ -65,7 +65,7 @@ struct Cost * dpih_get_cost(struct DPih *);
 struct Dyn * dpih_get_dyn(struct DPih *);
 size_t dpih_get_d(const struct DPih *);
 
-double dpih_rhs(struct DPih *,double *,double *,double *);
+double dpih_rhs(struct DPih *,const double *,const double *,double *);
 struct Cost * dpih_iter_vi(struct DPih *,int,const struct ApproxArgs *,
                            struct C3SCDiagnostic *);
 struct Cost * dpih_iter_pol(struct DPih *, struct ImplicitPolicy *,

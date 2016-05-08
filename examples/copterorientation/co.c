@@ -110,7 +110,7 @@ int f1(double t, const double * x, const double * u, double * out,
     return 0;
 }
 
-int s1(double t,double * x,double * u,double * out, double * grad,
+int s1(double t,const double * x,const double * u,double * out, double * grad,
        void * args)
 {
     (void)(t);
@@ -140,7 +140,7 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     return 0;
 }
 
-int stagecost(double t, double * x, double * u, double * out, 
+int stagecost(double t,const double * x,const double * u, double * out, 
               double * grad)
 {
     (void)(t);
@@ -173,7 +173,7 @@ int stagecost(double t, double * x, double * u, double * out,
     return 0;
 }
 
-int boundcost(double t, double * x, double * out)
+int boundcost(double t, const double * x, double * out)
 {
     /* printf("not here!!\n"); */
     (void)(t);
@@ -183,7 +183,7 @@ int boundcost(double t, double * x, double * out)
     return 0;
 }
 
-int ocost(double * x,double * out)
+int ocost(const double * x,double * out)
 {
     /* dprint(6,x); */
     (void)(x);
@@ -191,7 +191,7 @@ int ocost(double * x,double * out)
     return 0;
 }
 
-double startcost(double * x, void * args)
+double startcost(const double * x, void * args)
 {
     (void)(args);
     (void)(x);

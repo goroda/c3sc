@@ -50,7 +50,7 @@ int f1(double t, const double * x, const double * u,
     return 0;
 }
 
-int s1(double t,double * x,double * u,double * out, double * grad,
+int s1(double t,const double * x,const double * u,double * out, double * grad,
        void * args)
 {
     (void)(t);
@@ -72,7 +72,7 @@ int s1(double t,double * x,double * u,double * out, double * grad,
     return 0;
 }
 
-int stagecost(double t, double * x, double * u, double * out, 
+int stagecost(double t, const double * x, const double * u, double * out, 
               double * grad)
 {
     (void)(t);
@@ -91,7 +91,7 @@ int stagecost(double t, double * x, double * u, double * out,
 }
 
 // cost of going into the boundaries
-int boundcost(double t, double * x, double * out)
+int boundcost(double t, const double * x, double * out)
 {
 
     (void)(t);
@@ -102,7 +102,7 @@ int boundcost(double t, double * x, double * out)
 }
 
 // cost of hitting obstacle
-int ocost(double * x,double * out)
+int ocost(const double * x,double * out)
 {
     //dprint(3,x);
     (void)(x);
@@ -112,7 +112,7 @@ int ocost(double * x,double * out)
 }
 
 // starting cost
-double startcost(double * x, void * args)
+double startcost(const double * x, void * args)
 {
     (void)(args);
     (void)(x);

@@ -101,11 +101,11 @@ void mcnode_free(struct MCNode * mcn)
     Initialize a node by referencing an array x of size d, 
     node has no neighbors and only transitions to itself
 **************************************************************/
-struct MCNode * mcnode_init(size_t d, double * x)
+struct MCNode * mcnode_init(size_t d, const double * x)
 {
     struct MCNode * mm = mcnode_alloc(d);
     assert (mm != NULL);
-    mm->x = x;
+    mm->x = (double *)x;
     mm->pself = 1.0;
     return mm;
 }
@@ -267,7 +267,7 @@ struct MCNList * mcnlist_prepend_empty(struct MCNList ** mcn, size_t dir,
 double mcnode_expectation(
     const struct MCNode * mc,
     //void (*f)(size_t,double*,double**x,double*,void*),
-    double (*f)(double,double*,void*),
+    double (*f)(double,const double*,void*),
     void * arg,double * grad)
 {
 
@@ -670,7 +670,7 @@ size_t mca_get_du(struct MCA * mca)
     \return node
 **************************************************************/
 struct MCNode *
-mca_outbound_node(struct MCA * mca, double time, double * x)
+mca_outbound_node(struct MCA * mca, double time, const double * x)
 {
     (void)(time);
     struct MCNode * mcn = mcnode_init(mca->d,x);
@@ -699,8 +699,8 @@ mca_outbound_node(struct MCA * mca, double time, double * x)
     No funny boundary conditions
 **************************************************************/
 struct MCNode *
-mca_inbound_node(struct MCA * mca, double time, double * x,
-                 double * u, double *dt,double * gdt, double *grad)
+mca_inbound_node(struct MCA * mca, double time, const double * x,
+                 const double * u, double *dt,double * gdt, double *grad)
 {
 
     assert(mca->dyn != NULL);
@@ -831,7 +831,7 @@ mca_inbound_node(struct MCA * mca, double time, double * x,
 }
 
 void mca_upwind_dim(struct MCA * mca, struct MCNode * mcn,
-                    double * x, size_t ngrad,
+                    const double * x, size_t ngrad,
                     double minh2, double * Qh, double * dQ, size_t ii,
                     double * grad)
 {
@@ -907,8 +907,8 @@ void mca_upwind_dim(struct MCA * mca, struct MCNode * mcn,
     No funny boundary conditions
 **************************************************************/
 struct MCNode *
-mca_reflect_node(struct MCA * mca, double time, double * x,
-                 double * u, double *dt,double * gdt, double *grad,
+mca_reflect_node(struct MCA * mca, double time, const double * x,
+                 const double * u, double *dt,double * gdt, double *grad,
                  struct BoundInfo * bi)
 {
 
@@ -1095,9 +1095,9 @@ mca_reflect_node(struct MCA * mca, double time, double * x,
     No funny boundary conditions
 **************************************************************/
 struct MCNode *
-mca_period_node(struct MCA * mca, double time, double * x,
-                 double * u, double *dt,double * gdt, double *grad,
-                 struct BoundInfo * bi)
+mca_period_node(struct MCA * mca, double time, const double * x,
+                const double * u, double *dt,double * gdt, double *grad,
+                struct BoundInfo * bi)
 {
 
 
@@ -1245,8 +1245,8 @@ mca_period_node(struct MCA * mca, double time, double * x,
                             respect to control (NULL for no)
 **************************************************************/
 struct MCNode *
-mca_get_node(struct MCA * mca, double time, double * x,
-             double * u, double * dt, double * gdt,
+mca_get_node(struct MCA * mca, double time, const double * x,
+             const double * u, double * dt, double * gdt,
              struct BoundInfo ** bi,
              double *grad)
 {
@@ -1325,9 +1325,9 @@ mca_get_node(struct MCA * mca, double time, double * x,
 **************************************************************/
 double
 mca_expectation(struct MCA * mca, double time,
-                double * x, double * u, double * dt, double * gdt,
+                const double * x, const double * u, double * dt, double * gdt,
 //                void (*f)(size_t,double *,double **,double*,void*),
-                double (*f)(double,double *,void*),
+                double (*f)(double,const double *,void*),
                 void * arg, struct BoundInfo ** bi, double * grad,
                 int * info)
 {
@@ -1374,10 +1374,11 @@ mca_expectation(struct MCA * mca, double time,
 **************************************************************/
 double
 mca_expectation_cost(struct MCA * mca, double time,
-                double * x, double * u, double * dt, double * gdt,
+                     const double * x, const double * u,
+                     double * dt, double * gdt,
 //                void (*f)(size_t,double *,double **,double*,void*),
-                struct Cost * cost, struct BoundInfo ** bi, double * grad,
-                int * info)
+                     struct Cost * cost, struct BoundInfo ** bi, double * grad,
+                     int * info)
 {
 
 //    printf("compute expectation\n");

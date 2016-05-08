@@ -87,7 +87,7 @@ size_t approx_args_get_maxrank(const struct ApproxArgs * aargs)
 }
 
 int c3sc_check_bounds(size_t dx, double * lbx,
-                      double * ubx, double * x)
+                      double * ubx,const  double * x)
 {
     if ((lbx == NULL) || (ubx == NULL)){
         return 0;
