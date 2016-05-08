@@ -328,18 +328,20 @@ int main(int argc, char * argv[])
     for (size_t ii = 0; ii < 6; ii++){
         c3sc_set_external_boundary(sc,ii,"reflect");
         printf("(%3.14G,%3.14G)\n",lb[ii],ub[ii]);
+        /* double * xt = linspace(lb[4],ub[4],N); */
+        /* dprint(N,xt); */
     }
-    double center[6] = {0.0,0.0,0.0,0.0,0.0};
-    double width[6] = {ub[0]-lb[0],ub[1]-lb[1],ub[2]-lb[2],0.4,0.4,0.2};
-    dprint(6,width);
-    c3sc_add_obstacle(sc,center,width);
+    /* double center[6] = {0.0,0.0,0.0,0.0,0.0}; */
+    /* double width[6] = {ub[0]-lb[0],ub[1]-lb[1],ub[2]-lb[2],0.4,0.4,0.2}; */
+    /* dprint(6,width); */
+    /* c3sc_add_obstacle(sc,center,width); */
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
     int load_success = c3sc_cost_load(sc,"saved_cost.dat");
     if (load_success != 0){
-        c3sc_cost_approx(sc,startcost,NULL,0,aargs);
+        c3sc_cost_approx(sc,startcost,NULL,2,aargs);
     }
 
     double solve_tol = 1e-5;
@@ -360,8 +362,8 @@ int main(int argc, char * argv[])
         double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
 
         struct Cost * cost = c3sc_get_cost(sc);
-        int saved = cost_save(cost,"saved_cost.dat");
-        assert (saved == 0);
+        /* int saved = cost_save(cost,"saved_cost.dat"); */
+        /* assert (saved == 0); */
 
         size_t * ranks = cost_get_ranks(cost);
         double normval = cost_norm2(cost);
@@ -370,13 +372,13 @@ int main(int argc, char * argv[])
             iprint_sz(7,ranks);
         }
         sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
-        int dres = c3sc_diagnostic_save(diag,filename,4);
-        assert (dres == 0);
+        /* int dres = c3sc_diagnostic_save(diag,filename,4); */
+        /* assert (dres == 0); */
         if (diff < 1e-2){
             break;
         }
     }
-    /* exit(1); */
+    exit(1);
     struct Cost * cost = c3sc_get_cost(sc);
     int saved = cost_save(cost,"saved_cost.dat");
     assert (saved == 0);

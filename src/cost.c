@@ -443,7 +443,7 @@ void cost_approx(struct Cost * c,
     double ** start = malloc_dd(c->d);
     size_t * nstart = calloc_size_t(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
-        /* printf("x[%zu] = ",ii); dprint(Nuse[ii],xuse[ii]); */
+        printf("x[%zu] = ",ii); dprint(Nuse[ii],xuse[ii]);
         nstart[ii] = 5;
         assert (Nuse[ii] > 5);
         size_t mid = Nuse[ii]/2;
@@ -461,12 +461,14 @@ void cost_approx(struct Cost * c,
         start[ii][2] = xuse[ii][Nuse[ii]-2];
         start[ii][3] = xuse[ii][0];
         start[ii][4] = xuse[ii][Nuse[ii]-1];
-        /* printf("start[%zu] = ",ii); dprint(nstart[ii],start[ii]); */
+        printf("start[%zu] = ",ii); dprint(nstart[ii],start[ii]);
 //        printf("start mid = %G\n",start[ii][0]); 
     }
+    printf("approx start\n");
     c3approx_set_start(c3a,nstart,start);
-
+    
     c->cost = c3approx_do_cross(c3a,f,args);
+    printf("approx end\n");
     
     free(nstart); nstart = NULL;
     free_dd(c->d,start); start = NULL;
@@ -517,6 +519,22 @@ int cost_eval(struct Cost * cost,
     else{
         xuse = x;
     }
+
+    /* for (size_t ii = 0; ii < cost->d; ii++){ */
+    /*     int okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(xuse[ii]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,xuse); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
     
     *eval = function_train_eval(cost->cost,xuse);
     if (res != 0){
@@ -529,8 +547,8 @@ int cost_eval(struct Cost * cost,
 /**********************************************************//**
     Evaluate a cost function
 
-    \param[in] x    - location in space at which to evaluate
-    \param[in] eval - pointer to evaluation location
+    \param[in] x   - location in space at which to evaluate
+    \param[in] arg - pointer to cost function
 
 **************************************************************/
 double cost_eval_to_wrap(double * x,void * arg)
@@ -567,12 +585,12 @@ double cost_eval_bb(double t,double * x,void * args)
     Evaluate a cost function at two neighboring points
     around x
 
-    \param[in]     cost  - cost funciton
-    \param[in]     time  - time at which to evaluate
-    \param[in]     x     - location at which to evaluate
-    \param[in]     ii    - dimension at which to perturb x
-    \param[in]     pt    - perturbed values of x[ii] 
-    \param[in,out] evals - space allocated for evaluation
+    \param[in]     cost   - cost funciton
+    \param[in]     time   - time at which to evaluate
+    \param[in]     x      - location at which to evaluate
+    \param[in]     eval   - evaluation at x
+    \param[in]     points - perturbed values of x[ii] - + in each dimension
+    \param[in,out] evals  - space allocated to evaluation of each point
 
     \return res - 0 if everything is ok 
                  !0 if x is out of expected bounds
@@ -584,6 +602,56 @@ int cost_eval_neigh(struct Cost * cost,
                     double * points,
                     double * evals)
 {
+    (void)(time);
+
+    printf("\n\n ------------------\n evaluate neighbor!\n");
+    printf("x = "); dprint(cost->d, x);
+    for (size_t ii = 0; ii < cost->d; ii++){
+        dprint(cost->N[ii],cost->x[ii]);
+        printf("perturb (-,+)=(%G,%G)\n",points[2*ii],points[2*ii+1]);
+    }
+    /*     int okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(x[ii]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,x); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /*     okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(points[2*ii]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,x); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /*     okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(points[2*ii+1]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,x); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
+    
     *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
+    printf("done evaluating neighbor\n ----------------------\n\n\n");
     return 0;
 }

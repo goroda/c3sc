@@ -319,8 +319,7 @@ double mcnode_expectation(
     Compute the expectation of a function around a node
 
     \param[in]     mc   - node
-    \param[in]     f    - function(nvals,times,states,evas,arg)
-    \param[in]     arg  - additional function arguments
+    \param[in]     cost - cost function
     \param[in,out] grad - If (!NULL) return gradient
 
     \return average
