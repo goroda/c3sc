@@ -405,6 +405,7 @@ void cost_approx(struct Cost * c,
     double cross_tol = approx_args_get_cross_tol(aargs);
     double round_tol = approx_args_get_round_tol(aargs);
     size_t kickrank  = approx_args_get_kickrank(aargs);
+    size_t maxrank   = approx_args_get_maxrank(aargs);
 
     struct C3Approx * c3a = c3approx_create(CROSS,c->d,c->bds->lb,c->bds->ub);
     double ** xuse = malloc_dd(c->d);
@@ -437,7 +438,13 @@ void cost_approx(struct Cost * c,
     for (size_t ii = 0; ii < c->d; ii++){
         if (c->N[ii] < minN){ minN = Nuse[ii];}
     }
-    c3approx_set_adapt_maxrank_all(c3a,minN);
+
+    if (maxrank < minN){
+        c3approx_set_adapt_maxrank_all(c3a,maxrank);
+    }
+    else{
+        c3approx_set_adapt_maxrank_all(c3a,minN);
+    }
 
     // determine starting nodes
     double ** start = malloc_dd(c->d);

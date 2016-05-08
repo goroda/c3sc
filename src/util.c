@@ -12,6 +12,7 @@ struct ApproxArgs
     double cross_tol;
     double round_tol;
     size_t kickrank;
+    size_t maxrank;
 };
 
 struct ApproxArgs * approx_args_init()
@@ -25,6 +26,7 @@ struct ApproxArgs * approx_args_init()
     aargs->cross_tol = 1e-10;
     aargs->round_tol = 1e-10;
     aargs->kickrank = 5;
+    aargs->maxrank = 15;
 
     return aargs;
 }
@@ -70,6 +72,18 @@ size_t approx_args_get_kickrank(const struct ApproxArgs * aargs)
 {
     assert (aargs != NULL);
     return aargs->kickrank;
+}
+
+void approx_args_set_maxrank(struct ApproxArgs * aargs, size_t maxrank)
+{
+    assert (aargs != NULL);
+    aargs->maxrank = maxrank;
+}
+
+size_t approx_args_get_maxrank(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->maxrank;
 }
 
 int c3sc_check_bounds(size_t dx, double * lbx,

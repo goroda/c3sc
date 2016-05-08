@@ -157,7 +157,7 @@ int stagecost(double t, double * x, double * u, double * out,
     double wu1 = 37.18;
     double wu2 = 37.18;
     double wu3 = 7.0 * 37.18;
-    *out = *out + wu1 * pow(u[0],2) + wu2 * pow(u[1],2) +
+    *out = *out + 10.0 + wu1 * pow(u[0],2) + wu2 * pow(u[1],2) +
                                         wu3 * pow(u[2],2);
 
     //*out = 5.0;
@@ -298,9 +298,9 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-6);
-    c3opt_set_relftol(opt,1e-6);
-    c3opt_set_gtol(opt,1e-6);
+    c3opt_set_absxtol(opt,1e-10);
+    c3opt_set_relftol(opt,1e-10);
+    c3opt_set_gtol(opt,1e-10);
     
     c3opt_ls_set_maxiter(opt,200);
     c3opt_ls_set_alpha(opt,0.1);
@@ -311,9 +311,10 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-5);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_cross_tol(aargs,1e-3);
+    approx_args_set_round_tol(aargs,1e-3);
     approx_args_set_kickrank(aargs,6);
+    approx_args_set_maxrank(aargs,5);
 
     double beta = 0.0;
 
