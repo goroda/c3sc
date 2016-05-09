@@ -11,6 +11,7 @@ include_directories(CuTest)
 add_subdirectory(CuTest)
 
 add_subdirectory(mca_test)
+add_subdirectory(hashgrid_test)
 
 
 

@@ -896,12 +896,12 @@ dpih_iter_pol_solve(struct DPih * dp,
             }
         }
         if (jj > 1){
-            if ((prevrat < 1) && (rat > 1)){
-                break;
-            }
-            if ((prevrat > 1) && (rat < 1)){
-                break;
-            }
+            /* if ((prevrat < 1) && (rat > 1)){ */
+            /*     break; */
+            /* } */
+            /* if ((prevrat > 1) && (rat < 1)){ */
+            /*     break; */
+            /* } */
         }
         prevrat = rat;
         normprev = normval;

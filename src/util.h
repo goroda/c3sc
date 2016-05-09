@@ -19,4 +19,9 @@ int c3sc_check_bounds(size_t,double*,double*,const double*);
 size_t c3sc_sample_discrete_rv(size_t,double *,double);
 double * c3sc_combine_and_sort(size_t,double *,size_t,double *,size_t *);
 
+struct HashGrid;
+struct HashGrid * hash_grid_create(size_t);
+int hash_grid_add_element(struct HashGrid *,size_t,double);
+size_t hash_grid_get_ind(struct HashGrid *,double);
+void hash_grid_free(struct HashGrid *);
 #endif
