@@ -13,7 +13,7 @@ struct MCNode * mcnode_alloc(size_t);
 /* struct MCNode ** mcnode_alloc_array(size_t); */
 /* void mcnode_free_array(struct MCNode **, size_t); */
 void mcnode_free(struct MCNode *);
-struct MCNode * mcnode_init(size_t,double *);
+struct MCNode * mcnode_init(size_t,const double *);
 void mcnode_set_pself(struct MCNode *,double);
 void mcnode_set_gradient(struct MCNode *,size_t,double*);
 void mcnode_init_self_grad(struct MCNode *, size_t);
@@ -55,7 +55,7 @@ struct MCNList * mcnlist_prepend(struct MCNList **, size_t,
 double mcnode_expectation(
     const struct MCNode *,
     //void (*)(size_t,double*,double**x,double*,void*),
-    double (*)(double,double*,void*),
+    double (*)(double,const double*,void*),
     void *,double*);
 void mcnode_sample_neighbor(struct MCNode *, double, double *);
 void mcnode_print(struct MCNode *, FILE *, int);
@@ -73,30 +73,30 @@ void mca_attach_bound(struct MCA *, struct Boundary *);
 size_t mca_get_dx(struct MCA *);
 size_t mca_get_du(struct MCA *);
 double
-mca_expectation(struct MCA *,double,double *,double *,double *,
+mca_expectation(struct MCA *,double,const double *,const double *,double *,
                 double *,
 //                void(*)(size_t,double*,double**,double*,void*),
-                double(*)(double,double*,void*),
+                double(*)(double,const double*,void*),
                 void *,struct BoundInfo **,double*,int*);
 double
 mca_expectation_cost(struct MCA *, double,
-                     double *, double *, double *, double *,
+                     const double *, const double *, double *, double *,
                      struct Cost *, struct BoundInfo **, double *,
                      int *);
 
 struct MCNode *
-mca_inbound_node(struct MCA*,double,double*,
-                 double*,double*,double*,double*);
+mca_inbound_node(struct MCA*,double,const double*,
+                 const double*,double*,double*,double*);
 struct MCNode *
-mca_reflect_node(struct MCA *,double, double *,
-                 double *, double *,double *,double *,
+mca_reflect_node(struct MCA *,double, const double *,
+                 const double *, double *,double *,double *,
                  struct BoundInfo *);
 
 struct MCNode *
-mca_outbound_node(struct MCA *, double, double *);
+mca_outbound_node(struct MCA *, double, const double *);
 struct MCNode *
-mca_get_node(struct MCA *,double,double *,
-             double *,double *,double*,
+mca_get_node(struct MCA *,double,const double *,
+             const double *,double *,double*,
              struct BoundInfo **,double*);
 
 void mca_step(struct MCA *, double, double *, double *,double,

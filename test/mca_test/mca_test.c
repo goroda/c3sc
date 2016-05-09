@@ -80,7 +80,7 @@ void Test_mcnode_prepend(CuTest * tc)
     mcnode_free(mcn); mcn = NULL;
 }
 
-double expfunc(double t, double * x, void * args)
+double expfunc(double t, const double * x, void * args)
 {
     (void)(t);
     (void)(args);
@@ -152,7 +152,7 @@ int f1(double t, const double * x, const double * u, double * out,
     return 0;
 }
 
-int s1(double t,double * x,double * u,double * out, double * grad,
+int s1(double t,const double * x,const double * u,double * out, double * grad,
        void * args)
 {
     (void)(t);

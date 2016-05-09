@@ -85,8 +85,8 @@ size_t drift_get_du(struct Drift * b)
     return b->du;
 }
 
-int drift_eval(struct Drift * b,double time,double * x,
-               double * u, double * out, double * jac)
+int drift_eval(struct Drift * b,double time,const double * x,
+               const double * u, double * out, double * jac)
 {
     assert ( b != NULL);
     int res;
@@ -130,7 +130,7 @@ struct Diff
     size_t du;
     size_t dw;
  
-    int (*s)(double,double*,double*,double*,double*,void*);
+    int (*s)(double,const double*,const double*,double*,double*,void*);
     void * sargs;
 };
 
@@ -173,7 +173,7 @@ void diff_free(struct Diff * diff)
 }
 
 void diff_add_func(struct Diff * df,
-                   int (*s)(double,double*,double*,
+                   int (*s)(double,const double*,const double*,
                             double*,double*,void*),
                     void * sargs)
 {
@@ -182,8 +182,8 @@ void diff_add_func(struct Diff * df,
     df->sargs = sargs;
 }
 
-int diff_eval(struct Diff * b, double time, double * x, 
-              double * u, double * out, double * jac)
+int diff_eval(struct Diff * b, double time, const double * x, 
+              const double * u, double * out, double * jac)
 {
     int res;
     if (b->s == NULL){
@@ -287,8 +287,8 @@ size_t dyn_get_du(struct Dyn * dyn)
 }
 
 int dyn_eval(struct Dyn * dyn,double time,
-             double * x,
-             double * u, double * drift, double * jacdr,
+             const double * x,
+             const double * u, double * drift, double * jacdr,
              double * diff, double * jacdiff)
 {
     int res = 0;

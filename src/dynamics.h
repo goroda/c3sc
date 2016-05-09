@@ -14,18 +14,18 @@ void drift_add_func(struct Drift *,
                             double*,double*,void*),
                     void *);
 size_t drift_get_dx(struct Drift *);
-int drift_eval(struct Drift *,double,double*,double*,
-               double*,double*);
+int drift_eval(struct Drift *,double,const double*,
+               const double*,double*, double*);
 
 ////////////////////////////////////
 struct Diff * diff_alloc(size_t, size_t, size_t);
 struct Diff * diff_copy(struct Diff *);
 void diff_free(struct Diff *);
 void diff_add_func(struct Diff *,
-                   int (*)(double,double*,double*,
+                   int (*)(double,const double*,const double*,
                            double*,double*,void*),
                    void *);
-int diff_eval(struct Diff *,double,double*,double*,
+int diff_eval(struct Diff *,double,const double*,const double*,
               double*,double*);
 size_t diff_get_dw(struct Diff *);
 
@@ -41,10 +41,8 @@ void dyn_init_ref(struct Dyn*,struct Drift *, struct Diff *);
 size_t dyn_get_dx(struct Dyn *);
 size_t dyn_get_dw(struct Dyn *);
 size_t dyn_get_du(struct Dyn *);
-int dyn_eval(struct Dyn *,double,double*,double*,double*,
-             double*,double*,double*);
-
-
+int dyn_eval(struct Dyn *,double,const double*,const double*,
+             double*,double*,double*,double*);
 
 ////////////////////////////////////////////////////////////
 

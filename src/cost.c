@@ -8,35 +8,25 @@
 #include "cost.h"
 
 /** \struct Cost
- *  \brief Cost function
- *  \var Cost::d
- *  dimension of state space
- *  \var Cost::bds
- *  bounding box
- *  \var Cost::cost
- *  function train cost
- *  \var Cost::N
- *  Number of nodes of discretization in each dimension
- *  \var Cost::x
- *  discretization in each dimension
- *  \var Cost::Nobs
- *  Number of nodes that describes any obstacles
- *  \var Cost::xobs
- *  discretization of obstacles
- *  \var Cost::fm
- *  function monitor
- */
+\brief Cost function
+\var Cost::d    dimension of state space
+\var Cost::bds  bounding box
+\var Cost::cost function train cost
+\var Cost::grid grid of values
+\var Cost::fm   function monitor
+\var Cost::Nobs number of nodes in each grid that are obstacles
+\var Cost::obs  array of indices of grid which are obstacles
+*/
 struct Cost 
 {
     size_t d;
     struct BoundingBox * bds;
     struct FunctionTrain * cost;
 
-    size_t * N;
-    double ** x;
-
+    struct c3Vector ** grid;
+    
     size_t * Nobs;
-    double ** xobs;
+    size_t ** obs;
 
     struct FunctionMonitor * fm; // for storing evaluations
 };
@@ -54,11 +44,11 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     cost->d = d;
     cost->bds = bounding_box_vec(d,lb,ub);
     cost->cost = NULL;
-    
-    cost->N = NULL;
-    cost->x = NULL;
+
+    cost->grid = NULL;
     cost->Nobs = NULL;
-    cost->xobs = NULL;
+    cost->obs  = NULL;
+    
     cost->fm = NULL;
 
     return cost;
@@ -67,7 +57,7 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
 /**********************************************************//**
     Save a cost function
 **************************************************************/
-int cost_save(struct Cost * cost, char *filename)
+int cost_save(const struct Cost * cost, char *filename)
 {
     assert (cost->cost != NULL);
     int res = function_train_save(cost->cost,filename);
@@ -96,34 +86,31 @@ int cost_load(struct Cost * cost, char * filename)
 /**********************************************************//**
     Copy a cost function
 **************************************************************/
-struct Cost * cost_copy_deep(struct Cost * old)
+struct Cost * cost_copy_deep(const struct Cost * old)
 {
     if (old == NULL){
         return NULL;
     }
 
-    struct Cost * newc = cost_alloc(old->d,old->bds->lb,old->bds->ub);
+    double * lb = bounding_box_get_lb(old->bds);
+    double * ub = bounding_box_get_ub(old->bds);
+    struct Cost * newc = cost_alloc(old->d,lb,ub);
     newc->cost = function_train_copy(old->cost);
-    if (old->N != NULL){
-        newc->N = calloc_size_t(newc->d);
-        memmove(newc->N,old->N,newc->d*sizeof(size_t));
-    }
-    if (old->x != NULL){
-        newc->x = malloc_dd(newc->d);
-        for (size_t ii = 0; ii < newc->d; ii++){
-            newc->x[ii] = calloc_double(newc->N[ii]);
-            memmove(newc->x[ii],old->x[ii],newc->N[ii]*sizeof(double));
-        }
+    if (old->grid != NULL){
+        newc->grid = c3vector_array_copy(newc->d,old->grid);
     }
     if (old->Nobs != NULL){
-        newc->Nobs = calloc_size_t(newc->d);
-        memmove(newc->Nobs,old->Nobs,newc->d*sizeof(size_t));
-    }
-    if (old->xobs != NULL){
-        newc->xobs = malloc_dd(newc->d);
+        newc->Nobs = calloc_size_t(old->d);
+        memmove(newc->Nobs,old->Nobs, old->d*sizeof(size_t));
+        newc->obs = malloc(old->d * sizeof(size_t *));
         for (size_t ii = 0; ii < newc->d; ii++){
-            newc->xobs[ii] = calloc_double(newc->Nobs[ii]);
-            memmove(newc->xobs[ii],old->xobs[ii],newc->Nobs[ii]*sizeof(double));
+            if (newc->Nobs[ii] > 0){
+                newc->obs[ii]  = calloc_size_t(newc->Nobs[ii]);
+                memmove(newc->obs[ii],old->obs[ii],newc->Nobs[ii]*sizeof(size_t));
+            }
+            else{
+                newc->obs[ii] = NULL;
+            }
         }
     }
     
@@ -138,11 +125,18 @@ void cost_free(struct Cost * c)
     if (c != NULL){
         bounding_box_free(c->bds); c->bds = NULL;
         function_train_free(c->cost); c->cost = NULL;
-        free_dd(c->d,c->x); c->x = NULL;
-        free(c->N); c->N = NULL;
-        free_dd(c->d,c->xobs); c->xobs = NULL;
-        free(c->Nobs); c->Nobs = NULL;
+        c3vector_array_free(c->d,c->grid);
         function_monitor_free(c->fm); c->fm = NULL;
+
+        if (c->Nobs != NULL){
+            free(c->Nobs); c->Nobs = NULL;
+        }
+        if (c->obs != NULL){
+            for (size_t ii = 0; ii < c->d; ii++){
+                free(c->obs[ii]); c->obs[ii] = NULL;
+            }
+            free(c->obs);
+        }
         free(c); c = NULL;
     }
 }
@@ -150,16 +144,32 @@ void cost_free(struct Cost * c)
 /**********************************************************//**
     Return the dimension of a cost function
 **************************************************************/
-size_t cost_get_d(struct Cost * c)
+size_t cost_get_d(const struct Cost * c)
 {
     assert (c != NULL);
     return c->d;
 }
 
 /**********************************************************//**
+    Get the total discretization could be quite large and result
+    in overflow!!
+**************************************************************/
+size_t cost_get_size(const struct Cost * cost)
+{
+    /* assert (cost->N != NULL); */
+    assert (cost->grid != NULL);
+    size_t ntot = 1;
+    for (size_t ii = 0; ii < cost->d; ii++){
+        ntot *= cost->grid[ii]->size;
+    }
+    
+    return ntot;
+}
+
+/**********************************************************//**
     Return a reference to cost funciton lower bounds
 **************************************************************/
-double * cost_get_lb(struct Cost * c)
+double * cost_get_lb(const struct Cost * c)
 {
     assert (c != NULL);
     if (c->bds == NULL){
@@ -171,7 +181,7 @@ double * cost_get_lb(struct Cost * c)
 /**********************************************************//**
     Return a reference to cost funciton upper
 **************************************************************/
-double * cost_get_ub(struct Cost * c)
+double * cost_get_ub(const struct Cost * c)
 {
     assert (c != NULL);
     if (c->bds == NULL){
@@ -187,14 +197,14 @@ void cost_get_h(const struct Cost * c, double * h)
 {
     assert (c != NULL);
     for (size_t ii = 0; ii < c->d; ii++){
-        h[ii] = c->x[ii][1] - c->x[ii][0];
+        h[ii] = c->grid[ii]->elem[1] - c->grid[ii]->elem[0];
     }
 }
 
 /**********************************************************//**
     Get cost function ranks
 **************************************************************/
-size_t * cost_get_ranks(struct Cost * c)
+size_t * cost_get_ranks(const struct Cost * c)
 {
     assert (c != NULL);
     assert (c->cost != NULL);
@@ -204,7 +214,7 @@ size_t * cost_get_ranks(struct Cost * c)
 /**********************************************************//**
     Get cost norm
 **************************************************************/
-double cost_norm2(struct Cost * c)
+double cost_norm2(const struct Cost * c)
 {
     assert (c != NULL);
     return function_train_norm2(c->cost);
@@ -213,7 +223,7 @@ double cost_norm2(struct Cost * c)
 /**********************************************************//**
     Get norm2 difference between cost functions
 **************************************************************/
-double cost_norm2_diff(struct Cost * c, struct Cost * nc)
+double cost_norm2_diff(const struct Cost * c, const struct Cost * nc)
 {
     assert (c != NULL);
     assert (nc != NULL);
@@ -227,16 +237,14 @@ double cost_norm2_diff(struct Cost * c, struct Cost * nc)
     \param[in]     N    - number of nodes in each dimension
     \param[in]     x    - nodes in each dimension
 **************************************************************/
-void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
+void cost_init_grid(struct Cost * cost,size_t * N,double ** x)
 {
     assert (cost != NULL);
+    assert (cost->grid == NULL);
     
-    cost->x = malloc_dd(cost->d);
-    cost->N = calloc_size_t(cost->d);
+    cost->grid = c3vector_array_alloc(cost->d);
     for (size_t ii = 0; ii < cost->d; ii++){
-        cost->N[ii] = N[ii];
-        cost->x[ii] = calloc_double(N[ii]);
-        memmove(cost->x[ii],x[ii],N[ii]*sizeof(double));
+        cost->grid[ii] = c3vector_alloc(N[ii],x[ii]);
     }
 }
 
@@ -246,50 +254,44 @@ void cost_init_discrete(struct Cost * cost,size_t * N,double ** x)
     \param[in,out] cost - allocated cost
     \param[in]     lb   - lower bounds of obstacles
     \param[in]     ub   - upper bounds of obstacles
-    \param[in]     N    - number of nodes with which to represent obstacle
 **************************************************************/
-void cost_add_nodes(struct Cost * cost, double *lb, double *ub, size_t N)
+void cost_add_nodes(struct Cost * cost, double *lb, double *ub)
 {
     assert (cost != NULL);
-    assert (cost->xobs == NULL);
+    assert (cost->obs == NULL);
     assert (cost->Nobs == NULL);
-    cost->xobs = malloc_dd(cost->d);
+    cost->obs = malloc(cost->d * sizeof(size_t *));
+    assert (cost->obs != NULL);
     cost->Nobs = calloc_size_t(cost->d);
     for (size_t ii = 0; ii < cost->d; ii++){
-        cost->Nobs[ii] = N;
-        cost->xobs[ii] = linspace(lb[ii],ub[ii],N);
+        for (size_t jj = 0; jj < cost->grid[ii]->size; jj++){
+            if ((cost->grid[ii]->elem[jj] > lb[ii]-1e-13) && (cost->grid[ii]->elem[jj] < ub[ii]+1e-13)){
+                cost->Nobs[ii]++;
+            }
+        }
+        cost->obs[ii] = calloc_size_t(cost->Nobs[ii]);
+        size_t ind = 0;
+        for (size_t jj = 0; jj < cost->grid[ii]->size; jj++){
+            if ((cost->grid[ii]->elem[jj] > lb[ii]-1e-13) && (cost->grid[ii]->elem[jj] < ub[ii]+1e-13)){
+                cost->obs[ii][ind] = jj;
+                ind++;
+            }
+        }
     }
-}
+    
+    size_t allnonzero = 1;
+    for (size_t ii = 0; ii < cost->d; ii++){
+        if (cost->Nobs[ii] == 0){
+            allnonzero = 0;
+            break;
+        }
+    }
+    if (allnonzero == 0){
+        fprintf(stderr,"There are no valid nodes in the grid that represent this obstacle!\n");
+        exit(1);
+    }
+    
 
-/**********************************************************//**
-    Get the total discretization could be quite large and result
-    in overflow!!
-**************************************************************/
-size_t cost_get_size(const struct Cost * cost)
-{
-    assert (cost->N != NULL);
-    assert (cost->x != NULL);
-    double ** xuse = malloc_dd(cost->d);
-    size_t * Nuse = calloc_size_t(cost->d);
-    for (size_t ii = 0; ii < cost->d; ii++){
-        if (cost->Nobs != NULL){
-            xuse[ii] = c3sc_combine_and_sort(cost->N[ii],cost->x[ii],
-                                             cost->Nobs[ii],cost->xobs[ii],
-                                             Nuse+ii);
-        }
-        else{
-            xuse[ii] = calloc_double(cost->N[ii]);
-            memmove(xuse[ii],cost->x[ii],cost->N[ii]*sizeof(double));
-            Nuse[ii] = cost->N[ii];
-        }
-    }
-    size_t ntot = 1;
-    for (size_t ii = 0; ii < cost->d; ii++){
-        ntot *= Nuse[ii];
-    }
-    free_dd(cost->d,xuse); xuse = NULL;
-    free(Nuse); Nuse = NULL;
-    return ntot;
 }
 
 /**********************************************************//**
@@ -301,26 +303,17 @@ size_t cost_get_size(const struct Cost * cost)
     \note
     c->cost should be NULL
 **************************************************************/
-void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
+void cost_interpolate_new(struct Cost * cnew, const struct Cost * cold)
 {
     assert (cold->cost != NULL);
-    assert (cnew->N != NULL);
-    assert (cnew->x != NULL);
+    assert (cnew->grid != NULL);
+
     function_train_free(cnew->cost); cnew->cost = NULL;
     double ** xuse = malloc_dd(cnew->d);
     size_t * Nuse = calloc_size_t(cnew->d);
     for (size_t ii = 0; ii < cnew->d; ii++){
-        if (cnew->Nobs != NULL){
-            xuse[ii] = c3sc_combine_and_sort(cnew->N[ii],cnew->x[ii],
-                                             cnew->Nobs[ii],cnew->xobs[ii],
-                                             Nuse+ii);
-            
-        }
-        else{
-            xuse[ii] = calloc_double(cnew->N[ii]);
-            memmove(xuse[ii],cnew->x[ii],cnew->N[ii]*sizeof(double));
-            Nuse[ii] = cnew->N[ii];
-        }
+        xuse[ii] = cnew->grid[ii]->elem;
+        Nuse[ii] = cnew->grid[ii]->size;
     }
 
     cnew->cost = function_train_create_nodal(cold->cost,Nuse,xuse);
@@ -331,51 +324,50 @@ void cost_interpolate_new(struct Cost * cnew, struct Cost * cold)
 /**********************************************************//**
     Divide the number of nodes in half
 **************************************************************/
-void cost_interp_inhalf(struct Cost * cnew, int inhalf)
-{
+/* void cost_interp_inhalf(struct Cost * cnew, int inhalf) */
+/* { */
  
-    assert (cnew->N != NULL);
-    assert (cnew->x != NULL);
+/*     assert (cnew->N != NULL); */
+/*     assert (cnew->x != NULL); */
 
-    double * lb = cost_get_lb(cnew);
-    double * ub = cost_get_ub(cnew);
-    double ** xuse = malloc_dd(cnew->d);
-    size_t * Nuse = calloc_size_t(cnew->d);
-    for (size_t ii = 0; ii < cnew->d; ii++){
-        if (inhalf == 1){
-            cnew->N[ii] = cnew->N[ii]/2;
-        }
-        else{
-            cnew->N[ii] = cnew->N[ii]*2;
-        }
-        free(cnew->x[ii]);
-        cnew->x[ii] = linspace(lb[ii],ub[ii],cnew->N[ii]);
+/*     double * lb = cost_get_lb(cnew); */
+/*     double * ub = cost_get_ub(cnew); */
+/*     double ** xuse = malloc_dd(cnew->d); */
+/*     size_t * Nuse = calloc_size_t(cnew->d); */
+/*     for (size_t ii = 0; ii < cnew->d; ii++){ */
+/*         if (inhalf == 1){ */
+/*             cnew->N[ii] = cnew->N[ii]/2; */
+/*         } */
+/*         else{ */
+/*             cnew->N[ii] = cnew->N[ii]*2; */
+/*         } */
+/*         free(cnew->x[ii]); */
+/*         cnew->x[ii] = linspace(lb[ii],ub[ii],cnew->N[ii]); */
 
-        if (cnew->Nobs != NULL){
-            xuse[ii] = c3sc_combine_and_sort(cnew->N[ii],cnew->x[ii],
-                                             cnew->Nobs[ii],cnew->xobs[ii],
-                                             Nuse+ii);
-        }
-        else{
-            xuse[ii] = calloc_double(cnew->N[ii]);
-            memmove(xuse[ii],cnew->x[ii],cnew->N[ii]*sizeof(double));
-            Nuse[ii] = cnew->N[ii];
-        }
+/*         if (cnew->Nobs != NULL){ */
+/*             xuse[ii] = c3sc_combine_and_sort(cnew->N[ii],cnew->x[ii], */
+/*                                              cnew->Nobs[ii],cnew->xobs[ii], */
+/*                                              Nuse+ii); */
+/*         } */
+/*         else{ */
+/*             xuse[ii] = calloc_double(cnew->N[ii]); */
+/*             memmove(xuse[ii],cnew->x[ii],cnew->N[ii]*sizeof(double)); */
+/*             Nuse[ii] = cnew->N[ii]; */
+/*         } */
 
-    }
+/*     } */
 
-    if (cnew->cost != NULL){
-        struct FunctionTrain * newcost = 
-            function_train_create_nodal(cnew->cost,Nuse,xuse);
-        function_train_free(cnew->cost);
-        cnew->cost = function_train_copy(newcost);
-        function_train_free(newcost); newcost = NULL;
-    }
+/*     if (cnew->cost != NULL){ */
+/*         struct FunctionTrain * newcost =  */
+/*             function_train_create_nodal(cnew->cost,Nuse,xuse); */
+/*         function_train_free(cnew->cost); */
+/*         cnew->cost = function_train_copy(newcost); */
+/*         function_train_free(newcost); newcost = NULL; */
+/*     } */
 
-    free_dd(cnew->d,xuse); xuse = NULL;
-    free(Nuse); Nuse = NULL;
-}
-
+/*     free_dd(cnew->d,xuse); xuse = NULL; */
+/*     free(Nuse); Nuse = NULL; */
+/* } */
 
 /**********************************************************//**
     Set cost function to an approximation of some input
@@ -390,14 +382,13 @@ void cost_interp_inhalf(struct Cost * cnew, int inhalf)
     c->cost should be NULL
 **************************************************************/
 void cost_approx(struct Cost * c,
-                 double (*f)(double *, void *),
+                 double (*f)(const double *, void *),
                  void * args, int verbose,
                  const struct ApproxArgs * aargs)
 {
     assert (c != NULL);
     assert (c->bds != NULL);
-    assert (c->N != NULL);
-    assert (c->x != NULL);
+    assert (c->grid != NULL);
     if (c->cost != NULL){
         function_train_free(c->cost); c->cost = NULL;
     }
@@ -407,38 +398,36 @@ void cost_approx(struct Cost * c,
     size_t kickrank  = approx_args_get_kickrank(aargs);
     size_t maxrank   = approx_args_get_maxrank(aargs);
 
-    struct C3Approx * c3a = c3approx_create(CROSS,c->d,c->bds->lb,c->bds->ub);
-    double ** xuse = malloc_dd(c->d);
-    size_t * Nuse = calloc_size_t(c->d);
-    for (size_t ii = 0; ii < c->d; ii++){
-        if (c->Nobs != NULL){
-            xuse[ii] = c3sc_combine_and_sort(c->N[ii],c->x[ii],
-                                             c->Nobs[ii],c->xobs[ii],Nuse+ii);
-            
-        }
-        else{
-            xuse[ii] = calloc_double(c->N[ii]);
-            memmove(xuse[ii],c->x[ii],c->N[ii]*sizeof(double));
-            Nuse[ii] = c->N[ii];
-        }
-    }
-    
-    c3approx_init_lin_elem(c3a);
-    c3approx_set_lin_elem_fixed(c3a,Nuse,xuse);
+    struct C3Approx * c3a = c3approx_create(CROSS,c->d);
+    struct LinElemExpAopts ** aopts =
+        malloc(c->d * sizeof(struct LinElemExpAopts *));
+    struct OneApproxOpts ** qmopts =
+        malloc(c->d * sizeof(struct OneApproxOpts *));
 
     size_t init_rank = 5;
-    c3approx_init_cross(c3a,init_rank,verbose);
-    c3approx_set_fiber_opt_brute_force(c3a,Nuse,xuse);
-    
+    // determine starting nodes
+    double ** start = malloc_dd(c->d);
+    for (size_t ii = 0; ii < c->d; ii++){
+        start[ii] = calloc_double(init_rank);
+
+        for (size_t jj = 0; jj < init_rank; jj++){
+            start[ii][jj] = c->grid[ii]->elem[jj];
+        }
+        
+        if (c->Nobs != NULL){ // add the first element
+            start[ii][0] = c->grid[ii]->elem[c->obs[ii][0]];
+        }
+        c3approx_set_approx_opts_dim(c3a,ii,qmopts[ii]);
+    }
+    c3approx_init_cross(c3a,init_rank,verbose,start);
     c3approx_set_cross_tol(c3a,cross_tol);
     c3approx_set_cross_maxiter(c3a,10);
     c3approx_set_round_tol(c3a,round_tol);
     c3approx_set_adapt_kickrank(c3a,kickrank);
-    size_t minN = Nuse[0];
+    size_t minN = c->grid[0]->size;
     for (size_t ii = 0; ii < c->d; ii++){
-        if (c->N[ii] < minN){ minN = Nuse[ii];}
+        if (c->grid[ii]->size < minN){ minN = c->grid[ii]->size;}
     }
-
     if (maxrank < minN){
         c3approx_set_adapt_maxrank_all(c3a,maxrank);
     }
@@ -446,40 +435,21 @@ void cost_approx(struct Cost * c,
         c3approx_set_adapt_maxrank_all(c3a,minN);
     }
 
-    // determine starting nodes
-    double ** start = malloc_dd(c->d);
-    size_t * nstart = calloc_size_t(c->d);
-    for (size_t ii = 0; ii < c->d; ii++){
-        /* printf("x[%zu] = ",ii); dprint(Nuse[ii],xuse[ii]); */
-        nstart[ii] = 5;
-        assert (Nuse[ii] > 5);
-        size_t mid = Nuse[ii]/2;
-        if (c->Nobs != NULL){
-            mid = c->Nobs[ii]/2;
-        }
-        start[ii] = calloc_double(nstart[ii]);
-        if (c->Nobs != NULL){
-            start[ii][0] = c->xobs[ii][mid];
-        }
-        else{
-            start[ii][0] = xuse[ii][mid];
-        }
-        start[ii][1] = xuse[ii][1];
-        start[ii][2] = xuse[ii][Nuse[ii]-2];
-        start[ii][3] = xuse[ii][0];
-        start[ii][4] = xuse[ii][Nuse[ii]-1];
-        /* printf("start[%zu] = ",ii); dprint(nstart[ii],start[ii]); */
-//        printf("start mid = %G\n",start[ii][0]); 
-    }
-    c3approx_set_start(c3a,nstart,start);
-
-    c->cost = c3approx_do_cross(c3a,f,args);
+    struct Fwrap * fw = fwrap_create(c->d,"general");
+    fwrap_set_f(fw,f,args);
+        
+    c->cost = c3approx_do_cross(c3a,fw,1);
+    printf("approx end\n");
     
-    free(nstart); nstart = NULL;
+
     free_dd(c->d,start); start = NULL;
-    free_dd(c->d,xuse); xuse = NULL;
-    free(Nuse); Nuse = NULL;
+    for (size_t ii = 0; ii < c->d; ii++){
+        one_approx_opts_free_deep(&(qmopts[ii]));
+    }
+    free(qmopts);
+    free(aopts);;
     c3approx_destroy(c3a); c3a = NULL;
+    fwrap_destroy(fw);
 }
 
 /**********************************************************//**
@@ -495,39 +465,55 @@ void cost_approx(struct Cost * c,
 **************************************************************/
 int cost_eval(struct Cost * cost,
               double time,
-              double * x,
+              const double * x,
               double * eval)
 {
 
 
     (void)(time);
 
-    int res = c3sc_check_bounds(cost->bds->dim,
-                                cost->bds->lb,
-                                cost->bds->ub,
-                                x);
+    double * lb = bounding_box_get_lb(cost->bds);
+    double * ub = bounding_box_get_ub(cost->bds);
+    int res = c3sc_check_bounds(cost->d,lb,ub,x);
+
     double * xuse = NULL;
     if (res != 0){
-        xuse = calloc_double(cost->bds->dim);
-        for (size_t ii = 0; ii < cost->bds->dim; ii++){
-            if (x[ii] < cost->bds->lb[ii]){
-                xuse[ii] = cost->bds->lb[ii];
+        xuse = calloc_double(cost->d);
+        for (size_t ii = 0; ii < cost->d; ii++){
+            if (x[ii] < lb[ii]){
+                xuse[ii] = lb[ii];
             }
-            else if (x[ii] > cost->bds->ub[ii]){
-                xuse[ii] = cost->bds->ub[ii];
+            else if (x[ii] > ub[ii]){
+                xuse[ii] = ub[ii];
             }
             else{
                 xuse[ii] = x[ii];
             }
         }
     }
-    else{
-        xuse = x;
-    }
-    
-    *eval = function_train_eval(cost->cost,xuse);
-    if (res != 0){
+
+    /* for (size_t ii = 0; ii < cost->d; ii++){ */
+    /*     int okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(xuse[ii]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,xuse); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
+
+    if (xuse != NULL){
+        *eval = function_train_eval(cost->cost,xuse);
         free(xuse); xuse = NULL;
+    }
+    else{
+        *eval = function_train_eval(cost->cost,x);
     }
 
     return 0;
@@ -536,11 +522,11 @@ int cost_eval(struct Cost * cost,
 /**********************************************************//**
     Evaluate a cost function
 
-    \param[in] x    - location in space at which to evaluate
-    \param[in] eval - pointer to evaluation location
+    \param[in] x   - location in space at which to evaluate
+    \param[in] arg - pointer to cost function
 
 **************************************************************/
-double cost_eval_to_wrap(double * x,void * arg)
+double cost_eval_to_wrap(const double * x,void * arg)
 {
     struct Cost * cost = arg;
     double out;
@@ -559,7 +545,7 @@ double cost_eval_to_wrap(double * x,void * arg)
 
     \return value
 **************************************************************/
-double cost_eval_bb(double t,double * x,void * args)
+double cost_eval_bb(double t,const double * x,void * args)
 {
     (void)(t);
     struct Cost * c = args;
@@ -574,12 +560,12 @@ double cost_eval_bb(double t,double * x,void * args)
     Evaluate a cost function at two neighboring points
     around x
 
-    \param[in]     cost  - cost funciton
-    \param[in]     time  - time at which to evaluate
-    \param[in]     x     - location at which to evaluate
-    \param[in]     ii    - dimension at which to perturb x
-    \param[in]     pt    - perturbed values of x[ii] 
-    \param[in,out] evals - space allocated for evaluation
+    \param[in]     cost   - cost funciton
+    \param[in]     time   - time at which to evaluate
+    \param[in]     x      - location at which to evaluate
+    \param[in]     eval   - evaluation at x
+    \param[in]     points - perturbed values of x[ii] - + in each dimension
+    \param[in,out] evals  - space allocated to evaluation of each point
 
     \return res - 0 if everything is ok 
                  !0 if x is out of expected bounds
@@ -591,6 +577,56 @@ int cost_eval_neigh(struct Cost * cost,
                     double * points,
                     double * evals)
 {
+    (void)(time);
+
+    printf("\n\n ------------------\n evaluate neighbor!\n");
+    printf("x = "); dprint(cost->d, x);
+    for (size_t ii = 0; ii < cost->d; ii++){
+        dprint(cost->grid[ii]->size,cost->grid[ii]->elem);
+        printf("perturb (-,+)=(%G,%G)\n",points[2*ii],points[2*ii+1]);
+    }
+    /*     int okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(x[ii]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,x); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /*     okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(points[2*ii]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,x); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /*     okd = 0; */
+    /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
+    /*         if (fabs(points[2*ii+1]-cost->x[ii][jj]) < 1e-15){ */
+    /*             okd = 1; */
+    /*             break; */
+    /*         } */
+    /*     } */
+    /*     if (okd == 0){ */
+    /*         fprintf(stderr,"Evaluation point is not a proper candidate\n"); */
+    /*         printf("pt = "); dprint(cost->d,x); */
+    /*         dprint(cost->N[ii], cost->x[ii]); */
+    /*         exit(1); */
+    /*     } */
+    /* } */
+    
     *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
+    printf("done evaluating neighbor\n ----------------------\n\n\n");
     return 0;
 }

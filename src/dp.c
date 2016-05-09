@@ -147,7 +147,7 @@ void c3sc_add_dynamics(struct C3SC * sc,
                        int (*b)(double,const double*,const double*,
                                 double*,double*,void*),
                        void * bargs,
-                       int (*s)(double,double*,double*,
+                       int (*s)(double,const double*,const double*,
                                 double*,double*,void*),
                        void * sargs)
 {
@@ -189,13 +189,13 @@ void c3sc_init_mca(struct C3SC * sc, size_t * N)
         /* printf("x[%zu] = ",ii);dprint(N[ii],x[ii]); */
         /* printf("(%G,%G)\n",sc->lbx[ii],sc->ubx[ii]); */
     }
-    cost_init_discrete(sc->cost,N,x);
+    cost_init_grid(sc->cost,N,x);
 
     size_t nobs = boundary_get_nobs(sc->bound);
     for (size_t jj = 0; jj < nobs; jj++){
         double * lb = boundary_obstacle_get_lb(sc->bound,jj);
         double * ub = boundary_obstacle_get_ub(sc->bound,jj);
-        cost_add_nodes(sc->cost,lb,ub,3);
+        cost_add_nodes(sc->cost,lb,ub);
     }
 
     sc->mca = mca_alloc(sc->dx,sc->du,sc->dw,h);
@@ -231,9 +231,9 @@ void c3sc_attach_opt(struct C3SC * sc, struct c3Opt * opt)
     \param[in]     o    - obstacle cost (NULL if none)
 **************************************************************/
 void c3sc_init_dp(struct C3SC * sc, double beta,
-                  int (*s)(double,double*,double*,double*,double*),
-                  int (*b)(double,double*,double*),
-                  int (*o)(double*,double*))
+                  int (*s)(double,const double*,const double*,double*,double*),
+                  int (*b)(double,const double*,double*),
+                  int (*o)(const double*,double*))
 {
     assert(sc != NULL);
 
@@ -280,7 +280,7 @@ int c3sc_cost_load(struct C3SC * sc, char * filename )
 /**********************************************************//**
     Approximate a cost function
 **************************************************************/
-int c3sc_cost_approx(struct C3SC * sc, double (*f)(double *, void *),
+int c3sc_cost_approx(struct C3SC * sc, double (*f)(const double *, void *),
                      void * args, int verbose,
                      const struct ApproxArgs * aargs)
 {
@@ -375,9 +375,9 @@ struct DPih
     //  struct Policy * pol;
 
     double beta; // discount factor
-    int (*stagecost)(double,double*,double*,double*,double*);
-    int (*boundcost)(double,double*,double*);
-    int (*obscost)(double*,double*);
+    int (*stagecost)(double,const double*,const double*,double*,double*);
+    int (*boundcost)(double,const double*,double*);
+    int (*obscost)(const double*,double*);
 
     struct c3Opt * opt;
 };
@@ -396,9 +396,9 @@ struct DPih
 **************************************************************/
 struct DPih * 
 dpih_alloc(double beta,
-           int (*s)(double,double*,double*,double*,double*),
-           int (*b)(double,double*,double*),
-           int (*obs)(double *,double*))
+           int (*s)(double,const double*,const double*,double*,double*),
+           int (*b)(double,const double*,double*),
+           int (*obs)(const double *,double*))
 {
     struct DPih * dp = malloc(sizeof(struct DPih));
     if (dp == NULL){
@@ -421,26 +421,26 @@ dpih_alloc(double beta,
 /**********************************************************//**
     Interpolate a dynamic program
 **************************************************************/
-struct DPih * dpih_interp2(struct DPih * dp, int inhalf)
-{
-    struct DPih * newdp = dpih_alloc(dp->beta,dp->stagecost,
-                                     dp->boundcost,dp->obscost);
-    newdp->opt = c3opt_copy(dp->opt);
+/* struct DPih * dpih_interp2(struct DPih * dp, int inhalf) */
+/* { */
+/*     struct DPih * newdp = dpih_alloc(dp->beta,dp->stagecost, */
+/*                                      dp->boundcost,dp->obscost); */
+/*     newdp->opt = c3opt_copy(dp->opt); */
 
-    newdp->cost = cost_copy_deep(dp->cost);
-    cost_interp_inhalf(newdp->cost,inhalf);
-    size_t d = cost_get_d(dp->cost); 
+/*     newdp->cost = cost_copy_deep(dp->cost); */
+/*     cost_interp_inhalf(newdp->cost,inhalf); */
+/*     size_t d = cost_get_d(dp->cost);  */
    
-    double * newh = calloc_double(d);
-    cost_get_h(newdp->cost,newh);
+/*     double * newh = calloc_double(d); */
+/*     cost_get_h(newdp->cost,newh); */
     
-    newdp->mm = mca_copy_deep(dp->mm);
-    mca_set_newh(newdp->mm,newh);
+/*     newdp->mm = mca_copy_deep(dp->mm); */
+/*     mca_set_newh(newdp->mm,newh); */
         
-    free(newh); newh = NULL;
+/*     free(newh); newh = NULL; */
 
-    return newdp;
-}
+/*     return newdp; */
+/* } */
 
 /**********************************************************//**
     Copy dynamic program
@@ -553,7 +553,7 @@ struct Dyn * dpih_get_dyn(struct DPih * dp)
    Evaluate right hand side of Bellman equation at a given node *x*
    and for a given control *u*
 **************************************************************/
-double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
+double dpih_rhs(struct DPih * dp,const double * x,const double * u, double * grad)
 {
     size_t du = mca_get_du(dp->mm);
     size_t dx = mca_get_dx(dp->mm);
@@ -660,7 +660,7 @@ double dpih_rhs(struct DPih * dp,double * x,double * u, double * grad)
 struct DPX
 {
     struct DPih * dp;
-    double * x;
+    const double * x;
 };
     
 /**********************************************************//**
@@ -678,7 +678,7 @@ double dpih_rhs_opt_bb(size_t du, double * u, double * grad, void * arg)
 /**********************************************************//**
       Run optimizer and return optimal cost
 **************************************************************/
-double dpih_rhs_opt_cost(double * x,void * dp)
+double dpih_rhs_opt_cost(const double * x,void * dp)
 {
     /* if (x[2] < -1.6){ */
     /*     if (x[2] > -2.0){ */
@@ -744,7 +744,7 @@ struct DPPOL
 /**********************************************************//**
       Bellman RHS with fixed policy
 **************************************************************/
-double dpih_rhs_pol_cost(double * x,void * dp)
+double dpih_rhs_pol_cost(const double * x,void * dp)
 {
 
     struct DPPOL * dppol = dp;
@@ -764,7 +764,7 @@ double dpih_rhs_pol_cost(double * x,void * dp)
 /**********************************************************//**
       Bellman RHS with fixed policy
 **************************************************************/
-double dpih_rhs_pol_cost_weight(double * x,void * dp)
+double dpih_rhs_pol_cost_weight(const double * x,void * dp)
 {
 
     struct DPPOL * dppol = dp;
@@ -1046,12 +1046,14 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
     /* printf("here\n"); */
     struct DPX dpx;
     dpx.dp = ip->dp;
+    double * x = NULL;
     if (ip->transform == NULL){
         dpx.x = (double *) xin;
     }
     else{
-        dpx.x = calloc_double(ip->dx);
-        ip->transform(ip->dx,xin,dpx.x);
+        x = calloc_double(ip->dx);
+        ip->transform(ip->dx,xin,x);
+        dpx.x = x;
         /* printf("transformed!\n"); */
         /* printf("ip->dx = "); */
         /* dprint(ip->dx,dpx.x); */
@@ -1061,7 +1063,7 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
     size_t dx = mca_get_dx(dpx.dp->mm);
     size_t du = mca_get_du(dpx.dp->mm);
 
-    char * ser = serialize_darray_to_text(dx,dpx.x);
+    char * ser = serialize_darray_to_text(dx,(double *)dpx.x);
     char * sval = lookup_key(ip->fm[0],ser);
     /* if (1 == 0){ */
     if (sval != NULL){
@@ -1113,7 +1115,8 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
 
 //    printf("we are done!\n");
     if (ip->transform != NULL){
-        free(dpx.x); dpx.x = NULL;
+        free(x); x = NULL;
+//        free(dpx.x); dpx.x = NULL;
     }
     int res_pol = 0;
     return res_pol;
