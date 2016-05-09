@@ -25,8 +25,8 @@ struct ApproxArgs * approx_args_init()
     
     aargs->cross_tol = 1e-10;
     aargs->round_tol = 1e-10;
-    aargs->kickrank = 5;
-    aargs->maxrank = 15;
+    aargs->kickrank = 10;
+    aargs->maxrank = 40;
 
     return aargs;
 }

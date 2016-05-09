@@ -162,6 +162,7 @@ size_t cost_get_size(const struct Cost * cost)
     for (size_t ii = 0; ii < cost->d; ii++){
         ntot *= cost->grid[ii]->size;
     }
+//    printf("ntot = %zu\n",ntot);
     
     return ntot;
 }
@@ -264,6 +265,7 @@ void cost_add_nodes(struct Cost * cost, double *lb, double *ub)
     assert (cost->obs != NULL);
     cost->Nobs = calloc_size_t(cost->d);
     for (size_t ii = 0; ii < cost->d; ii++){
+
         for (size_t jj = 0; jj < cost->grid[ii]->size; jj++){
             if ((cost->grid[ii]->elem[jj] > lb[ii]-1e-13) && (cost->grid[ii]->elem[jj] < ub[ii]+1e-13)){
                 cost->Nobs[ii]++;
@@ -288,6 +290,8 @@ void cost_add_nodes(struct Cost * cost, double *lb, double *ub)
     }
     if (allnonzero == 0){
         fprintf(stderr,"There are no valid nodes in the grid that represent this obstacle!\n");
+        /* printf("Boundary[%zu] in (%G,%G)\n",ii,lb[ii],ub[ii]); */
+        /* printf("\t grid is "); dprint(cost->grid[ii]->size,cost->grid[ii]->elem); */
         exit(1);
     }
     
@@ -417,13 +421,23 @@ void cost_approx(struct Cost * c,
         if (c->Nobs != NULL){ // add the first element
             start[ii][0] = c->grid[ii]->elem[c->obs[ii][0]];
         }
+        /* printf("ii=%zu ",ii); */
+        /* dprint(init_rank,start[ii]); */
+        /* printf("set it\n"); */
+
+        aopts[ii] = lin_elem_exp_aopts_alloc(c->grid[ii]->size,c->grid[ii]->elem);
+        qmopts[ii] = one_approx_opts_alloc(LINELM,aopts[ii]);
         c3approx_set_approx_opts_dim(c3a,ii,qmopts[ii]);
+        /* printf("did it\n"); */
     }
+    /* printf("really?!\n"); */
     c3approx_init_cross(c3a,init_rank,verbose,start);
+    /* printf("why\n"); */
     c3approx_set_cross_tol(c3a,cross_tol);
     c3approx_set_cross_maxiter(c3a,10);
     c3approx_set_round_tol(c3a,round_tol);
     c3approx_set_adapt_kickrank(c3a,kickrank);
+    /* printf("set all things\n"); */
     size_t minN = c->grid[0]->size;
     for (size_t ii = 0; ii < c->d; ii++){
         if (c->grid[ii]->size < minN){ minN = c->grid[ii]->size;}
@@ -434,12 +448,13 @@ void cost_approx(struct Cost * c,
     else{
         c3approx_set_adapt_maxrank_all(c3a,minN);
     }
-
+    /* printf("wrap function\n"); */
     struct Fwrap * fw = fwrap_create(c->d,"general");
     fwrap_set_f(fw,f,args);
-        
+
+    /* printf("start approximation\n"); */
     c->cost = c3approx_do_cross(c3a,fw,1);
-    printf("approx end\n");
+    /* printf("approx end\n"); */
     
 
     free_dd(c->d,start); start = NULL;
@@ -579,12 +594,12 @@ int cost_eval_neigh(struct Cost * cost,
 {
     (void)(time);
 
-    printf("\n\n ------------------\n evaluate neighbor!\n");
-    printf("x = "); dprint(cost->d, x);
-    for (size_t ii = 0; ii < cost->d; ii++){
-        dprint(cost->grid[ii]->size,cost->grid[ii]->elem);
-        printf("perturb (-,+)=(%G,%G)\n",points[2*ii],points[2*ii+1]);
-    }
+    /* printf("\n\n ------------------\n evaluate neighbor!\n"); */
+    /* printf("x = "); dprint(cost->d, x); */
+    /* for (size_t ii = 0; ii < cost->d; ii++){ */
+    /*     dprint(cost->grid[ii]->size,cost->grid[ii]->elem); */
+    /*     printf("perturb (-,+)=(%G,%G)\n",points[2*ii],points[2*ii+1]); */
+    /* } */
     /*     int okd = 0; */
     /*     for (size_t jj = 0; jj < cost->N[ii]; jj++){ */
     /*         if (fabs(x[ii]-cost->x[ii][jj]) < 1e-15){ */
@@ -627,6 +642,6 @@ int cost_eval_neigh(struct Cost * cost,
     /* } */
     
     *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
-    printf("done evaluating neighbor\n ----------------------\n\n\n");
+    /* printf("done evaluating neighbor\n ----------------------\n\n\n"); */
     return 0;
 }
