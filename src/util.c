@@ -7,6 +7,60 @@
 #include "util.h"
 #include "cdyn/src/simulate.h"
 
+/////////////////////////////////////////////
+/// Packing a double
+/// from 
+/// http://stackoverflow.com/questions/3418319/serialize-double-and-float-with-c#3418560
+////////////////////////////////////////////
+#define FRAC_MAX 9223372036854775807LL /* 2**63 - 1 */
+
+struct dbl_packed
+{
+    int exp;
+    long long frac;
+};
+
+void pack(double x, struct dbl_packed *r)
+{
+
+    double xf = fabs(frexp(x, &(r->exp))) - 0.5;
+
+
+    if (xf < 0.0)
+    {
+        r->frac = 0;
+        return;
+    }
+    
+    r->frac = 1 + (long long)(xf * 2.0 * (FRAC_MAX - 1));
+
+    if (x < 0.0){
+        r->frac = -r->frac;
+    }
+    printf("pack x = %G, exp=%d, xf=%G \n",x,r->exp,xf);
+}
+
+double unpack(const struct dbl_packed *p)
+{
+    double xf, x;
+
+    if (p->frac == 0)
+        return 0.0;
+
+    xf = ((double)(llabs(p->frac) - 1) / (FRAC_MAX - 1)) / 2.0;
+
+    x = ldexp(xf + 0.5, p->exp);
+
+    if (p->frac < 0)
+        x = -x;
+
+    return x;
+}
+
+/////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////
+
 struct ApproxArgs
 {
     double cross_tol;
@@ -193,3 +247,242 @@ size_t c3sc_sample_discrete_rv(size_t n, double * probs,
     fprintf(stderr,"Uniform sample is %G\n",sample);
     return 0;
 }
+
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////// Hashing doubles /////////////////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+/***********************************************************//**
+    Simple hash function
+
+    \param[in] size - hashtable size
+    \param[in] str  - string to hash
+
+    \return hashval
+
+    \note
+    http://www.sparknotes.com/cs/searching/hashtables/section3/page/2/
+***************************************************************/
+static size_t hashd(size_t size, char * str)
+{   
+    size_t hashval = 0;
+    
+    for (; *str != '\0'; str++){
+        hashval = (size_t) *str + (hashval << 5) - hashval;
+        printf("\t hashval = %zu ", hashval );
+    }
+    printf("\n");
+    
+    return hashval % size;
+}
+
+struct HashGridList{
+
+//    double x;
+    char * key;
+    size_t ind;
+    struct HashGridList * next;
+};
+
+void hash_grid_list_push(struct HashGridList ** head, size_t ind,char * string)//double xIn, size_t ind)
+{
+    struct HashGridList * newNode = malloc(sizeof(struct HashGridList));
+    //  newNode->x = xIn;
+    newNode->ind = ind;
+    newNode->next = *head;
+    size_t nvals = sizeof(int)+sizeof(long long)+1;
+    newNode->key = malloc(nvals);
+    memmove(newNode->key,string,nvals);
+    *head = newNode;
+}
+
+void hash_grid_list_free(struct HashGridList ** head){
+
+    // This is a bit inefficient and doesnt free the last node
+    struct HashGridList * current = *head;
+    struct HashGridList * next;
+    while (current != NULL){
+        next = current->next; current->next = NULL;
+        free(current->key); current->key = NULL;
+        /* free(current->x); */
+        free(current); current = NULL;
+        current = next;
+    }
+    *head = NULL;
+}
+
+struct HashGrid
+{
+    size_t size;
+    struct HashGridList ** table;
+};
+
+
+/***********************************************************//**
+    Allocate memory for a new hashtable of cpairs
+
+    \param[in] size - size table
+    
+    \return new_table 
+***************************************************************/
+struct HashGrid * hash_grid_create(size_t size)
+{
+
+    struct HashGrid * new_table = NULL;
+    if (size < 1) return NULL;
+    
+    if (NULL == (new_table = malloc(sizeof(struct HashGrid)))){
+        fprintf(stderr, "failed to allocate memory for hashtable.\n");
+        exit(1);
+    }
+    if (NULL == (new_table->table = malloc(size * sizeof(struct HashGridList *)))){
+        fprintf(stderr, "failed to allocate memory for hashtable.\n");
+        exit(1);
+    }
+
+    new_table->size = size;
+    size_t ii;
+    for (ii = 0; ii < size; ii++){
+        new_table->table[ii] = NULL;
+    }
+
+    return new_table;
+}
+
+/***********************************************************//**
+    Lookup a key in the hashtable
+
+    \param[in]      ht  - hashtable
+    \param[in]      key - key to lookup
+    \param[int,out] exists - returns 1 if exists 0 if doesnt
+    
+    \return out - either NULL or the second element in the pair stored under the key 
+***************************************************************/
+static size_t lookup_keyd(struct HashGrid * ht , char * key, int * exists)
+{
+    struct HashGridList * pl = NULL;
+    size_t val = hashd(ht->size,key);
+    
+    printf("val ind = %zu\n",val);
+    *exists = 0;
+    size_t out = 0;
+    for (pl = ht->table[val]; pl != NULL; pl = pl->next){
+        if (strcmp(key,pl->key) == 0){
+            out = pl->ind;
+//            out[N]='\0';
+            *exists = 1;
+            return out;
+        }
+    }
+    return out;
+}
+
+/***********************************************************//**
+    Add an index and value to the has table
+
+    \param[in] ht  - hashtable
+    \param[in] ind - index
+    \param[in] val - double to add
+    
+    \return
+        0 if good, 1 if some err, 2 if exists
+***************************************************************/
+int hash_grid_add_element(struct HashGrid * ht,size_t ind,double val)
+{
+
+    struct dbl_packed dbl;
+    pack(val,&dbl);
+    printf("exp = %d, frac=%lld \n",dbl.exp,dbl.frac);
+    
+    size_t nvals = sizeof(int) + sizeof(long long)+sizeof(char);
+    char * key = malloc(nvals);
+    assert (key != NULL);
+    memmove(key,(char *)&(dbl.exp),sizeof(int));
+    memmove(key+sizeof(int),(char *)&(dbl.frac),sizeof(long long));
+    key[nvals-1] = '\0';
+    /* char  * key = "asaksjdhaskdh\0"; */
+    /* for (size_t ii = 0; ii < nvals; ii++){ */
+    /*     printf("%c",key[ii]); */
+    /* } */
+    /* printf("\n"); */
+    
+    // check if key already exists
+    int exists = 0;
+    lookup_keyd(ht,key,&exists);
+    if (exists == 1) {
+        free(key); key = NULL;
+        return 2;
+    }
+
+    size_t hashval = hashd(ht->size,key);
+    
+    hash_grid_list_push(&(ht->table[hashval]),ind,key);
+    free(key); key = NULL;
+
+    return 0;
+}
+
+/***********************************************************//**
+    Get the index associated with a particular value
+
+    \param[in] ht  - hashtable
+    \param[in] val - double to add
+    
+    \return index
+***************************************************************/
+size_t hash_grid_get_ind(struct HashGrid * ht,double val)
+{
+
+    struct dbl_packed dbl;
+    pack(val,&dbl);
+    
+    int nvals = sizeof(int) + sizeof(long long)+1;
+    char * key = malloc(nvals);
+    assert (key != NULL);
+    memmove(key,&(dbl.exp),sizeof(int));
+    memmove(key+sizeof(int),&(dbl.frac),sizeof(long long));
+    key[nvals-1] = '\0';
+    
+    // check if key already exists
+    int exists = 0;
+    size_t ind = lookup_keyd(ht,key,&exists);
+    if (exists == 0) {
+        fprintf(stderr,"Value doesn't exists %G\n",val);
+        exit(1);
+        /* free(key); key = NULL; */
+        return 2;
+    }
+    
+    return ind;
+}
+
+/***********************************************************//**
+    Free memory allocated to the hashtable
+
+    \param[in,out] ht - hashtable
+***************************************************************/
+void hash_grid_free(struct HashGrid * ht)
+{
+    if (ht != NULL){
+        size_t ii;
+        for (ii = 0; ii < ht->size; ii++){
+            hash_grid_list_free(&(ht->table[ii]));
+        }
+        free(ht->table); ht->table = NULL;
+        free(ht); ht = NULL;
+    }
+}
+
+/* unsigned char * serialize_int(unsigned char *buffer, int value) */
+/* { */
+/*     buffer[0] = value >> 24; */
+/*     buffer[1] = value >> 16; */
+/*     buffer[2] = value >> 8; */
+/*     buffer[3] = value; */
+/*     return buffer + 4; */
+/* } */
+
