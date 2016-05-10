@@ -120,8 +120,8 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 36; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e-4;
-    double vspeed = 1e-4;
+    double vpos = 1e-3;
+    double vspeed = 1e-3;
     double vspeed_last = 1e-4;
 
     out[0] = vpos;
@@ -158,7 +158,13 @@ int stagecost(double t,const double * x,const double * u, double * out,
     double wu3 = 7.0 * 37.18;
     /* *out = *out + 1.0 + wu1 * pow(u[0],2) + wu2 * pow(u[1],2) + */
     /*                                     wu3 * pow(u[2],2); */
-    *out = 1.0;
+    *out = 1e-1;
+    /* *out += pow(x[0],2); */
+    /* *out += pow(x[1],2); */
+    /* *out += pow(x[2],2); */
+    /* *out += pow(x[3],2); */
+    /* *out += pow(x[4],2); */
+    /* *out += pow(x[5],2); */
 
     //*out = 5.0;
     
@@ -179,7 +185,7 @@ int boundcost(double t, const double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 1e2;
+    *out = 1e1;
     return 0;
 }
 
@@ -195,7 +201,7 @@ double startcost(const double * x, void * args)
 {
     (void)(args);
     (void)(x);
-    return 5.0;
+    return 1.0;
 }
 
 int main(int argc, char * argv[])
@@ -308,13 +314,13 @@ int main(int argc, char * argv[])
 
     c3opt_set_verbose(opt,0);
 
-
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-4);
+    approx_args_set_round_tol(aargs,1e-6);
     approx_args_set_kickrank(aargs,15);
-    approx_args_set_maxrank(aargs,10);
+    approx_args_set_maxrank(aargs,5);
+    approx_args_set_startrank(aargs,5);
 
     double beta = 1.0;
 
@@ -327,15 +333,16 @@ int main(int argc, char * argv[])
     c3sc_set_state_bounds(sc,lb,ub);
     printf("bounds = \n");
     for (size_t ii = 0; ii < 6; ii++){
-        c3sc_set_external_boundary(sc,ii,"reflect");
+        /* c3sc_set_external_boundary(sc,ii,"reflect"); */
         printf("(%3.14G,%3.14G)\n",lb[ii],ub[ii]);
         /* double * xt = linspace(lb[4],ub[4],N); */
         /* dprint(N,xt); */
     }
-    /* double center[6] = {0.0,0.0,0.0,0.0,0.0}; */
+    double center[6] = {0.0,0.0,0.0,0.0,0.0};
     /* double width[6] = {ub[0]-lb[0],ub[1]-lb[1],ub[2]-lb[2],0.4,0.4,0.2}; */
+    double width[6] = {0.4,0.2,0.2,ub[3]-lb[3],ub[4]-lb[4],ub[5]-lb[5]};
     /* dprint(6,width); */
-    /* c3sc_add_obstacle(sc,center,width); */
+    c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
@@ -402,8 +409,8 @@ int main(int argc, char * argv[])
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-//    double state[6] = {-0.2, 0.3, 0.0, 0.4, 0.4, 0.04};
-    double state[6] = {0.0, 0.0, 0.0, 0.4, 0.4, 0.04};
+    double state[6] = {-0.2, 0.3, 0.0, 0.4, 0.4, 0.04};
+//    double state[6] = {0.1, 0.6, -0.2, 0.4, 0.2, 0.04};
     double con[3] = {0.0, 0.0, 0.0};
 
     struct Trajectory * traj = NULL;
@@ -411,7 +418,7 @@ int main(int argc, char * argv[])
     trajectory_add(&traj,6,3,time,state,con);
     printf("initialized trajectory\n");
 
-    double final_time = 5e-1;
+    double final_time = 2e0;
     double dt = 5e-3;
     int res;
     while (time < final_time){

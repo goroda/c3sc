@@ -66,6 +66,7 @@ struct ApproxArgs
     double cross_tol;
     double round_tol;
     size_t kickrank;
+    size_t startrank;
     size_t maxrank;
 };
 
@@ -80,6 +81,7 @@ struct ApproxArgs * approx_args_init()
     aargs->cross_tol = 1e-10;
     aargs->round_tol = 1e-10;
     aargs->kickrank = 10;
+    aargs->startrank = 5;
     aargs->maxrank = 40;
 
     return aargs;
@@ -138,6 +140,18 @@ size_t approx_args_get_maxrank(const struct ApproxArgs * aargs)
 {
     assert (aargs != NULL);
     return aargs->maxrank;
+}
+
+void approx_args_set_startrank(struct ApproxArgs * aargs, size_t startrank)
+{
+    assert (aargs != NULL);
+    aargs->startrank = startrank;
+}
+
+size_t approx_args_get_startrank(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->startrank;
 }
 
 int c3sc_check_bounds(size_t dx, double * lbx,
@@ -400,6 +414,7 @@ void hash_grid_free_ndgrid(size_t d, struct HashGrid ** hg)
         for (size_t ii = 0; ii < d; ii++){
             hash_grid_free(hg[ii]); hg[ii] = NULL;
         }
+        free(hg); hg = NULL;
     }
 }
 
@@ -527,7 +542,7 @@ size_t hash_grid_get_ind(struct HashGrid * ht,double val,int *exists)
         /* free(key); key = NULL; */
         /* return 2; */
     }
-    
+    free(key); key = NULL;
     return ind;
 }
 

@@ -409,6 +409,7 @@ void cost_approx(struct Cost * c,
     double round_tol = approx_args_get_round_tol(aargs);
     size_t kickrank  = approx_args_get_kickrank(aargs);
     size_t maxrank   = approx_args_get_maxrank(aargs);
+    size_t startrank = approx_args_get_startrank(aargs);
 
     struct C3Approx * c3a = c3approx_create(CROSS,c->d);
     struct LinElemExpAopts ** aopts =
@@ -416,7 +417,7 @@ void cost_approx(struct Cost * c,
     struct OneApproxOpts ** qmopts =
         malloc(c->d * sizeof(struct OneApproxOpts *));
 
-    size_t init_rank = 5;
+    size_t init_rank = startrank;
     // determine starting nodes
     double ** start = malloc_dd(c->d);
     for (size_t ii = 0; ii < c->d; ii++){
