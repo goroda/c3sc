@@ -273,9 +273,9 @@ static size_t hashd(size_t size, char * str)
     
     for (; *str != '\0'; str++){
         hashval = (size_t) *str + (hashval << 5) - hashval;
-        printf("\t hashval = %zu ", hashval );
+        /* printf("\t hashval = %zu ", hashval ); */
     }
-    printf("\n");
+    /* printf("\n"); */
     
     return hashval % size;
 }
@@ -294,9 +294,10 @@ void hash_grid_list_push(struct HashGridList ** head, size_t ind,char * string)/
     //  newNode->x = xIn;
     newNode->ind = ind;
     newNode->next = *head;
-    size_t nvals = sizeof(int)+sizeof(long long)+1;
-    newNode->key = malloc(nvals);
-    memmove(newNode->key,string,nvals);
+    size_t N1 = strlen(string);
+    newNode->key = malloc((N1+1)*sizeof(char));
+    strncpy(newNode->key,string,N1);
+    newNode->key[N1] = '\0';
     *head = newNode;
 }
 
@@ -320,7 +321,6 @@ struct HashGrid
     size_t size;
     struct HashGridList ** table;
 };
-
 
 /***********************************************************//**
     Allocate memory for a new hashtable of cpairs
@@ -354,11 +354,61 @@ struct HashGrid * hash_grid_create(size_t size)
 }
 
 /***********************************************************//**
+    Allocate memory for and has a grid
+
+    \param[in] size - size table
+    \param[in] grid - grid to has
+    
+    \return new_table 
+***************************************************************/
+struct HashGrid * hash_grid_create_grid(size_t size, const struct c3Vector * grid)
+{
+    struct HashGrid * hg = hash_grid_create(size);
+    for (size_t ii = 0; ii < grid->size; ii++){
+        hash_grid_add_element(hg,ii,grid->elem[ii]);
+    }
+    return hg;
+}
+
+/***********************************************************//**
+    Allocate memory for and hash a grid
+
+    \param[in] size - size table
+    \param[in] d    - number of dimensions
+    \param[in] grid - grids to hash
+    
+    \return new_table 
+***************************************************************/
+struct HashGrid ** hash_grid_create_ndgrid(size_t size, size_t d, struct c3Vector ** grid)
+{
+    struct HashGrid ** hg = malloc(d * sizeof(struct HashGrid *));
+    for (size_t jj = 0; jj < d; jj++){
+        hg[jj] = hash_grid_create(size);
+        for (size_t ii = 0; ii < grid[jj]->size; ii++){
+            hash_grid_add_element(hg[jj],ii,grid[jj]->elem[ii]);
+        }
+    }
+    return hg;
+}
+
+/***********************************************************//**
+    Free an array of hash grids
+***************************************************************/
+void hash_grid_free_ndgrid(size_t d, struct HashGrid ** hg)
+{
+    if (hg != NULL){
+        for (size_t ii = 0; ii < d; ii++){
+            hash_grid_free(hg[ii]); hg[ii] = NULL;
+        }
+    }
+}
+
+/***********************************************************//**
     Lookup a key in the hashtable
 
-    \param[in]      ht  - hashtable
-    \param[in]      key - key to lookup
-    \param[int,out] exists - returns 1 if exists 0 if doesnt
+    \param[in]     ht     - hashtable
+    \param[in]     key    - key to lookup
+    \param[in,out] exists - returns 1 if exists 0 if doesnt
     
     \return out - either NULL or the second element in the pair stored under the key 
 ***************************************************************/
@@ -367,7 +417,7 @@ static size_t lookup_keyd(struct HashGrid * ht , char * key, int * exists)
     struct HashGridList * pl = NULL;
     size_t val = hashd(ht->size,key);
     
-    printf("val ind = %zu\n",val);
+    /* printf("val ind = %zu\n",val); */
     *exists = 0;
     size_t out = 0;
     for (pl = ht->table[val]; pl != NULL; pl = pl->next){
@@ -394,16 +444,20 @@ static size_t lookup_keyd(struct HashGrid * ht , char * key, int * exists)
 int hash_grid_add_element(struct HashGrid * ht,size_t ind,double val)
 {
 
-    struct dbl_packed dbl;
-    pack(val,&dbl);
-    printf("exp = %d, frac=%lld \n",dbl.exp,dbl.frac);
-    
-    size_t nvals = sizeof(int) + sizeof(long long)+sizeof(char);
-    char * key = malloc(nvals);
-    assert (key != NULL);
-    memmove(key,(char *)&(dbl.exp),sizeof(int));
-    memmove(key+sizeof(int),(char *)&(dbl.frac),sizeof(long long));
-    key[nvals-1] = '\0';
+    /* struct dbl_packed dbl; */
+    /* pack(val,&dbl); */
+    /* printf("exp = %d, frac=%lld \n",dbl.exp,dbl.frac); */
+
+
+    /* char last = '\0'; */
+    /* char * key = malloc(nvals); */
+    /* assert (key != NULL); */
+    /* memmove(key,&(dbl.exp),sizeof(int)); */
+    /* memmove(key+sizeof(int),(char *)&(dbl.frac),sizeof(long long)); */
+    /* memmove(key+sizeof(int)+sizeof(long long),&last,sizeof(char)); */
+    char * key = serialize_double_to_text(val);
+    /* printf("%s\n",key); */
+    /* key[nvals-1] = '\0'; */
     /* char  * key = "asaksjdhaskdh\0"; */
     /* for (size_t ii = 0; ii < nvals; ii++){ */
     /*     printf("%c",key[ii]); */
@@ -419,11 +473,26 @@ int hash_grid_add_element(struct HashGrid * ht,size_t ind,double val)
     }
 
     size_t hashval = hashd(ht->size,key);
-    
+    /* printf("adding hashval = %zu\n",hashval); */
     hash_grid_list_push(&(ht->table[hashval]),ind,key);
     free(key); key = NULL;
 
     return 0;
+}
+
+void hash_grid_print(struct HashGrid * ht, FILE *fp)
+{
+    for (size_t ii = 0; ii < ht->size; ii++){
+        struct HashGridList * hgl = ht->table[ii];
+        if (hgl != NULL){
+            while (hgl != NULL){
+                double val = deserialize_double_from_text(hgl->key);
+                fprintf(fp,"ind=%zu,val = %3.15G ",ii,val);
+                hgl = hgl->next;
+            }
+            fprintf(fp,"\n");
+        }
+    }
 }
 
 /***********************************************************//**
@@ -434,30 +503,55 @@ int hash_grid_add_element(struct HashGrid * ht,size_t ind,double val)
     
     \return index
 ***************************************************************/
-size_t hash_grid_get_ind(struct HashGrid * ht,double val)
+size_t hash_grid_get_ind(struct HashGrid * ht,double val,int *exists)
 {
 
-    struct dbl_packed dbl;
-    pack(val,&dbl);
-    
-    int nvals = sizeof(int) + sizeof(long long)+1;
-    char * key = malloc(nvals);
-    assert (key != NULL);
-    memmove(key,&(dbl.exp),sizeof(int));
-    memmove(key+sizeof(int),&(dbl.frac),sizeof(long long));
-    key[nvals-1] = '\0';
+    char * key = serialize_double_to_text(val);
+    /* struct dbl_packed dbl; */
+    /* pack(val,&dbl); */
+    /* size_t nvals = sizeof(int) + sizeof(long long)+1; */
+    /* char * key = malloc(nvals); */
+    /* assert (key != NULL); */
+    /* memmove(key,&(dbl.exp),sizeof(int)); */
+    /* memmove(key+sizeof(int),&(dbl.frac),sizeof(long long)); */
+    /* key[nvals-1] = '\0'; */
     
     // check if key already exists
-    int exists = 0;
-    size_t ind = lookup_keyd(ht,key,&exists);
-    if (exists == 0) {
-        fprintf(stderr,"Value doesn't exists %G\n",val);
-        exit(1);
+    *exists = 1;
+    size_t ind = lookup_keyd(ht,key,exists);
+    if (*exists == 0) {
+        /* fprintf(stderr,"Value doesn't exists %3.15G\n",val); */
+        /* assert (1 == 0); */
+        free(key);
+        return 0;
         /* free(key); key = NULL; */
-        return 2;
+        /* return 2; */
     }
     
     return ind;
+}
+
+/***********************************************************//**
+    get index associated with an array of grids
+
+    \return 0 if got index, 1 if didnt
+***************************************************************/
+int hash_grid_ndgrid_get_ind(struct HashGrid ** ht, size_t dim, const double * x, size_t * out)
+{
+    int success = 0;
+    int exists;
+    for (size_t ii = 0; ii < dim; ii++){
+        out[ii] = hash_grid_get_ind(ht[ii],x[ii],&exists);
+        if (exists == 0){
+            //success = 1;
+            /* fprintf(stderr,"value does not exist in array\n"); */
+            /* dprint(dim,x); */
+            /* exit(1); */
+            success = 1;
+            break;
+        }
+    }
+    return success;
 }
 
 /***********************************************************//**

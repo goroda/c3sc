@@ -9,13 +9,14 @@
 
 /** \struct Cost
 \brief Cost function
-\var Cost::d    dimension of state space
-\var Cost::bds  bounding box
-\var Cost::cost function train cost
-\var Cost::grid grid of values
-\var Cost::fm   function monitor
-\var Cost::Nobs number of nodes in each grid that are obstacles
-\var Cost::obs  array of indices of grid which are obstacles
+\var Cost::d        dimension of state space
+\var Cost::bds      bounding box
+\var Cost::cost     function train cost
+\var Cost::grid     grid of values
+\var Cost::hashgrid map from grid values to indices
+\var Cost::fm       function monitor
+\var Cost::Nobs     number of nodes in each grid that are obstacles
+\var Cost::obs      array of indices of grid which are obstacles
 */
 struct Cost 
 {
@@ -24,6 +25,7 @@ struct Cost
     struct FunctionTrain * cost;
 
     struct c3Vector ** grid;
+    struct HashGrid ** hashgrid;
     
     size_t * Nobs;
     size_t ** obs;
@@ -46,9 +48,11 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     cost->cost = NULL;
 
     cost->grid = NULL;
+    cost->hashgrid = NULL;
     cost->Nobs = NULL;
     cost->obs  = NULL;
-    
+
+
     cost->fm = NULL;
 
     return cost;
@@ -98,6 +102,7 @@ struct Cost * cost_copy_deep(const struct Cost * old)
     newc->cost = function_train_copy(old->cost);
     if (old->grid != NULL){
         newc->grid = c3vector_array_copy(newc->d,old->grid);
+        newc->hashgrid = hash_grid_create_ndgrid(10000,newc->d,newc->grid);
     }
     if (old->Nobs != NULL){
         newc->Nobs = calloc_size_t(old->d);
@@ -126,6 +131,7 @@ void cost_free(struct Cost * c)
         bounding_box_free(c->bds); c->bds = NULL;
         function_train_free(c->cost); c->cost = NULL;
         c3vector_array_free(c->d,c->grid);
+        hash_grid_free_ndgrid(c->d,c->hashgrid);
         function_monitor_free(c->fm); c->fm = NULL;
 
         if (c->Nobs != NULL){
@@ -242,11 +248,13 @@ void cost_init_grid(struct Cost * cost,size_t * N,double ** x)
 {
     assert (cost != NULL);
     assert (cost->grid == NULL);
-    
+    assert (cost->hashgrid == NULL);
     cost->grid = c3vector_array_alloc(cost->d);
     for (size_t ii = 0; ii < cost->d; ii++){
+        /* dprint(N[ii],x[ii]); */
         cost->grid[ii] = c3vector_alloc(N[ii],x[ii]);
     }
+    cost->hashgrid = hash_grid_create_ndgrid(10000,cost->d,cost->grid);
 }
 
 /**********************************************************//**
@@ -424,8 +432,10 @@ void cost_approx(struct Cost * c,
         /* printf("ii=%zu ",ii); */
         /* dprint(init_rank,start[ii]); */
         /* printf("set it\n"); */
+        /* dprint(c->grid[ii]->size,c->grid[ii]->elem); */
 
         aopts[ii] = lin_elem_exp_aopts_alloc(c->grid[ii]->size,c->grid[ii]->elem);
+
         qmopts[ii] = one_approx_opts_alloc(LINELM,aopts[ii]);
         c3approx_set_approx_opts_dim(c3a,ii,qmopts[ii]);
         /* printf("did it\n"); */
@@ -486,7 +496,24 @@ int cost_eval(struct Cost * cost,
 
 
     (void)(time);
-
+    assert (cost->cost != NULL);
+    assert (cost->hashgrid != NULL);
+    size_t * ind = calloc_size_t(cost->d);
+    /* printf("get ind\n"); */
+    int success = hash_grid_ndgrid_get_ind(cost->hashgrid,cost->d,x,ind);
+    if (success == 0){
+        /* printf("obtain evaluation\n"); */
+        *eval = function_train_eval_ind(cost->cost,ind);
+        /* printf("evaluation is %G\n",*eval); */
+        /* iprint_sz(cost->d,ind); */
+        free(ind); ind = NULL;
+        return 0;
+    }
+    free(ind); ind = NULL;
+    printf("x that is not indexed is\n");
+    dprint(cost->d,x);
+    assert(1 == 0);
+    
     double * lb = bounding_box_get_lb(cost->bds);
     double * ub = bounding_box_get_ub(cost->bds);
     int res = c3sc_check_bounds(cost->d,lb,ub,x);
@@ -593,7 +620,76 @@ int cost_eval_neigh(struct Cost * cost,
                     double * evals)
 {
     (void)(time);
+    assert (cost->cost != NULL);
+    assert (cost->hashgrid != NULL);
+    int dothis = 1;
+    if (dothis){
+        size_t * ind = calloc_size_t(cost->d);
+        size_t * pert = calloc_size_t(cost->d*2);
+        /* printf("get ind\n"); */
+        int success = hash_grid_ndgrid_get_ind(cost->hashgrid,cost->d,x,ind);
+        /* printf("got ind\n"); */
+        /* dprint(cost->d*2, points); */
+        if (success == 0){
+            int exist;
+            for (size_t jj = 0; jj < cost->d; jj++){
+                /* printf("jj = %zu\n",jj); */
+                /* printf("grid = "); dprint(cost->grid[jj]->size,cost->grid[jj]->elem); */
+                /* printf("hashgrid is\n"); */
+                /* hash_grid_print(cost->hashgrid[jj],stdout); */
+                /* printf("point is %3.15G\n",points[jj*cost->d]); */
+                pert[jj*2] = hash_grid_get_ind(cost->hashgrid[jj],points[jj*2],&exist);
+                if (exist == 0){
+                    success = 1;
+                    break;
+                }
+            
+                pert[jj*2+1] = hash_grid_get_ind(cost->hashgrid[jj],points[jj*2+1],&exist);
+                if (exist == 0){
+                    success = 1;
+                    break;
+                }
+            }
+            if (success == 0){
+                /* printf("sometimes here\n"); */
+                *eval = function_train_eval_co_perturb_ind(cost->cost,ind,pert,evals);
+            
+                /* printf("x should be "); */
+                /* dprint(cost->d, x); */
+                /* printf("x is\n"); */
+                /* for (size_t ii = 0; ii < cost->d; ii++){ */
+                /*     printf("%G ",cost->grid[ii]->elem[ind[ii]]); */
+                /* } */
+                /* printf("\n"); */
 
+                /* printf("pert should be "); */
+                /* dprint(2*cost->d, points); */
+                /* printf("pert is\n "); */
+                /* for (size_t ii = 0; ii < cost->d; ii++){ */
+                /*     printf("(%G,%G)  ",cost->grid[ii]->elem[pert[2*ii]], cost->grid[ii]->elem[pert[2*ii+1]]); */
+                /* } */
+                /* printf("\n"); */
+                /* exit(1); */
+            
+
+
+                /* double eval2; */
+                /* double * evals = calloc_double(cost->d*2); */
+                /* *eval = function_train_eval_co_perturb(cost->cost,x,points,evals); */
+                /* free(ind); ind = NULL; */
+                /* free(pert); pert = NULL; */
+                return 0;
+            }
+
+            /* return 0; */
+        }
+        free(ind); ind = NULL;
+        free(pert); pert = NULL;
+    }
+    /* assert(1 == 0); */
+    /* exit(1); */
+    *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
+    
     /* printf("\n\n ------------------\n evaluate neighbor!\n"); */
     /* printf("x = "); dprint(cost->d, x); */
     /* for (size_t ii = 0; ii < cost->d; ii++){ */
@@ -641,7 +737,7 @@ int cost_eval_neigh(struct Cost * cost,
     /*     } */
     /* } */
     
-    *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
+    /* *eval = function_train_eval_co_perturb(cost->cost,x,points,evals); */
     /* printf("done evaluating neighbor\n ----------------------\n\n\n"); */
     return 0;
 }

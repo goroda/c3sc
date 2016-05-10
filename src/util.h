@@ -21,7 +21,12 @@ double * c3sc_combine_and_sort(size_t,double *,size_t,double *,size_t *);
 
 struct HashGrid;
 struct HashGrid * hash_grid_create(size_t);
+struct HashGrid * hash_grid_create_grid(size_t,const struct c3Vector *);
+struct HashGrid ** hash_grid_create_ndgrid(size_t, size_t, struct c3Vector **);
+void hash_grid_free_ndgrid(size_t d, struct HashGrid **);
 int hash_grid_add_element(struct HashGrid *,size_t,double);
-size_t hash_grid_get_ind(struct HashGrid *,double);
+void hash_grid_print(struct HashGrid *, FILE *);
+size_t hash_grid_get_ind(struct HashGrid *,double,int *);
+int hash_grid_ndgrid_get_ind(struct HashGrid **, size_t, const double *, size_t *);
 void hash_grid_free(struct HashGrid *);
 #endif

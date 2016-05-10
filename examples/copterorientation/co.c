@@ -58,8 +58,8 @@ int f1(double t, const double * x, const double * u, double * out,
         printf(" state[4] out of bounds, %G t=%G\n",x[4],t);
         return 1;
     }
-    if ((x[5] < lb[5]) || (x[5] > ub[5]) ){
-        printf(" state[5] out of bounds, %G\n",x[5]);
+    if ((x[5] < lb[5]-1e-13) || (x[5] > ub[5]+1e-13) ){
+        printf(" state[5] out of bounds, %3.15G < %3.15G\n",x[5],lb[5]);
         return 1;
     }
 
@@ -342,7 +342,7 @@ int main(int argc, char * argv[])
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
     int load_success = c3sc_cost_load(sc,"saved_cost.dat");
     if (load_success != 0){
-        c3sc_cost_approx(sc,startcost,NULL,2,aargs);
+        c3sc_cost_approx(sc,startcost,NULL,0,aargs);
     }
 
     double solve_tol = 1e-5;
