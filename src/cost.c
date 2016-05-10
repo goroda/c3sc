@@ -497,22 +497,25 @@ int cost_eval(struct Cost * cost,
 
     (void)(time);
     assert (cost->cost != NULL);
-    assert (cost->hashgrid != NULL);
-    size_t * ind = calloc_size_t(cost->d);
-    /* printf("get ind\n"); */
-    int success = hash_grid_ndgrid_get_ind(cost->hashgrid,cost->d,x,ind);
-    if (success == 0){
-        /* printf("obtain evaluation\n"); */
-        *eval = function_train_eval_ind(cost->cost,ind);
-        /* printf("evaluation is %G\n",*eval); */
-        /* iprint_sz(cost->d,ind); */
+    int dothis = 0;
+    if (dothis){
+        assert (cost->hashgrid != NULL);
+        size_t * ind = calloc_size_t(cost->d);
+        /* printf("get ind\n"); */
+        int success = hash_grid_ndgrid_get_ind(cost->hashgrid,cost->d,x,ind);
+        if (success == 0){
+            /* printf("obtain evaluation\n"); */
+            *eval = function_train_eval_ind(cost->cost,ind);
+            /* printf("evaluation is %G\n",*eval); */
+            /* iprint_sz(cost->d,ind); */
+            free(ind); ind = NULL;
+            return 0;
+        }
         free(ind); ind = NULL;
-        return 0;
+        printf("x that is not indexed is\n");
+        dprint(cost->d,x);
+        assert(1 == 0);
     }
-    free(ind); ind = NULL;
-    printf("x that is not indexed is\n");
-    dprint(cost->d,x);
-    assert(1 == 0);
     
     double * lb = bounding_box_get_lb(cost->bds);
     double * ub = bounding_box_get_ub(cost->bds);
@@ -622,7 +625,7 @@ int cost_eval_neigh(struct Cost * cost,
     (void)(time);
     assert (cost->cost != NULL);
     assert (cost->hashgrid != NULL);
-    int dothis = 1;
+    int dothis = 0;
     if (dothis){
         size_t * ind = calloc_size_t(cost->d);
         size_t * pert = calloc_size_t(cost->d*2);

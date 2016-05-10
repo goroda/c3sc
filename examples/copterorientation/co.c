@@ -312,9 +312,9 @@ int main(int argc, char * argv[])
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-8);
-    approx_args_set_kickrank(aargs,10);
-    approx_args_set_maxrank(aargs,15);
+    approx_args_set_round_tol(aargs,1e-4);
+    approx_args_set_kickrank(aargs,15);
+    approx_args_set_maxrank(aargs,10);
 
     double beta = 1.0;
 
@@ -346,7 +346,7 @@ int main(int argc, char * argv[])
     }
 
     double solve_tol = 1e-5;
-    size_t npol = 10;
+    size_t npol = 5;
 
     struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
     char filename[256];
@@ -363,8 +363,8 @@ int main(int argc, char * argv[])
         double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
 
         struct Cost * cost = c3sc_get_cost(sc);
-        /* int saved = cost_save(cost,"saved_cost.dat"); */
-        /* assert (saved == 0); */
+        int saved = cost_save(cost,"saved_cost.dat");
+        assert (saved == 0);
 
         size_t * ranks = cost_get_ranks(cost);
         double normval = cost_norm2(cost);
@@ -373,13 +373,13 @@ int main(int argc, char * argv[])
             iprint_sz(7,ranks);
         }
         sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
-        /* int dres = c3sc_diagnostic_save(diag,filename,4); */
-        /* assert (dres == 0); */
+        int dres = c3sc_diagnostic_save(diag,filename,4);
+        assert (dres == 0);
         if (diff < 1e-2){
             break;
         }
     }
-    exit(1);
+    /* exit(1); */
     struct Cost * cost = c3sc_get_cost(sc);
     int saved = cost_save(cost,"saved_cost.dat");
     assert (saved == 0);
