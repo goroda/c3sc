@@ -261,6 +261,8 @@ int main(int argc, char * argv[])
     approx_args_set_cross_tol(aargs,1e-5);
     approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,5);
+    approx_args_set_maxrank(aargs,10);
+    approx_args_set_startrank(aargs,10);
 
     double beta = 0.0;
     // setup problem
@@ -372,7 +374,7 @@ int main(int argc, char * argv[])
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
     implicit_policy_add_transform(pol,dx,state_transform);
     printf("created policy\n");
-    char odename[256] = "rk4";
+    char odename[256] = "forward-euler";
     struct Integrator * ode_sys = NULL;
     ode_sys = integrator_create_controlled(
         3,1,f1sym, NULL,implicit_policy_controller,pol);
