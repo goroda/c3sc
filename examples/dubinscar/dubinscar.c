@@ -242,6 +242,8 @@ int main(int argc, char * argv[])
         }
     } while (next_option != -1);
 
+    char filename[256];
+    
     size_t dx = 3;
     size_t dw = 3;
     size_t du = 1;
@@ -276,7 +278,9 @@ int main(int argc, char * argv[])
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
-    int load_success = c3sc_cost_load(sc,"saved_cost.dat");
+
+    sprintf(filename,"%s/%s.dat",dirout,"saved_cost.dat");
+    int load_success = c3sc_cost_load(sc,filename);
     if (load_success != 0){
         c3sc_cost_approx(sc,startcost,NULL,0,aargs);
     }
@@ -289,7 +293,6 @@ int main(int argc, char * argv[])
     size_t npol = 10;
 
     struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
-    char filename[256];
     FILE *fp;
 
     printf("\n\n\n\n\n\n\n\n\n\n");
@@ -298,22 +301,32 @@ int main(int argc, char * argv[])
     for (size_t ii = 0; ii < niter+1; ii++){
     /* for (size_t ii = 0; ii < 0; ii++){ */
 
-        if (ii > 5){
-            c3sc_pol_solve(sc,npol,solve_tol,verbose-1,aargs);
+        if (ii > 0){
+            c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
         }
 
-        double diff = c3sc_iter_vi(sc,verbose-1,aargs,diag);
+        double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
 
         struct Cost * cost = c3sc_get_cost(sc);
         size_t * ranks = cost_get_ranks(cost);
-        iprint_sz(4,ranks);
-//        printf("get cost\n");
-        saved = cost_save(cost,"saved_cost.dat");
-        assert (saved == 0);
-        //      printf("save cost\n");
+        double normval = cost_norm2(cost);
         if (verbose != 0){
-            printf("ii=%zu diff = %G\n",ii,diff);
+            printf("ii=%zu diff=%G,norm=%G diff/norm=%G, ranks=",ii,diff,normval,diff/normval);
+            iprint_sz(4,ranks);
         }
+        
+//        printf("get cost\n");
+        sprintf(filename,"%s/%s.dat",dirout,"saved_cost.dat");
+        saved = cost_save(cost,filename);
+        assert (saved == 0);
+
+        sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
+        int dres = c3sc_diagnostic_save(diag,filename,4);
+        assert (dres == 0);
+        //      printf("save cost\n");
+        /* if (verbose != 0){ */
+        /*     printf("ii=%zu diff = %G\n",ii,diff); */
+        /* } */
         if (diff < 1e-2){
             break;
         }

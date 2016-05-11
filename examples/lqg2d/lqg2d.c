@@ -305,7 +305,7 @@ int main(int argc, char * argv[])
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-10);
-    approx_args_set_round_tol(aargs,1e-10);
+    approx_args_set_round_tol(aargs,1e-7);
     approx_args_set_kickrank(aargs,5);
 
     // setup problem
@@ -315,20 +315,20 @@ int main(int argc, char * argv[])
     /* c3sc_set_external_boundary(sc,0,"reflect"); */
     /* c3sc_set_external_boundary(sc,1,"reflect"); */
     double center[2] = {0.0,0.0};
-    double width[2] = {0.1,0.1};
+    double width[2] = {0.15,0.15};
     c3sc_add_obstacle(sc,center,width);
     c3sc_add_dynamics(sc,f1,NULL,s1,ss);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
-    /* int load_success = c3sc_cost_load(sc,"cost_N=10.dat"); */
-    /* if (load_success != 0){ */
-    /*     c3sc_cost_approx(sc,startcost,NULL,0,aargs); */
-    /* } */
-    c3sc_cost_approx(sc,startcost,NULL,0,aargs);
+    int load_success = c3sc_cost_load(sc,"cost_N=10.dat");
+    if (load_success != 0){
+        c3sc_cost_approx(sc,startcost,NULL,0,aargs);
+    }
+    //c3sc_cost_approx(sc,startcost,NULL,0,aargs);
 
     double solve_tol = 1e-4;
-    size_t npol = 100;
+    size_t npol = 10;
 
     struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
     char filename[256];
@@ -363,7 +363,7 @@ int main(int argc, char * argv[])
             iprint_sz(3,ranks);
         }
 
-        if (diff/normval < 1e-4){
+        if (diff/normval < 1e-3){
             break;
         }
 

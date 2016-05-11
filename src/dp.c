@@ -892,7 +892,11 @@ dpih_iter_pol_solve(struct DPih * dp,
         double diff = cost_norm2_diff(tcost,cost);
         if (verbose > 0){
             if ((jj+1) % 1 == 0){
-                printf("\t jj=%zu, normval=%G, ratio=%G\n",jj,diff/normval,rat);
+                printf("\t POLICY ITERATION (%zu\\%zu):\n",jj+1,max_solve_iter);
+                printf("\t \t L2 Difference between iterates    = %3.5E\n ",diff);
+                printf("\t \t L2 Norm of current value function = %3.5E\n", normval);
+                printf("\t \t Relative L2 Cauchy difference     = %3.5E\n", diff/normval);
+                printf("\t \t Ratio: L2 Norm Prev / L2 Norm Cur = %G\n",rat);
             }
         }
         if (jj > 1){

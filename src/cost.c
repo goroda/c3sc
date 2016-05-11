@@ -26,6 +26,7 @@ struct Cost
 
     struct c3Vector ** grid;
     struct HashGrid ** hashgrid;
+    int cost_eval_grid;
     
     size_t * Nobs;
     size_t ** obs;
@@ -46,7 +47,7 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     cost->d = d;
     cost->bds = bounding_box_vec(d,lb,ub);
     cost->cost = NULL;
-
+    cost->cost_eval_grid = 1;
     cost->grid = NULL;
     cost->hashgrid = NULL;
     cost->Nobs = NULL;
@@ -634,25 +635,41 @@ int cost_eval_neigh(struct Cost * cost,
         int success = hash_grid_ndgrid_get_ind(cost->hashgrid,cost->d,x,ind);
         /* printf("got ind\n"); */
         /* dprint(cost->d*2, points); */
+
         if (success == 0){
             int exist;
             for (size_t jj = 0; jj < cost->d; jj++){
+                
                 /* printf("jj = %zu\n",jj); */
                 /* printf("grid = "); dprint(cost->grid[jj]->size,cost->grid[jj]->elem); */
                 /* printf("hashgrid is\n"); */
                 /* hash_grid_print(cost->hashgrid[jj],stdout); */
                 /* printf("point is %3.15G\n",points[jj*cost->d]); */
-                pert[jj*2] = hash_grid_get_ind(cost->hashgrid[jj],points[jj*2],&exist);
-                if (exist == 0){
-                    success = 1;
-                    break;
-                }
+                /* pert[jj*2] = hash_grid_get_ind(cost->hashgrid[jj],points[jj*2],&exist); */
+                /* if (exist == 0){ */
+                /*     success = 1; */
+                /*     break; */
+                /* } */
+
             
-                pert[jj*2+1] = hash_grid_get_ind(cost->hashgrid[jj],points[jj*2+1],&exist);
-                if (exist == 0){
-                    success = 1;
-                    break;
+                /* pert[jj*2+1] = hash_grid_get_ind(cost->hashgrid[jj],points[jj*2+1],&exist); */
+                /* if (exist == 0){ */
+                /*     success = 1; */
+                /*     break; */
+                /* } */
+                if (points[jj*2] < x[jj]){
+                    pert[jj*2] = ind[jj]-1;
                 }
+                else{
+                    pert[jj*2] = ind[jj];
+                }
+                if (points[jj*2+1] > x[jj]){
+                    pert[jj*2+1] = ind[jj]+1;
+                }
+                else{
+                    pert[jj*2+1] = ind[jj];
+                }
+
             }
             if (success == 0){
                 /* printf("sometimes here\n"); */
