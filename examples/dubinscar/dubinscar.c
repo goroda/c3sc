@@ -272,7 +272,7 @@ int main(int argc, char * argv[])
     c3sc_set_external_boundary(sc,1,"reflect");
     c3sc_set_external_boundary(sc,2,"periodic");
     // possible obstacle
-    double w = 0.4;
+    double w = 1.0;
     double center[3] = {0.0,0.0,0.0};
     double width[3] = {w,w,2.0*M_PI};
     c3sc_add_obstacle(sc,center,width);
@@ -374,7 +374,7 @@ int main(int argc, char * argv[])
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
     implicit_policy_add_transform(pol,dx,state_transform);
     printf("created policy\n");
-    char odename[256] = "forward-euler";
+    char odename[256] = "rk4";
     struct Integrator * ode_sys = NULL;
     ode_sys = integrator_create_controlled(
         3,1,f1sym, NULL,implicit_policy_controller,pol);

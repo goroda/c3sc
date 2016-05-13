@@ -312,8 +312,8 @@ int main(int argc, char * argv[])
     double beta = 0.1; 
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
-    /* c3sc_set_external_boundary(sc,0,"reflect"); */
-    /* c3sc_set_external_boundary(sc,1,"reflect"); */
+    c3sc_set_external_boundary(sc,0,"reflect");
+    c3sc_set_external_boundary(sc,1,"reflect");
     double center[2] = {0.0,0.0};
     double width[2] = {0.15,0.15};
     c3sc_add_obstacle(sc,center,width);
@@ -363,7 +363,7 @@ int main(int argc, char * argv[])
             iprint_sz(3,ranks);
         }
 
-        if (diff/normval < 1e-3){
+        if (diff/normval < 1e-5){
             break;
         }
 
