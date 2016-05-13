@@ -24,8 +24,7 @@ size_t mcnode_get_du(const struct MCNode *);
 double * mcnode_get_gpself(const struct MCNode *);
 struct MCNList * mcnode_get_neigh(const struct MCNode *);
 size_t mcnode_get_n(const struct MCNode *);
-
-void mcnode_prepend_neigh(struct MCNode *, size_t,
+void mcnode_prepend_neigh(struct MCNode *, size_t,int,
                           double, double, double *);
 
 struct MCNList;
@@ -39,6 +38,7 @@ struct MCNList * mcnlist_get_next(const struct MCNList *);
 
 void mcnlist_free(struct MCNList *);
 struct MCNList * mcnlist_prepend(struct MCNList **, size_t,
+                                 int,
                                  double, double, double *);
 
 /* struct MCNode **  mcnode_get_neighbors(const struct MCNode *); */

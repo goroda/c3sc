@@ -1058,9 +1058,9 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
         x = calloc_double(ip->dx);
         ip->transform(ip->dx,xin,x);
         dpx.x = x;
-        /* printf("transformed!\n"); */
         /* printf("ip->dx = "); */
         /* dprint(ip->dx,dpx.x); */
+        /* printf("transformed!\n"); */
     }
 
 

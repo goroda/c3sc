@@ -60,7 +60,7 @@ void Test_mcnode_prepend(CuTest * tc)
     mcnode_set_pself(mcn,pselfin);
 
     for (size_t ii = 0; ii < dglob;ii++){
-        mcnode_prepend_neigh(mcn,ii,x[ii]-h[ii],probs[ii],NULL);
+        mcnode_prepend_neigh(mcn,ii,-1,x[ii]-h[ii],probs[ii],NULL);
     }
 
     double pself = mcnode_get_pself(mcn);
@@ -115,7 +115,7 @@ void Test_mcnode_expectation(CuTest * tc)
     mcnode_set_gradient(mcn,du,gprobself);
 
     for (size_t ii = 0; ii < dglob; ii++){
-        mcnode_prepend_neigh(mcn,ii,x[ii]-h[ii],probs[ii],gprob[ii]);
+        mcnode_prepend_neigh(mcn,ii,-1,x[ii]-h[ii],probs[ii],gprob[ii]);
     }
     
     double avg = mcnode_expectation(mcn,expfunc,NULL,NULL);

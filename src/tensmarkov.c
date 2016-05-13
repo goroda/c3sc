@@ -142,10 +142,10 @@ void mcnode_init_self_grad(struct MCNode * mcn, size_t du)
 /**********************************************************//**
     Add Neighbor
 **************************************************************/
-void mcnode_prepend_neigh(struct MCNode * mcn, size_t dir,
+void mcnode_prepend_neigh(struct MCNode * mcn, size_t dir, int plusminus,
                           double val, double p, double * grad)
 {
-    mcnlist_prepend(&(mcn->neigh),dir,val,p,grad);
+    mcnlist_prepend(&(mcn->neigh),dir,plusminus,val,p,grad);
 }
 
 size_t mcnode_get_d(const struct MCNode * mcn){ return mcn->d; }
@@ -163,7 +163,8 @@ struct MCNList
     double p; // probability to transition to this node
     int galloc;
     double * gradp; // gradient of transition probability
-    size_t dir; // direction of neighbor
+    size_t dir; // dimension of neighbor
+    int plusminus;
     double val;
     struct MCNList * next;
 };
@@ -171,8 +172,10 @@ struct MCNList
 double mcnlist_get_p(const struct MCNList * mcn){return mcn->p;}
 double * mcnlist_get_gradp(const struct MCNList * mcn){return mcn->gradp;}
 size_t mcnlist_get_dir(const struct MCNList * mcn){return mcn->dir;}
+int mcnlist_get_plusminus(const struct MCNList * mcn){return mcn->plusminus;}
 double mcnlist_get_val(const struct MCNList * mcn){return mcn->val;}
 struct MCNList * mcnlist_get_next(const struct MCNList * mcn){return mcn->next;}
+
 size_t mcnlist_length(const struct MCNList * mcn)
 {
     size_t N = 0;
@@ -222,13 +225,14 @@ void mcnlist_free(struct MCNList * mcnl)
 /**********************************************************//**
     Add a neighbor to the front of the list
 **************************************************************/
-struct MCNList * mcnlist_prepend(struct MCNList ** mcn, size_t dir,
+struct MCNList * mcnlist_prepend(struct MCNList ** mcn, size_t dir,int plusminus,
                                  double val, double p, double * grad)
 {
     struct MCNList * node = mcnlist_alloc();
     node->p = p;
     node->gradp = grad;
     node->dir = dir;
+    node->plusminus = plusminus;
     node->val = val;
     node->next = *mcn;
     *mcn = node;
@@ -238,11 +242,14 @@ struct MCNList * mcnlist_prepend(struct MCNList ** mcn, size_t dir,
 /**********************************************************//**
     Prepend an empty element
 **************************************************************/
-struct MCNList * mcnlist_prepend_empty(struct MCNList ** mcn, size_t dir,
-                                       double val, size_t dgrad)
+struct MCNList * 
+mcnlist_prepend_empty(struct MCNList ** mcn, size_t dir,
+                      int plusminus,
+                      double val, size_t dgrad)
 {
     struct MCNList * node = mcnlist_alloc();
     node->dir = dir;
+    node->plusminus = plusminus;
     node->val = val;
 //    node->p = p;
     if (dgrad > 0){
@@ -297,7 +304,7 @@ double mcnode_expectation(
         struct MCNList * temp = mc->neigh;
         while (temp != NULL){
             point2[temp->dir] = temp->val;
-            //dprint(mc->d,point2);
+           
             eval = f(time,point2,arg);
             avg += temp->p * eval;
             if (grad != NULL){
@@ -306,8 +313,7 @@ double mcnode_expectation(
             point2[temp->dir] = mc->x[temp->dir];
             temp = temp->next;
         }
-
-
+        
         /* mcnlist_to_coordinate_pert(temp,pert); */
 
     }
@@ -347,6 +353,7 @@ double mcnode_expectation_cost(
 
     /* printf("here!\n"); */
     // take care of transitions to neighbors
+    /* printf("mcn->neigh == NULL? = %d\n",mc->neigh==NULL); */
     if (mc->neigh != NULL){
         double * pert = calloc_double(2 * mc->d);
         // default
@@ -358,15 +365,16 @@ double mcnode_expectation_cost(
         /* printf("fill in pert\n"); */
         while (temp != NULL){
             int dir = temp->dir;
-            if (temp->val > mc->x[dir]){
-                pert[2*temp->dir+1] = temp->val;
+            if (temp->plusminus == 1){
+                pert[2*dir+1] = temp->val;
             }
-            else{
-                pert[2*temp->dir] = temp->val;
+            else if (temp->plusminus == -1){
+                pert[2*dir] = temp->val;
             }
             temp = temp->next;
         }
         /* printf("got pert\n"); */
+        /* dprint(2*mc->d,pert); */
         double * evals = calloc_double(2*mc->d);
         double peval = 0.0;
         int res = cost_eval_neigh(cost,time,point2,&peval,pert,evals);
@@ -740,8 +748,34 @@ mca_inbound_node(struct MCA * mca, double time, const double * x,
         // prepend the - and + nodes.
         // mcn->neigh points to plus node
         // mcn->neigh->next points to minus node
-        mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
-        mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
+        int map;
+        double xl, xr;
+        double xmap = outer_bound_dim(mca->bound,ii,x[ii]-mca->h[ii],&map);
+        if (map == 0){
+            xl = xmap;
+        }
+        else if (map == 1){ // left size periodic
+            xl = xmap - mca->h[ii];
+        }
+        else{
+            assert (1 == 0);
+        }
+
+        xmap = outer_bound_dim(mca->bound,ii,x[ii]+mca->h[ii],&map);
+        if (map == 0){
+            xr = xmap;
+        }
+        else if (map == 2){// right size periodic
+            xr = xmap + mca->h[ii];
+        }
+        else{
+            assert (1 == 0);
+        }
+
+        // xl = x[ii]-mca->h[ii]
+
+        mcnlist_prepend_empty(&(mcn->neigh),ii,-1,xl,ngrad);
+        mcnlist_prepend_empty(&(mcn->neigh),ii,1,xr,ngrad);
         struct MCNList * node_plus = mcn->neigh;
         struct MCNList * node_minus = mcn->neigh->next;
             
@@ -839,8 +873,8 @@ void mca_upwind_dim(struct MCA * mca, struct MCNode * mcn,
     // prepend the - and + nodes.
     // mcn->neigh points to plus node
     // mcn->neigh->next points to minus node
-    mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
-    mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
+    mcnlist_prepend_empty(&(mcn->neigh),ii,-1,x[ii]-mca->h[ii],ngrad);
+    mcnlist_prepend_empty(&(mcn->neigh),ii,1,x[ii]+mca->h[ii],ngrad);
     struct MCNList * node_plus = mcn->neigh;
     struct MCNList * node_minus = mcn->neigh->next;
             
@@ -983,7 +1017,7 @@ mca_reflect_node(struct MCA * mca, double time, const double * x,
             int reflect_dir = bound_info_reflect_dim_dir(bi,ii);
             //printf("before\n");
             if (reflect_dir == -1){ // just do right side poition
-                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,1,x[ii]+mca->h[ii],ngrad);
                 struct MCNList * node_plus = mcn->neigh;
                 node_plus->p  = t * diff/2.0;
 
@@ -1010,7 +1044,7 @@ mca_reflect_node(struct MCA * mca, double time, const double * x,
                 }
             }
             else{ // just do left side portion
-                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,-1,x[ii]-mca->h[ii],ngrad);
                 struct MCNList * node_minus = mcn->neigh;
                 node_minus->p  = t * diff/2.0;
                 if (grad != NULL){
@@ -1135,9 +1169,10 @@ mca_period_node(struct MCA * mca, double time, const double * x,
     double minh2 = pow(mca->minh,2);
     double hrel;
     for (size_t ii = 0; ii < mca->d; ii++){
-        //printf("ii=%zu\n",ii);
-        int on_bound = bound_info_onbound_dim(bi,ii);
 
+        int on_bound = bound_info_onbound_dim(bi,ii);
+        /* printf("ii=%zu\n",ii); */
+        /* printf("\t on bound=%d\n",on_bound); */
         if (on_bound == 0){
             mca_upwind_dim(mca,mcn,x,ngrad,minh2,&Qh,dQ,ii,grad);
         }
@@ -1151,15 +1186,22 @@ mca_period_node(struct MCA * mca, double time, const double * x,
             assert (period == 1);
             int period_dir = bound_info_period_dim_dir(bi,ii);
             double xmap = bound_info_period_xmap(bi,ii);
-            //printf("before\n");
+            /* printf("period_dir= %d \n",period_dir); */
             if (period_dir == -1){ // left maps to something
-                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]+mca->h[ii],ngrad);
-                mcnlist_prepend_empty(&(mcn->neigh),ii,xmap-mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,-1,xmap-mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,1,x[ii]+mca->h[ii],ngrad);
+
             }
             else{ // just do left side portion
-                mcnlist_prepend_empty(&(mcn->neigh),ii,xmap+mca->h[ii],ngrad);
-                mcnlist_prepend_empty(&(mcn->neigh),ii,x[ii]-mca->h[ii],ngrad);
+                /* printf("should be here  xmap=%G\n",xmap); */
+                mcnlist_prepend_empty(&(mcn->neigh),ii,-1,x[ii]-mca->h[ii],ngrad);
+                mcnlist_prepend_empty(&(mcn->neigh),ii,1,xmap+mca->h[ii],ngrad);
             }
+
+            /* printf("\t mcn->neigh->dir=%zu\n",mcn->neigh->dir); */
+            /* printf("\t mcn->neigh->vval=%G\n",mcn->neigh->val); */
+            /* printf("\t mcn->neigh->next->dir=%zu\n",mcn->neigh->next->dir); */
+            /* printf("\t mcn->neigh->next->dir=%G\n",mcn->neigh->next->val); */
 
             struct MCNList * node_plus = mcn->neigh;
             struct MCNList * node_minus = mcn->neigh->next;
@@ -1227,6 +1269,7 @@ mca_period_node(struct MCA * mca, double time, const double * x,
         pself = 0.0;
     }
     mcnode_set_pself(mcn,pself);
+    /* printf("mcn->neigh == NULL? = %d\n",mcn->neigh==NULL); */
     return mcn;
 }
 
@@ -1255,17 +1298,10 @@ mca_get_node(struct MCA * mca, double time, const double * x,
     struct MCNode * mcn = NULL;
     
 
-//    printf("get node\n"); dprint(mca->d, x);
+    /* printf("get node\n"); dprint(mca->d, x); */
     int onbound = bound_info_onbound(*bi);
-//    printf("onbound = %d\n",onbound);
-    /* if (x[1] < -2.0){ */
-    /*     printf("what!\n"); */
-    /*     if (onbound == 0){ */
-    /*         printf("get node\n"); dprint(mca->d, x); */
-    /*         printf("onbound = %d\n",onbound); */
-    /*         exit(1); */
-    /*     } */
-    /* } */
+    /* printf("onbound = %d\n",onbound); */
+    
     if (onbound == 0){
         mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad);
     }
@@ -1290,6 +1326,7 @@ mca_get_node(struct MCA * mca, double time, const double * x,
             else{
                 int period = bound_info_period(*bi);
                 if (period != 0){
+                    /* printf("periodic\n"); */
                     /* assert (1 == 0); */
                     mcn = mca_period_node(mca,time,x,u,dt,gdt,grad,*bi);
                 }

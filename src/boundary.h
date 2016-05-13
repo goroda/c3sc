@@ -17,6 +17,8 @@ size_t boundary_get_nobs(struct Boundary *);
 struct Boundary * boundary_copy_deep(struct Boundary *);
 void boundary_free(struct Boundary *);
 void boundary_external_set_type(struct Boundary *,size_t,char *);
+double outer_bound_dim(const struct Boundary *, size_t, 
+                       double, int *);
 struct BoundInfo * boundary_type(const struct Boundary *,double,const double *);
 
 enum BOUNDRESULT {

@@ -97,14 +97,15 @@ int boundcost(double t, const double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 100.0;
+    *out = 10.0;
     return 0;
 }
 
 // cost of hitting obstacle
 int ocost(const double * x,double * out)
 {
-    //dprint(3,x);
+    /* printf("absorbed\n"); */
+    /* dprint(3,x); */
     (void)(x);
     
     *out = 0.0;
@@ -126,7 +127,7 @@ int f1sym(double t, const double * x, const double * u,
           double * out,
           double * jac, void * args)
 {
-    (void)(t);
+
     (void)(args);
 
     if (fabs(x[0]) < 0.1){
@@ -137,6 +138,13 @@ int f1sym(double t, const double * x, const double * u,
     out[0] = cos(x[2]);
     out[1] = sin(x[2]);
     out[2] = u[0];
+
+    (void)(t);
+
+    /* printf("t=%G,u=%G\n",t,u[0]); */
+    /* printf("x = "); dprint(3,x); */
+    /* printf("out = "); dprint(3,out); */
+    /* printf("----\n"); */
     
     if (jac != NULL){
         jac[0] = 0.0;
@@ -150,13 +158,16 @@ int f1sym(double t, const double * x, const double * u,
 void state_transform(size_t ndim, const double * x, double * y)
 {
     (void)(ndim);
+
     y[0] = x[0];
     y[1] = x[1];
     y[2] = x[2];
+    /* int trans = 0; */
     if ((x[2] < M_PI ) && (x[2] > -M_PI)){
         y[2] = x[2];
     }
     else if (x[2] > M_PI){
+        /* trans = 1; */
         while (y[2] > 2 * M_PI){
             y[2] -= 2.0*M_PI;
         }
@@ -165,6 +176,7 @@ void state_transform(size_t ndim, const double * x, double * y)
         }
     }
     else if (x[2] < -M_PI){
+        /* trans = 1; */
         while (y[2] < - 2.0* M_PI){
             y[2] += 2.0 * M_PI;
         }
@@ -172,6 +184,12 @@ void state_transform(size_t ndim, const double * x, double * y)
             y[2] += 2.0 * M_PI;
         }
     }
+    /* if (trans == 1){ */
+    /*     printf("out here x = (%G,%G,%G)\n",x[0],x[1],x[2]); */
+    /*     printf("out here y = (%G,%G,%G)\n",y[0],y[1],y[2]); */
+        
+    /* } */
+
 }
 
 void print_cost(FILE * fp2, struct Cost * cost, size_t N1, size_t N2, double * lb, double * ub, double angle)
@@ -261,13 +279,15 @@ int main(int argc, char * argv[])
     approx_args_set_cross_tol(aargs,1e-5);
     approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,5);
+    approx_args_set_maxrank(aargs,15);
+    approx_args_set_startrank(aargs,15);
 
     double beta = 0.0;
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
-    c3sc_set_external_boundary(sc,0,"reflect");
-    c3sc_set_external_boundary(sc,1,"reflect");
+    /* c3sc_set_external_boundary(sc,0,"reflect"); */
+    /* c3sc_set_external_boundary(sc,1,"reflect"); */
     c3sc_set_external_boundary(sc,2,"periodic");
     // possible obstacle
     double w = 0.4;
@@ -279,13 +299,13 @@ int main(int argc, char * argv[])
     c3sc_attach_opt(sc,opt);
     c3sc_init_dp(sc,beta,stagecost,boundcost,ocost);
 
-    sprintf(filename,"%s/%s.dat",dirout,"saved_cost.dat");
+    sprintf(filename,"%s/%s.dat",dirout,"saved_cost");
     int load_success = c3sc_cost_load(sc,filename);
     if (load_success != 0){
         c3sc_cost_approx(sc,startcost,NULL,0,aargs);
     }
     struct Cost * cost_init = c3sc_get_cost(sc);
-    int saved = cost_save(cost_init,"saved_cost.dat");
+    int saved = cost_save(cost_init,filename);
     assert (saved == 0);
     printf("save cost\n");
 
@@ -298,7 +318,7 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n\n\n");
     printf("Start Solver Iterations\n");
     printf("\n\n\n\n\n\n\n\n\n\n");
-    for (size_t ii = 0; ii < niter+1; ii++){
+    for (size_t ii = 0; ii < niter; ii++){
     /* for (size_t ii = 0; ii < 0; ii++){ */
 
         if (ii > 0){
@@ -316,7 +336,7 @@ int main(int argc, char * argv[])
         }
         
 //        printf("get cost\n");
-        sprintf(filename,"%s/%s.dat",dirout,"saved_cost.dat");
+        sprintf(filename,"%s/%s.dat",dirout,"saved_cost");
         saved = cost_save(cost,filename);
         assert (saved == 0);
 
@@ -381,9 +401,23 @@ int main(int argc, char * argv[])
     integrator_set_verbose(ode_sys,0);
     printf("initialized integrator\n");
     
+
+    /* double t = 0.0; */
+    /* double xt[3] = {-1.8517,-0.70712, M_PI}; */
+    /* double ut[1]; */
+    /* int rt = implicit_policy_eval(pol,t,xt,ut); */
+    /* printf("u=%G\n",ut[0]); */
+    /* xt[2] = M_PI-1e-2; */
+    /* rt = implicit_policy_eval(pol,t,xt,ut); */
+    /* printf("u=%G\n",ut[0]); */
+    /* xt[2] = M_PI+1e-2; */
+    /* rt = implicit_policy_eval(pol,t,xt,ut); */
+    /* printf("u=%G\n",ut[0]); */
+    /* /\* exit(1); *\/ */
+
     // Initialize trajectories for filter and for observations
     double time = 0.0;
-    double state[3] = {3.0, 0.0, -M_PI/2.0};
+    double state[3] = {-1.0, 0.0, 3*M_PI/4.0};
     double con[1] = {0.0};
     
     struct Trajectory * traj = NULL;
@@ -418,14 +452,16 @@ int main(int argc, char * argv[])
     trajectory_print(traj,fp,4);
     fclose(fp);
 
-    double state2[3] = {-1.0, 0.0, 3.0*M_PI/4.0};
+    /* double final_time = 1e1; */
+    /* double dt = 1e-2; */
+    /* int res; */
+    double state2[3] = {3.0, 2.0, -M_PI/2};
+    /* double state2[3] = {-1.0, -1.0, M_PI/3.0}; */
     double con2[1] = {0.0};
     time = 0.0;
     struct Trajectory * traj2 = NULL;
-    printf("add trajectory\n");
     trajectory_add(&traj2,3,1,time,state2,con2);
-    printf("initialized trajectory\n");
-    final_time = 1e1;
+//    final_time = 1e1;
     time = 0.0;
     while (time < final_time){
         res = trajectory_step(traj2,ode_sys,dt);
@@ -439,7 +475,7 @@ int main(int argc, char * argv[])
         time = time + dt;
     }
     if (verbose == 1){
-        trajectory_print(traj,stdout,4);
+        trajectory_print(traj2,stdout,4);
     }
     sprintf(filename,"%s/%s.dat",dirout,"traj2");
     fp = fopen(filename,"w");

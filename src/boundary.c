@@ -528,6 +528,28 @@ int bound_info_set_xmap_dim(struct BoundInfo * bi, double x, size_t dim)
     return 0;
 }
 
+double outer_bound_dim(const struct Boundary * bound, size_t dim, 
+                       double x, int *map)
+{
+    
+    *map = 0;
+    if (external_boundary_check_left(bound->eb[dim],x)){
+        enum EBTYPE type = external_boundary_get_type(bound->eb[dim]);
+        if (type == PERIODIC){
+            *map = 1;
+            return external_boundary_get_right(bound->eb[dim]);
+        }
+    }
+    else if (external_boundary_check_right(bound->eb[dim],x)){
+        enum EBTYPE type = external_boundary_get_type(bound->eb[dim]);
+        if (type == PERIODIC){
+            *map = 2;
+            return external_boundary_get_left(bound->eb[dim]);
+        }
+    }
+    return x;
+}
+
 /**********************************************************//**
     Return boundary info
 **************************************************************/

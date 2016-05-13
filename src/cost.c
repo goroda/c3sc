@@ -273,6 +273,24 @@ void cost_add_nodes(struct Cost * cost, double *lb, double *ub)
     cost->obs = malloc(cost->d * sizeof(size_t *));
     assert (cost->obs != NULL);
     cost->Nobs = calloc_size_t(cost->d);
+    size_t Nobs = 4;
+    for (size_t ii = 0; ii < cost->d; ii++){
+        /* size_t newsize = cost->grid[ii]->size + 4; */
+        size_t newsize;
+        double * obs = linspace(lb[ii],ub[ii],Nobs);
+        double * newg = c3sc_combine_and_sort(cost->grid[ii]->size,
+                                              cost->grid[ii]->elem,
+                                              Nobs,
+                                              obs,
+                                              &newsize);
+        c3vector_free(cost->grid[ii]);
+        cost->grid[ii] = c3vector_alloc(newsize,newg);
+        printf("grid is\n \t ");
+        dprint(cost->grid[ii]->size,cost->grid[ii]->elem);
+        free(newg); newg = NULL;
+        free(obs); obs = NULL;
+    }
+
     for (size_t ii = 0; ii < cost->d; ii++){
 
         for (size_t jj = 0; jj < cost->grid[ii]->size; jj++){
@@ -522,7 +540,8 @@ int cost_eval(struct Cost * cost,
     double * lb = bounding_box_get_lb(cost->bds);
     double * ub = bounding_box_get_ub(cost->bds);
     int res = c3sc_check_bounds(cost->d,lb,ub,x);
-
+    
+    /* printf("x = "); dprint(3,x); */
     double * xuse = NULL;
     if (res != 0){
         xuse = calloc_double(cost->d);
@@ -709,6 +728,10 @@ int cost_eval_neigh(struct Cost * cost,
     }
     /* assert(1 == 0); */
     /* exit(1); */
+
+    /* printf("in cost eval\n"); */
+    /* printf("\t x = "); dprint(3,x); */
+    /* printf("\t neigh = "); dprint(6,points); */
     *eval = function_train_eval_co_perturb(cost->cost,x,points,evals);
     
     /* printf("\n\n ------------------\n evaluate neighbor!\n"); */
