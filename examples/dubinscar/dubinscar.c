@@ -290,7 +290,7 @@ int main(int argc, char * argv[])
     /* c3sc_set_external_boundary(sc,1,"reflect"); */
     c3sc_set_external_boundary(sc,2,"periodic");
     // possible obstacle
-    double w = 0.4;
+    double w = 1.0;
     double center[3] = {0.0,0.0,0.0};
     double width[3] = {w,w,2.0*M_PI};
     c3sc_add_obstacle(sc,center,width);
