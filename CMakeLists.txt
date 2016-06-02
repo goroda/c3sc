@@ -10,8 +10,9 @@ if (APPLE)
         PATH_SUFFIXES Frameworks
         NO_DEFAULT_PATH)
 
-    set(PROJECT_LINK_LIBS libcdyn.dylib)
-    link_directories(/Users/alex/Documents/cdyn/build/src/)
+    set(PROJECT_LINK_LIBS libcdyn.dylib libc3.dylib)
+    link_directories(/Users/alex/Documents/cdyn/build/src/
+                     /Users/alex/Documents/c3/lib/)
     
     set(blas_lapack ${macblas}/Accelerate)
     set(compiler_flags "-std=c99 -O3 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn")
@@ -28,8 +29,9 @@ else ()
     include_directories(/usr/include)
     set(blas_lapack "-lblas -llapack")
 
-    set(PROJECT_LINK_LIBS libcdyn.so)
-    link_directories(/home/goroda/GitProjects/cdyn/build/src)
+    set(PROJECT_LINK_LIBS libcdyn.so libc3.so)
+    link_directories(/home/goroda/GitProjects/cdyn/build/src
+                     /home/goroda/GitProjects/c3/lib/)
     
     #find_package(SWIG REQUIRED)
     #include(${SWIG_USE_FILE})

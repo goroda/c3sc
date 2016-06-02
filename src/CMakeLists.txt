@@ -8,10 +8,8 @@ else ()
     add_library(c3sc SHARED ${SRC_FILES})
     target_link_libraries(c3sc
         ${blas_lapack}
-        c3
         ${PROJECT_LINK_LIBS}
         -lm
         )
-        
 endif()
 

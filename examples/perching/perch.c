@@ -167,7 +167,7 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
         out[ii] = 0.0;
     }
     for (size_t ii = 0; ii < 7; ii++){
-        out[ii*7+ii] = 1e-4;
+        out[ii*7+ii] = 1e-3;
     }
     
     if (grad != NULL){
@@ -209,7 +209,8 @@ int boundcost(double t,const double * x, double * out)
     /* printf("not here!!\n"); */
     (void)(t);
     *out = 0.0;
-    *out += 600.0    * x[0]*x[0];
+//    *out += 600.0    * x[0]*x[0]; // original
+    *out += 400.0    * x[0]*x[0];
     *out += 400.0    * x[1]*x[1];
     *out += 1.0/9.0  * x[2]*x[2];
     *out += 1.0/9.0  * x[3]*x[3];
@@ -284,34 +285,35 @@ int main(int argc, char * argv[])
     size_t dw = 7;
     size_t du = 1;
     double lb[7] = {-4.0, -1.0, -M_PI/2.0, -2.0*M_PI/9.0, 0.0, -5.0, -10.0};
-    double ub[7] = {4.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
+    double ub[7] = {0.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
     size_t Narr[7] = {N, N, N, N, N, N, N};
 
-    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
-    size_t nopts = 10;
-    double * uopts = linspace(-2.0*M_PI,2.0*M_PI,nopts);
-    c3opt_set_brute_force_vals(opt,nopts,uopts);
+    /* struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du); */
+    /* size_t nopts = 5; */
+    /* double * uopts = linspace(-2.0*M_PI,2.0*M_PI,nopts); */
+    /* c3opt_set_brute_force_vals(opt,nopts,uopts); */
 
-    /* double lbu[1] = {-2.0*M_PI}; */
-    /* double ubu[1] = {2.0*M_PI}; */
-    /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
-    /* c3opt_add_lb(opt,lbu); */
-    /* c3opt_add_ub(opt,ubu); */
-    /* c3opt_set_absxtol(opt,1e-6); */
-    /* c3opt_set_relftol(opt,1e-6); */
-    /* c3opt_set_gtol(opt,1e-6); */
+    double lbu[1] = {-2.0*M_PI};
+    double ubu[1] = {2.0*M_PI};
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbu);
+    c3opt_add_ub(opt,ubu);
+    c3opt_set_absxtol(opt,1e-4);
+    c3opt_set_relftol(opt,1e-4);
+    c3opt_set_gtol(opt,1e-10);
     
-    /* c3opt_ls_set_maxiter(opt,200); */
-    /* c3opt_ls_set_alpha(opt,0.1); */
-    /* c3opt_ls_set_beta(opt,0.2); */
-    /* c3opt_set_verbose(opt,0); */
-
+    c3opt_ls_set_maxiter(opt,10);
+    c3opt_ls_set_alpha(opt,0.3);
+    c3opt_ls_set_beta(opt,0.2);
+    c3opt_set_verbose(opt,0);
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-5);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_cross_tol(aargs,1e-3);
+    approx_args_set_round_tol(aargs,1e-3);
     approx_args_set_kickrank(aargs,6);
+    approx_args_set_maxrank(aargs,20);
+    approx_args_set_startrank(aargs,20);
 
     double beta = 0.0;
 
@@ -322,6 +324,9 @@ int main(int argc, char * argv[])
     // setup problem
     c3sc sc = c3sc_create(IH,dx,du,dw);
     c3sc_set_state_bounds(sc,lb,ub);
+    /* for (size_t ii = 0; ii < dx; ii++){ */
+    /*     c3sc_set_external_boundary(sc,ii,"reflect"); */
+    /* } */
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
     c3sc_init_mca(sc,Narr);
     c3sc_attach_opt(sc,opt);
@@ -332,7 +337,7 @@ int main(int argc, char * argv[])
     }
 
     double solve_tol = 1e-5;
-    size_t npol = 100;
+    size_t npol = 5;
 
     struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
     char filename[256];
@@ -343,7 +348,7 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     for (size_t ii = 0; ii < niter; ii++){
 
-        if (ii > 2){
+        if (ii > 1){
             c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
         }
         double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
@@ -356,7 +361,7 @@ int main(int argc, char * argv[])
         double normval = cost_norm2(cost);
         if (verbose != 0){
             printf("ii=%zu diff=%G,norm=%G ranks=",ii,diff,normval);
-            iprint_sz(7,ranks);
+            iprint_sz(8,ranks);
         }
         sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
         int dres = c3sc_diagnostic_save(diag,filename,4);
@@ -378,25 +383,24 @@ int main(int argc, char * argv[])
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
 //    printf("created policy\n");
     /* char odename[256] = "rkf45"; */
-    char odename[256] = "rk4";
+    char odename[256] = "forward-euler";
     struct Integrator * ode_sys =
         integrator_create_controlled(7,1,f1,NULL,implicit_policy_controller,pol);
     integrator_set_type(ode_sys,odename);
     /* integrator_set_adaptive_opts(ode_sys,1e-5,1e-2,1e-7); */
-    integrator_set_dt(ode_sys,1e-3);
+    integrator_set_dt(ode_sys,1e-2);
     integrator_set_verbose(ode_sys,0);
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-    double state[7] = {-3.4, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
+//    double state[7] = {-2.8, -0.2, 0.0, 0.0, 6.0, 0.0, 0.0};
+    double state[7] = {-2.5, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
     double con[1] = {0.0};
-
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");
     trajectory_add(&traj,7,1,time,state,con);
     printf("initialized trajectory\n");
-
-    double final_time = 1e0;
+    double final_time = 1.2;
     double dt = 1e-2;
     int res;
     while (time < final_time){
@@ -408,11 +412,9 @@ int main(int argc, char * argv[])
 //        assert(res == 0);
         time = time + dt;
     }
-
-    if (verbose == 1){
-        trajectory_print(traj,stdout,10);
-    }
-    
+    /* if (verbose == 1){ */
+    /*     trajectory_print(traj,stdout,10); */
+    /* } */
     sprintf(filename,"%s/%s.dat",dirout,"traj");
     fp = fopen(filename,"w");
     assert (fp != NULL);
