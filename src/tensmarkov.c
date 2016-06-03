@@ -45,6 +45,7 @@ struct Node * node_init(size_t d, const double * x, const double * h,
 {
     int onbound = bound_info_onbound(bi);
     struct Node * n = node_alloc(d,x);
+    /* printf("allocated onbound=%d\n",onbound); */
     if (onbound == 0){
         n->pert = calloc_double(2*d);
         n->cost = calloc_double(2*d);
@@ -64,6 +65,8 @@ struct Node * node_init(size_t d, const double * x, const double * h,
             assert (res == 0);
         }
         else{
+            n->pert = calloc_double(2*d);
+            n->cost = calloc_double(2*d);
             int reflect = bound_info_reflect(bi);
             if (reflect != 0){
                 for (size_t ii = 0; ii < d; ii++){

@@ -311,11 +311,11 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-3);
+    approx_args_set_cross_tol(aargs,2e-2);
     approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,6);
-    approx_args_set_maxrank(aargs,5);
-    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,10);
+    approx_args_set_startrank(aargs,10);
 
     double beta = 0.0;
 
@@ -350,7 +350,7 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     for (size_t ii = 0; ii < niter; ii++){
 
-        if (ii > 1){
+        if (ii > 3){
             c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
         }
         double diff = c3sc_iter_vi(sc,verbose,aargs,diag);

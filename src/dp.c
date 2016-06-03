@@ -793,7 +793,9 @@ double dpih_rhs2_opt_bb(size_t du, double * u, double * grad, void * arg)
 {
     (void)(du);
     struct DPX2 * dpx = arg;
+    /* printf("here\n"); */
     double val = dpih_rhs2(dpx->dp,dpx->node,dpx->bi,u,grad);
+    /* printf("there\n"); */
     return val;    
 }
 
@@ -872,11 +874,14 @@ double dpih_rhs2_opt_cost(const double * x,void * dp)
     double * h = mca_get_h(dpx.dp->mm);
     double time = 0.0;
     
+    /* printf("lets go!\n"); */
     struct BoundInfo * bi = boundary_type(bound,time,x);
+    /* printf("got it\n"); */
     struct Node * node = node_init(dx,x,h,dpx.dp->cost,bi);
     dpx.node = node;
     dpx.bi = bi;
     
+    /* printf("no no!\n"); */
     double * ustart = calloc_double(du);
     /* double out = dpih_rhs(dpx.dp,x,ustart,NULL); */
     /* free(ustart); */
@@ -980,7 +985,8 @@ struct Cost * dpih_iter_vi(struct DPih * dp,int verbose,
 
     size_t d = cost_get_d(cost);
     struct FunctionMonitor * fm = NULL;
-    fm = function_monitor_initnd(dpih_rhs_opt_cost,dp,d,1000*d);
+    /* fm = function_monitor_initnd(dpih_rhs_opt_cost,dp,d,1000*d); */
+    fm = function_monitor_initnd(dpih_rhs2_opt_cost,dp,d,1000*d);
     cost_approx(cost,function_monitor_eval,fm,verbose,aargs);
     
     if (diag != NULL)
