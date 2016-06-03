@@ -657,10 +657,120 @@ double dpih_rhs(struct DPih * dp,const double * x,const double * u,double * grad
     return out;
 }
 
+/**********************************************************//**
+   Evaluate right hand side of Bellman equation at a given node *x*
+   and for a given control *u*
+**************************************************************/
+double dpih_rhs2(struct DPih * dp, struct Node * node,
+                 struct BoundInfo * bi,
+                 const double * u, double * grad)
+{
+    size_t du = mca_get_du(dp->mm);
+    size_t dx = mca_get_dx(dp->mm);
+    /* printf("eval rhs\n"); */
+    /* printf("x = "); dprint(mca_get_dx(dp->mm),x); */
+    /* printf("u = "); dprint(du,u); */
+    double dt;
+    double * gdt = NULL;
+    double t = 0.0;
+    /* struct BoundInfo * bi = NULL;  */
+    double val;
+
+    /* printf("get expectation \n"); */
+
+    int info;
+    if (grad == NULL){
+        val = mca_expectation_cost2(dp->mm,t,node,u,&dt,NULL,
+                                    bi,grad,&info);
+    }
+    else{
+        gdt = calloc_double(du);
+        val = mca_expectation_cost2(dp->mm,t,node,u,&dt,gdt,
+                                    bi,grad,&info);
+
+    }
+    if (info != 0){
+        fprintf(stderr, "Warning: mca_expectation call from dpih_rhs");
+        fprintf(stderr, " resulted in an error\n");
+        fprintf(stderr, "\tx = ");
+        for (size_t ii = 0; ii < dx; ii++ ){
+            fprintf(stderr,"%G ",node->x[ii]);
+        }
+        fprintf(stderr,"\n\tControl = ");
+        for (size_t ii = 0; ii < du; ii++){
+            fprintf(stderr,"%G ",u[ii]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"\tBoundary info is ?????\n");
+        exit(1);
+    }
+    
+    /* printf("got expectation\n"); */
+    double out;
+    int absorb = bound_info_absorb(bi);
+    if (absorb == 1){
+//        printf("MASSIVE ERROR!\n");
+        int in_obstacle = bound_info_get_in_obstacle(bi);
+        if (in_obstacle < 0){
+            int res = dp->boundcost(t,node->x,&out);
+            assert (res == 0);
+        }
+        else{
+            assert (dp->obscost != NULL);
+            int res = dp->obscost(node->x,&out);
+            assert(res == 0);
+        }
+        if (grad != NULL){
+            for (size_t ii = 0; ii < du; ii++ ){
+                grad[ii] = 0.0;
+            }
+        }
+        /* printf("\n\nx = ");dprint(2,x); */
+        /* printf("in obstacle %d\n",in_obstacle); */
+        /* printf("out = %G\n",out); */
+
+    }
+    else{
+        double sc;
+
+        if (grad == NULL){
+            int res = dp->stagecost(t,node->x,u,&sc,NULL);
+            assert (res == 0);
+            out = exp(-dp->beta*dt)*val + dt*sc;
+        }
+        else{
+            du = mca_get_du(dp->mm);
+            double * gtemp = calloc_double(du);
+            int res = dp->stagecost(t,node->x,u,&sc,gtemp);
+            assert (res == 0);
+            double ebt = exp(-dp->beta*dt);
+            
+            out = ebt*val + dt*sc;
+            
+            for (size_t jj = 0; jj < du; jj++){
+                grad[jj] = -dp->beta*ebt*gdt[jj]*val +
+                    ebt*grad[jj] + dt*gtemp[jj] + gdt[jj]*sc;
+            }
+            free(gtemp); gtemp = NULL;
+        }
+    }
+    free(gdt); gdt = NULL;
+    /* bound_info_free(bi); bi = NULL; */
+    /* printf("evaluated it\n"); */
+    return out;
+}
+
 struct DPX
 {
     struct DPih * dp;
     const double * x;
+};
+
+struct DPX2
+{
+    struct DPih * dp;
+    struct BoundInfo * bi;
+    struct Node * node;
 };
     
 /**********************************************************//**
@@ -672,6 +782,18 @@ double dpih_rhs_opt_bb(size_t du, double * u, double * grad, void * arg)
     (void)(du);
     struct DPX * dpx = arg;
     double val = dpih_rhs(dpx->dp,dpx->x,u,grad);
+    return val;    
+}
+
+/**********************************************************//**
+   Helper function for obtaining new cost by minimizing 
+   Bellman Equation
+**************************************************************/
+double dpih_rhs2_opt_bb(size_t du, double * u, double * grad, void * arg)
+{
+    (void)(du);
+    struct DPX2 * dpx = arg;
+    double val = dpih_rhs2(dpx->dp,dpx->node,dpx->bi,u,grad);
     return val;    
 }
 
@@ -731,6 +853,61 @@ double dpih_rhs_opt_cost(const double * x,void * dp)
     /* printf("x = "); dprint(dx, x); */
     /* printf("optimal u = %G\n",ustart[0]); */
     free(ustart); ustart = NULL;
+    return val;
+}
+
+/**********************************************************//**
+      Run optimizer and return optimal cost
+**************************************************************/
+double dpih_rhs2_opt_cost(const double * x,void * dp)
+{
+
+    struct DPX2 dpx;
+    dpx.dp = dp;
+    assert (dpx.dp->opt != NULL);
+    
+    size_t dx = mca_get_dx(dpx.dp->mm);
+    size_t du = mca_get_du(dpx.dp->mm);
+    struct Boundary * bound = mca_get_boundary(dpx.dp->mm);
+    double * h = mca_get_h(dpx.dp->mm);
+    double time = 0.0;
+    
+    struct BoundInfo * bi = boundary_type(bound,time,x);
+    struct Node * node = node_init(dx,x,h,dpx.dp->cost,bi);
+    dpx.node = node;
+    dpx.bi = bi;
+    
+    double * ustart = calloc_double(du);
+    /* double out = dpih_rhs(dpx.dp,x,ustart,NULL); */
+    /* free(ustart); */
+    /* return out; */
+    
+    double val = 0.0;
+    struct c3Opt * opt = dpx.dp->opt;
+    c3opt_add_objective(opt,dpih_rhs2_opt_bb,&dpx);
+
+//    printf("before = ");
+//    dprint(dx,x);
+    int res = c3opt_minimize(opt,ustart,&val);
+    if (res < -1){
+        printf("max iter reached in optimization res=%d\n",res);
+
+        printf("x = ");
+        dprint(dx,x);
+        dprint(du,ustart);
+        for (size_t ii = 0; ii < du; ii++){
+            ustart[ii] = 0.001;
+        }
+        val = 0.0;
+        printf("restart with verbose\n");
+        c3opt_set_verbose(opt,2);
+        int res2 = c3opt_minimize(opt,ustart,&val);
+        printf("res2 = %d\n",res2);
+    }
+    free(ustart); ustart = NULL;
+    
+    node_free(node); node = NULL;
+    bound_info_free(bi); bi = NULL;
     return val;
 }
 

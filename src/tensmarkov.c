@@ -10,6 +10,120 @@
 #include "dynamics.h"
 #include "cost.h"
 
+/* struct Node */
+/* { */
+/*     size_t d; */
+/*     double * x; */
+/*     double c; // cost */
+/*     double * pert; // (- +) in each direction //2d */
+/*     double * cost; */
+/* }; */
+
+struct Node * node_alloc(size_t d, const double * x)
+{
+    struct Node * n = malloc(sizeof(struct Node));
+    assert (n != NULL);
+    n->x = calloc_double(d);
+    memmove(n->x,x,d*sizeof(double));
+    n->pert = NULL;
+    n->cost = NULL;
+    return n;
+}
+
+void node_free(struct Node * node)
+{
+    if (node != NULL){
+        free(node->x); node->x = NULL;
+        free(node->pert); node->pert = NULL;
+        free(node->cost); node->cost = NULL;
+        free(node); node = NULL;
+    }
+}
+
+struct Node * node_init(size_t d, const double * x, const double * h,
+                        struct Cost * cost, struct BoundInfo * bi)
+{
+    int onbound = bound_info_onbound(bi);
+    struct Node * n = node_alloc(d,x);
+    if (onbound == 0){
+        n->pert = calloc_double(2*d);
+        n->cost = calloc_double(2*d);
+        for (size_t ii = 0; ii < d; ii++){
+            n->pert[ii*2]   = x[ii] - h[ii];
+            n->pert[ii*2+1] = x[ii] + h[ii];
+        }
+        int res = cost_eval_neigh(cost,0.0,n->x,&(n->c),n->pert,n->cost);
+        assert (res == 0);
+    }
+    else{
+        int absorb = bound_info_absorb(bi);
+        if (absorb == 1){
+            n->pert = NULL;
+            n->cost = NULL;
+            int res = cost_eval(cost,0.0,n->x,&(n->c));
+            assert (res == 0);
+        }
+        else{
+            int reflect = bound_info_reflect(bi);
+            if (reflect != 0){
+                for (size_t ii = 0; ii < d; ii++){
+                    int on_bound = bound_info_onbound_dim(bi,ii);
+                    if (on_bound == 0){
+                        n->pert[ii*2]   = x[ii] - h[ii];
+                        n->pert[ii*2+1] = x[ii] + h[ii];
+                    }
+                    else{
+                        int reflect_dir = bound_info_reflect_dim_dir(bi,ii);
+                        //printf("before\n");
+                        if (reflect_dir == -1){ // just do right side poition
+                            n->pert[ii*2] = x[ii];
+                            n->pert[ii*2+1] = x[ii]+h[ii];
+                        }
+                        else{
+                            n->pert[ii*2] = x[ii] - h[ii];
+                            n->pert[ii*2+1] = x[ii];
+                        }
+                    }
+                }
+                int res = cost_eval_neigh(cost,0.0,n->x,&(n->c),n->pert,n->cost);
+                assert (res == 0);
+            }
+            else{
+                int period = bound_info_period(bi);
+                if (period != 0){
+                    for (size_t ii = 0; ii < d; ii++){
+                        int on_bound = bound_info_onbound_dim(bi,ii);
+                        if (on_bound == 0){
+                            n->pert[ii*2]   = x[ii] - h[ii];
+                            n->pert[ii*2+1] = x[ii] + h[ii];
+                        }
+                        else{
+                            int period_dir = bound_info_period_dim_dir(bi,ii);
+                            double xmap = bound_info_period_xmap(bi,ii);
+                            if (period_dir == -1){ // left maps to something
+                                n->pert[ii*2]   = xmap  - h[ii];
+                                n->pert[ii*2+1] = x[ii] + h[ii];
+                            }
+                            else{ // just do left side portion
+                                n->pert[ii*2]   = x[ii] - h[ii];
+                                n->pert[ii*2+1] = xmap + h[ii];
+                            }
+                        }
+                    }
+                    int res = cost_eval_neigh(cost,0.0,n->x,&(n->c),n->pert,n->cost);
+                    assert (res == 0);
+                }
+                else{
+                    fprintf(stderr,"Not sure what to do with this node\n");
+                    printf("onbound = %d\n",onbound);
+                    dprint(d,x);
+                    exit(1);                
+                }
+            }
+        }
+    }
+    return n;
+}
 
 /** \struct MCNode
  *  \brief Markov Chain Node (tree like structure)
@@ -424,6 +538,109 @@ double mcnode_expectation_cost(
 }
 
 /**********************************************************//**
+    Compute the expectation of a function around a node
+
+    \param[in]     mc   - node
+    \param[in]     n - node with costs computed
+    \param[in,out] grad - If (!NULL) return gradient
+
+    \return average
+**************************************************************/
+double mcnode_expectation2(
+    const struct MCNode * mc,
+    struct Node * n,
+    //void (*f)(size_t,double*,double**x,double*,void*),
+    /* double (*f)(double,double*,void*), */
+    /* void * arg, */
+    double * grad)
+{
+
+    if (grad!= NULL){
+        for (size_t ii = 0; ii < mc->du; ii++){
+            grad[ii] = 0.0;
+        }
+    }
+
+    double * point2 = calloc_double(mc->d);
+    memmove(point2,mc->x,mc->d * sizeof(double));
+
+    double avg = 0.0;
+    /* double time = 0.0; */
+
+    /* printf("here!\n"); */
+    // take care of transitions to neighbors
+    /* printf("mcn->neigh == NULL? = %d\n",mc->neigh==NULL); */
+    if (mc->neigh != NULL){
+        /* double * pert = calloc_double(2 * mc->d); */
+        /* // default */
+        /* for (size_t ii = 0; ii < mc->d; ii++){ */
+        /*     pert[2*ii] = mc->x[ii]; */
+        /*     pert[2*ii+1] = mc->x[ii]; */
+        /* } */
+        /* struct MCNList * temp = mc->neigh; */
+        /* /\* printf("fill in pert\n"); *\/ */
+        /* while (temp != NULL){ */
+        /*     int dir = temp->dir; */
+        /*     if (temp->plusminus == 1){ */
+        /*         pert[2*dir+1] = temp->val; */
+        /*     } */
+        /*     else if (temp->plusminus == -1){ */
+        /*         pert[2*dir] = temp->val; */
+        /*     } */
+        /*     temp = temp->next; */
+        /* } */
+        /* /\* printf("got pert\n"); *\/ */
+        /* /\* dprint(2*mc->d,pert); *\/ */
+        /* double * evals = calloc_double(2*mc->d); */
+        /* double peval = 0.0; */
+        /* int res = cost_eval_neigh(cost,time,point2,&peval,pert,evals); */
+        /* printf("evalueted cost\n"); */
+        /* assert (res == 0); */
+        /* temp = mc->neigh; */
+        struct MCNList * temp = mc->neigh;
+        while (temp != NULL){
+            int dir = temp->dir;
+            double eval;
+            if (temp->val > mc->x[dir]){
+                eval = n->cost[2*temp->dir+1];
+            }
+            else{
+                eval = n->cost[2*temp->dir];
+            }
+            avg += temp->p * eval;
+            if (grad != NULL){
+                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);
+            }
+            temp = temp->next;
+        }
+
+        // take care of self transition
+        if (mc->pself > 0.0){
+            /* assert (res == 0); */
+            avg += mc->pself * n->c; // self eval;
+            if (grad != NULL){
+                cblas_daxpy(mc->du,n->c,mc->gpself,1,grad,1);
+            }
+        }
+        
+        /* free(pert);  */
+        /* free(evals); */
+    }
+    else{
+        /* double eval; */
+        /* int res = cost_eval(cost,time,point2,&eval); */
+        /* assert (res == 0); */
+        avg += mc->pself * n->c;
+        if (grad != NULL){
+            cblas_daxpy(mc->du,n->c,mc->gpself,1,grad,1);
+        }
+    }
+    /* printf("finished!\n"); */
+    free(point2); point2 = NULL;
+    return avg;
+}
+
+/**********************************************************//**
     Print a node
 
     \param[in] n          - state
@@ -641,6 +858,24 @@ struct Dyn * mca_get_dyn(struct MCA * mca)
 {
     assert (mca != NULL);
     return mca->dyn;
+}
+
+/**********************************************************//**
+    Get a reference to the boundary
+**************************************************************/
+struct Boundary * mca_get_boundary(struct MCA * mca)
+{
+    assert (mca != NULL);
+    return mca->bound;
+}
+
+/**********************************************************//**
+    Get distances between nodes
+**************************************************************/
+double * mca_get_h(struct MCA * mca)
+{
+    assert (mca != NULL);
+    return mca->h;
 }
 
 /**********************************************************//**
@@ -1343,6 +1578,75 @@ mca_get_node(struct MCA * mca, double time, const double * x,
     //bound_info_free(bi); bi = NULL;
     return mcn;
 }
+/**********************************************************//**
+    Generate a node of the Markov chain
+    
+    \param[in]     mca    - markov chain approximation 
+    \param[in]     time   - time
+    \param[in]     x      - current state
+    \param[in]     u      - current control
+    \param[in,out] dt     - time step
+    \param[in,out] gdt    - gradient of time step
+    \param[in,out] bi     - boundary info
+    \param[in]     grad   - flag for specifying whether or not to
+                            compute gradients of transitions with 
+                            respect to control (NULL for no)
+**************************************************************/
+struct MCNode *
+mca_get_node2(struct MCA * mca, double time, const double * x,
+             const double * u, double * dt, double * gdt,
+             struct BoundInfo * bi,
+             double *grad)
+{
+
+    struct MCNode * mcn = NULL;
+    
+
+    /* printf("get node\n"); dprint(mca->d, x); */
+    int onbound = bound_info_onbound(bi);
+    /* printf("onbound = %d\n",onbound); */
+    
+    if (onbound == 0){
+        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad);
+    }
+    else{
+        int absorb = bound_info_absorb(bi);
+        //      printf("absorb = %d\n",absorb);
+        if (absorb == 1){
+            *dt = 0;
+            if (gdt != NULL){
+                for (size_t ii = 0; ii < mca->du; ii++){
+                    gdt[ii] = 0.0;
+                }
+            }
+            mcn = mca_outbound_node(mca,time,x);            
+        }
+        else{
+            int reflect = bound_info_reflect(bi);
+            if (reflect != 0){
+//                assert (1 == 0);
+                mcn = mca_reflect_node(mca,time,x,u,dt,gdt,grad,bi);
+            }
+            else{
+                int period = bound_info_period(bi);
+                if (period != 0){
+                    /* printf("periodic\n"); */
+                    /* assert (1 == 0); */
+                    mcn = mca_period_node(mca,time,x,u,dt,gdt,grad,bi);
+                }
+                else{
+                    fprintf(stderr,"Not sure what to do with this node\n");
+                    printf("onbound = %d\n",onbound);
+                    dprint(mca->d,x);
+                    exit(1);                
+                }
+            }
+        }
+    }
+    // printf("got node\n");
+    //bound_info_free(bi); bi = NULL;
+    return mcn;
+}
 
 /**********************************************************//**
     Compute expectation of a function
@@ -1363,7 +1667,7 @@ mca_get_node(struct MCA * mca, double time, const double * x,
 double
 mca_expectation(struct MCA * mca, double time,
                 const double * x, const double * u, double * dt, double * gdt,
-//                void (*f)(size_t,double *,double **,double*,void*),
+//              void (*f)(size_t,double *,double **,double*,void*),
                 double (*f)(double,const double *,void*),
                 void * arg, struct BoundInfo ** bi, double * grad,
                 int * info)
@@ -1437,6 +1741,55 @@ mca_expectation_cost(struct MCA * mca, double time,
     }
     else{
         val = mcnode_expectation_cost(mcn,cost,grad);
+        mcnode_free(mcn); mcn = NULL;
+        *info = 0;
+    }
+    return val;
+}
+
+/**********************************************************//**
+    Compute expectation of a cost function
+    
+    \param[in]     mca  - markov chain approximation 
+    \param[in]     time - time
+    \param[in]     node - current state with cost info for neighbors
+    \param[in]     u    - current control
+    \param[in,out] dt   - time step
+    \param[in,out] bi   - boundary information
+    \param[in,out] grad - gradient
+    \param[in,out] info - 0 if successfull 1 if error
+
+    \return expectation of f
+**************************************************************/
+double
+mca_expectation_cost2(struct MCA * mca, double time, struct Node * node,
+                      const double * u,
+                      double * dt, double * gdt,
+//                void (*f)(size_t,double *,double **,double*,void*),
+                      struct BoundInfo * bi, double * grad,
+                      int * info)
+{
+
+//    printf("compute expectation\n");
+    double * x = node->x;
+    struct MCNode * mcn = mca_get_node2(mca,time,x,u,dt,gdt,bi,grad);
+    double val = 0.0;
+    if (mcn == NULL){
+        fprintf(stderr, "Warning: MCNode obtained in mca_expectation is NULL\n");
+        fprintf(stderr, "\tx = ");
+        for (size_t ii = 0; ii < mca->d; ii++ ){
+            fprintf(stderr,"%G ",x[ii]);
+        }
+        fprintf(stderr,"\n\tControl = ");
+        for (size_t ii = 0; ii < mca->du; ii++){
+            fprintf(stderr,"%G ",u[ii]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"\tBoundary info is ?????\n");
+        *info = 1;
+    }
+    else{
+        val = mcnode_expectation2(mcn,node,grad);
         mcnode_free(mcn); mcn = NULL;
         *info = 0;
     }

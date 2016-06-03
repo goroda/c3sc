@@ -5,6 +5,18 @@
 #include "boundary.h"
 #include "cost.h"
 
+struct Node
+{
+    size_t d;
+    double * x;
+    double c; // cost
+    double * pert; // (- +) in each direction //2d
+    double * cost;
+};
+struct Node * node_init(size_t, const double *, const double *,
+                        struct Cost *, struct BoundInfo *);
+void node_free(struct Node *);
+
 enum NodeType {INBOUNDS,OUTBOUNDS,ONBOUNDS};
 
 struct MCNode;
@@ -69,6 +81,8 @@ void mca_free(struct MCA *);
 void mca_free_deep(struct MCA *);
 void mca_attach_dyn(struct MCA *, struct Dyn *);
 struct Dyn * mca_get_dyn(struct MCA *);
+struct Boundary * mca_get_boundary(struct MCA *);
+double * mca_get_h(struct MCA *);
 void mca_attach_bound(struct MCA *, struct Boundary *);
 size_t mca_get_dx(struct MCA *);
 size_t mca_get_du(struct MCA *);
@@ -83,7 +97,12 @@ mca_expectation_cost(struct MCA *, double,
                      const double *, const double *, double *, double *,
                      struct Cost *, struct BoundInfo **, double *,
                      int *);
-
+double
+mca_expectation_cost2(struct MCA * mca, double time, struct Node * node,
+                      const double * u,
+                      double * dt, double * gdt,
+                      struct BoundInfo * bi, double * grad,
+                      int * info);
 struct MCNode *
 mca_inbound_node(struct MCA*,double,const double*,
                  const double*,double*,double*,double*);
