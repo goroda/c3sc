@@ -61,7 +61,7 @@ int f1(double t, const double * x, const double * u, double * out,
 
 
     double lb[7] = {-4.0, -1.0, -M_PI/2.0, -2.0*M_PI/9.0, 0.0, -5.0, -10.0};
-    double ub[7] = {4.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
+    double ub[7] = {0.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
 
     if ((x[0] < lb[0]) || (x[0] > ub[0]) ){
         printf(" state[0] out of bounds, %G\n",x[0]);
@@ -167,7 +167,7 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
         out[ii] = 0.0;
     }
     for (size_t ii = 0; ii < 7; ii++){
-        out[ii*7+ii] = 1e-3;
+        out[ii*7+ii] = 1e-1;
     }
     
     if (grad != NULL){
@@ -211,12 +211,14 @@ int boundcost(double t,const double * x, double * out)
     *out = 0.0;
 //    *out += 600.0    * x[0]*x[0]; // original
     *out += 400.0    * x[0]*x[0];
-    *out += 400.0    * x[1]*x[1];
+//    *out += 400.0    * x[1]*x[1];// original
+    *out += 800.0    * x[1]*x[1];
     *out += 1.0/9.0  * x[2]*x[2];
     *out += 1.0/9.0  * x[3]*x[3];
     *out +=  1.0     * x[4]*x[4];
-    *out +=  1.0     * x[5]*x[5];
-    *out += 1.0/9.0  * x[6]*x[6];
+//    *out +=  1.0     * x[5]*x[5]; // original
+    *out +=  100.0     * x[5]*x[5];
+    *out += 1.0/9.0  * (x[6]+0.5)*(x[6]+0.5);
     
     return 0;
 }
@@ -298,8 +300,8 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-4);
-    c3opt_set_relftol(opt,1e-4);
+    c3opt_set_absxtol(opt,1e-10);
+    c3opt_set_relftol(opt,1e-10);
     c3opt_set_gtol(opt,1e-10);
     
     c3opt_ls_set_maxiter(opt,10);
@@ -310,10 +312,10 @@ int main(int argc, char * argv[])
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-3);
-    approx_args_set_round_tol(aargs,1e-3);
+    approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,6);
-    approx_args_set_maxrank(aargs,20);
-    approx_args_set_startrank(aargs,20);
+    approx_args_set_maxrank(aargs,5);
+    approx_args_set_startrank(aargs,5);
 
     double beta = 0.0;
 
@@ -393,8 +395,8 @@ int main(int argc, char * argv[])
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-//    double state[7] = {-2.8, -0.2, 0.0, 0.0, 6.0, 0.0, 0.0};
-    double state[7] = {-2.5, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
+    double state[7] = {-2.8, -0.2, 0.0, 0.0, 6.0, 0.0, 0.0};
+//    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
     double con[1] = {0.0};
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");

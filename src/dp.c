@@ -553,7 +553,7 @@ struct Dyn * dpih_get_dyn(struct DPih * dp)
    Evaluate right hand side of Bellman equation at a given node *x*
    and for a given control *u*
 **************************************************************/
-double dpih_rhs(struct DPih * dp,const double * x,const double * u, double * grad)
+double dpih_rhs(struct DPih * dp,const double * x,const double * u,double * grad)
 {
     size_t du = mca_get_du(dp->mm);
     size_t dx = mca_get_dx(dp->mm);
