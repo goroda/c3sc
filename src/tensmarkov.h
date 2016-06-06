@@ -11,6 +11,7 @@ struct Node
     double * x;
     double c; // cost
     double * pert; // (- +) in each direction //2d
+    int * use;
     double * cost;
 };
 struct Node * node_init(size_t, const double *, const double *,
@@ -20,56 +21,14 @@ void node_free(struct Node *);
 enum NodeType {INBOUNDS,OUTBOUNDS,ONBOUNDS};
 
 struct MCNode;
-struct MCNode * mcnode_alloc(size_t);
-
-/* struct MCNode ** mcnode_alloc_array(size_t); */
-/* void mcnode_free_array(struct MCNode **, size_t); */
+struct MCNode * mcnode_alloc(struct Node *, size_t);
 void mcnode_free(struct MCNode *);
-struct MCNode * mcnode_init(size_t,const double *);
-void mcnode_set_pself(struct MCNode *,double);
-void mcnode_set_gradient(struct MCNode *,size_t,double*);
-void mcnode_init_self_grad(struct MCNode *, size_t);
 size_t mcnode_get_d(const struct MCNode *);
 double * mcnode_get_xref(const struct MCNode *);
 double mcnode_get_pself(const struct MCNode *);
 size_t mcnode_get_du(const struct MCNode *);
 double * mcnode_get_gpself(const struct MCNode *);
-struct MCNList * mcnode_get_neigh(const struct MCNode *);
-size_t mcnode_get_n(const struct MCNode *);
-void mcnode_prepend_neigh(struct MCNode *, size_t,int,
-                          double, double, double *);
 
-struct MCNList;
-struct MCNList * mcnlist_alloc();
-double mcnlist_get_p(const struct MCNList *);
-double * mcnlist_get_gradp(const struct MCNList *);
-size_t mcnlist_get_dir(const struct MCNList *);
-double mcnlist_get_val(const struct MCNList *);
-size_t mcnlist_length(const struct MCNList *);
-struct MCNList * mcnlist_get_next(const struct MCNList *);
-
-void mcnlist_free(struct MCNList *);
-struct MCNList * mcnlist_prepend(struct MCNList **, size_t,
-                                 int,
-                                 double, double, double *);
-
-/* struct MCNode **  mcnode_get_neighbors(const struct MCNode *); */
-/* double * mcnode_get_pref(const struct MCNode *); */
-
-/* void mcnode_add_neighbors_hspace(struct MCNode *,  */
-/*                                  const double *, */
-/*                                  const double, */
-/*                                  const double *, */
-/*                                  const struct BoundInfo *); */
-/* void mcnode_add_gradients(struct MCNode *, size_t, */
-/*                           size_t, const double *, */
-/*                           double **); */
-double mcnode_expectation(
-    const struct MCNode *,
-    //void (*)(size_t,double*,double**x,double*,void*),
-    double (*)(double,const double*,void*),
-    void *,double*);
-void mcnode_sample_neighbor(struct MCNode *, double, double *);
 void mcnode_print(struct MCNode *, FILE *, int);
 
 /////////////////////////////////////////////////
@@ -86,40 +45,16 @@ double * mca_get_h(struct MCA *);
 void mca_attach_bound(struct MCA *, struct Boundary *);
 size_t mca_get_dx(struct MCA *);
 size_t mca_get_du(struct MCA *);
-double
-mca_expectation(struct MCA *,double,const double *,const double *,double *,
-                double *,
-//                void(*)(size_t,double*,double**,double*,void*),
-                double(*)(double,const double*,void*),
-                void *,struct BoundInfo **,double*,int*);
-double
-mca_expectation_cost(struct MCA *, double,
-                     const double *, const double *, double *, double *,
-                     struct Cost *, struct BoundInfo **, double *,
-                     int *);
-double
-mca_expectation_cost2(struct MCA * mca, double time, struct Node * node,
-                      const double * u,
-                      double * dt, double * gdt,
-                      struct BoundInfo * bi, double * grad,
-                      int * info);
-struct MCNode *
-mca_inbound_node(struct MCA*,double,const double*,
-                 const double*,double*,double*,double*);
-struct MCNode *
-mca_reflect_node(struct MCA *,double, const double *,
-                 const double *, double *,double *,double *,
-                 struct BoundInfo *);
 
-struct MCNode *
-mca_outbound_node(struct MCA *, double, const double *);
-struct MCNode *
-mca_get_node(struct MCA *,double,const double *,
-             const double *,double *,double*,
-             struct BoundInfo **,double*);
-
-void mca_step(struct MCA *, double, double *, double *,double,
-              double *, double *);
+double
+mca_expectation_cost2(struct MCA *, double,
+                      struct Node *,
+                      const double *,
+                      double *, double *,
+                      double *,
+                      int *);
+/* void mca_step(struct MCA *, double, double *, double *,double, */
+/*               double *, double *); */
 
 /* double tensor_mm_cost(struct TensorMM *, */
 /*                       double, double *, */

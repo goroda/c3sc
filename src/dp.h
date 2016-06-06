@@ -47,6 +47,19 @@ size_t c3sc_get_du(const struct C3SC *);
 
 ////////////////////////////////////////////////////
 
+struct DPPOL
+{
+    struct DPih * dp;
+    struct ImplicitPolicy * pol;
+    double weight;
+};
+
+struct DPX2
+{
+    struct DPih * dp;
+    struct BoundInfo * bi;
+    struct Node * node;
+};
 
 struct DPih * 
 dpih_alloc(double,
@@ -57,15 +70,17 @@ struct DPih * dpih_copy_deep(struct DPih *);
 void dpih_free(struct DPih *);
 void dpih_free_deep(struct DPih *);
 void dpih_attach_mca(struct DPih *, struct MCA **);
+struct MCA * dpih_get_mca(struct DPih *);
 void dpih_attach_cost(struct DPih *, struct Cost **);
 void dpih_attach_cost_ow(struct DPih *, struct Cost *);
 void dpih_attach_opt(struct DPih *, struct c3Opt **);
-
+struct c3Opt * dpih_get_opt(struct DPih *);
 struct Cost * dpih_get_cost(struct DPih *);
 struct Dyn * dpih_get_dyn(struct DPih *);
 size_t dpih_get_d(const struct DPih *);
 
-double dpih_rhs(struct DPih *,const double *,const double *,double *);
+double dpih_bellman_evalu(size_t, double *, double *, void *);
+double dpih_bellman_minimize(const double *,void *);
 struct Cost * dpih_iter_vi(struct DPih *,int,const struct ApproxArgs *,
                            struct C3SCDiagnostic *);
 struct Cost * dpih_iter_pol(struct DPih *, struct ImplicitPolicy *,
@@ -75,7 +90,6 @@ dpih_iter_pol_solve(struct DPih *, struct ImplicitPolicy *,
                     size_t, double, int,const struct ApproxArgs *);
 
 struct DPfh;
-
 struct ImplicitPolicy * implicit_policy_alloc();
 struct ImplicitPolicy * c3sc_create_implicit_policy(struct C3SC *);
 void implicit_policy_add_transform(struct ImplicitPolicy *,size_t, void (*)(size_t, const double *, double *));

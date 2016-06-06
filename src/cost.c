@@ -656,7 +656,7 @@ int cost_eval_neigh(struct Cost * cost,
         /* dprint(cost->d*2, points); */
 
         if (success == 0){
-            int exist;
+            /* int exist; */
             for (size_t jj = 0; jj < cost->d; jj++){
                 
                 /* printf("jj = %zu\n",jj); */

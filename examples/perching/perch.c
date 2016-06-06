@@ -215,9 +215,9 @@ int boundcost(double t,const double * x, double * out)
     *out += 800.0    * x[1]*x[1];
     *out += 1.0/9.0  * x[2]*x[2];
     *out += 1.0/9.0  * x[3]*x[3];
-    *out +=  1.0     * x[4]*x[4];
-//    *out +=  1.0     * x[5]*x[5]; // original
-    *out +=  100.0     * x[5]*x[5];
+//    *out +=  1.0     * x[4]*x[4]; // original
+    *out +=  100.0     * x[4]*x[4];
+    *out +=  1.0     * x[5]*x[5]; // original
     *out += 1.0/9.0  * (x[6]+0.5)*(x[6]+0.5);
     
     return 0;

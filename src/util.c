@@ -427,7 +427,7 @@ void hash_grid_free_ndgrid(size_t d, struct HashGrid ** hg)
     
     \return out - either NULL or the second element in the pair stored under the key 
 ***************************************************************/
-static size_t lookup_keyd(struct HashGrid * ht , char * key, int * exists)
+static size_t lookup_keyd(struct HashGrid * ht, char * key, int * exists)
 {
     struct HashGridList * pl = NULL;
     size_t val = hashd(ht->size,key);

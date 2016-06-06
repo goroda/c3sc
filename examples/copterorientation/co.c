@@ -220,7 +220,7 @@ int main(int argc, char * argv[])
 
     char * dirout = ".";
     int verbose = 0;
-    size_t N = 20;
+    size_t N = 40;
     size_t niter = 100;
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
@@ -364,14 +364,14 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     for (size_t ii = 0; ii < niter; ii++){
 
-        if (ii > 0){
-            c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
-        }
+        /* if (ii > 0){ */
+        /*     c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs); */
+        /* } */
         double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
 
         struct Cost * cost = c3sc_get_cost(sc);
-        int saved = cost_save(cost,"saved_cost.dat");
-        assert (saved == 0);
+        /* int saved = cost_save(cost,"saved_cost.dat"); */
+        /* assert (saved == 0); */
 
         size_t * ranks = cost_get_ranks(cost);
         double normval = cost_norm2(cost);
@@ -380,13 +380,13 @@ int main(int argc, char * argv[])
             iprint_sz(7,ranks);
         }
         sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
-        int dres = c3sc_diagnostic_save(diag,filename,4);
-        assert (dres == 0);
+        /* int dres = c3sc_diagnostic_save(diag,filename,4); */
+        /* assert (dres == 0); */
         if (diff < 1e-2){
             break;
         }
     }
-    /* exit(1); */
+    exit(1);
     struct Cost * cost = c3sc_get_cost(sc);
     int saved = cost_save(cost,"saved_cost.dat");
     assert (saved == 0);

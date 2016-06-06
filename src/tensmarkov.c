@@ -23,9 +23,11 @@ struct Node * node_alloc(size_t d, const double * x)
 {
     struct Node * n = malloc(sizeof(struct Node));
     assert (n != NULL);
+    n->d = d;
     n->x = calloc_double(d);
     memmove(n->x,x,d*sizeof(double));
     n->pert = NULL;
+    n->use = calloc_int(2*d);
     n->cost = NULL;
     return n;
 }
@@ -35,6 +37,7 @@ void node_free(struct Node * node)
     if (node != NULL){
         free(node->x); node->x = NULL;
         free(node->pert); node->pert = NULL;
+        free(node->use); node->use = NULL;
         free(node->cost); node->cost = NULL;
         free(node); node = NULL;
     }
@@ -52,6 +55,8 @@ struct Node * node_init(size_t d, const double * x, const double * h,
         for (size_t ii = 0; ii < d; ii++){
             n->pert[ii*2]   = x[ii] - h[ii];
             n->pert[ii*2+1] = x[ii] + h[ii];
+            n->use[ii*2]   = 1;
+            n->use[ii*2+1] = 1;
         }
         int res = cost_eval_neigh(cost,0.0,n->x,&(n->c),n->pert,n->cost);
         assert (res == 0);
@@ -74,6 +79,8 @@ struct Node * node_init(size_t d, const double * x, const double * h,
                     if (on_bound == 0){
                         n->pert[ii*2]   = x[ii] - h[ii];
                         n->pert[ii*2+1] = x[ii] + h[ii];
+                        n->use[2*ii]   = 1;
+                        n->use[2*ii+1] = 1;
                     }
                     else{
                         int reflect_dir = bound_info_reflect_dim_dir(bi,ii);
@@ -81,10 +88,12 @@ struct Node * node_init(size_t d, const double * x, const double * h,
                         if (reflect_dir == -1){ // just do right side poition
                             n->pert[ii*2] = x[ii];
                             n->pert[ii*2+1] = x[ii]+h[ii];
+                            n->use[2*ii+1] = 1;
                         }
                         else{
                             n->pert[ii*2] = x[ii] - h[ii];
                             n->pert[ii*2+1] = x[ii];
+                            n->use[2*ii] = 1;
                         }
                     }
                 }
@@ -95,6 +104,10 @@ struct Node * node_init(size_t d, const double * x, const double * h,
                 int period = bound_info_period(bi);
                 if (period != 0){
                     for (size_t ii = 0; ii < d; ii++){
+                        // use both no matter what
+                        n->use[2*ii]   = 1;
+                        n->use[2*ii+1] = 1;
+                        
                         int on_bound = bound_info_onbound_dim(bi,ii);
                         if (on_bound == 0){
                             n->pert[ii*2]   = x[ii] - h[ii];
@@ -149,44 +162,39 @@ struct Node * node_init(size_t d, const double * x, const double * h,
  */
 struct MCNode
 {
-    size_t d;
-    size_t du; // dimension of gradients
-    int xalloc;
-    double * x;
+    struct Node * node;
 
+    size_t du;
+    double p;
+    double * gradp;
+    double * pn; // probability transitions to neighbors;
+    double * gradpn; // gradient of probability transitions to neighbors
     
-    //size_t N;
-    //struct MCNode ** neighbors;
-    struct MCNList * neigh;
-    double pself;
-    int galloc;
-    double * gpself;
-//    double * p; // transition probabilities
-//    double ** gp;
-
 };
 
 /**********************************************************//**
     Allocate node
 
-    \param[in] d - dimension of node
+    \param[in] node - node
+    \param[in] du   - number of controls
 
     \return allocate node
 **************************************************************/
-struct MCNode * mcnode_alloc(size_t d)
+struct MCNode * mcnode_alloc(struct Node * node, size_t du)
 {
+    assert (node != NULL);
     struct MCNode * mcn;
     mcn = malloc(sizeof(struct MCNode));
     assert (mcn != NULL);
     
-    mcn->d = d;
-    mcn->du = 0;
-    mcn->xalloc = 0;
-    mcn->x = NULL;
-    mcn->pself = 1.0;
-    mcn->galloc = 0;
-    mcn->gpself = NULL;
-    mcn->neigh = NULL;
+    mcn->node = node;
+
+    /* printf("du = %zu\n",du); */
+    /* printf("d = %zu\n",node->d); */
+    mcn->du = du;
+    mcn->gradp = calloc_double(du);
+    mcn->pn = calloc_double(2*node->d);
+    mcn->gradpn = calloc_double(2* du * node->d);
     
     return mcn;
 }
@@ -197,449 +205,66 @@ struct MCNode * mcnode_alloc(size_t d)
 void mcnode_free(struct MCNode * mcn)
 {
     if (mcn != NULL){
-        if (mcn->xalloc == 1){
-            free(mcn->x); mcn->x = NULL;
-        }
-        if (mcn->galloc == 1){
-            free(mcn->gpself);
-        }
-        mcnlist_free(mcn->neigh); mcn->neigh = NULL;
+        free(mcn->gradp); mcn->gradp = NULL;
+        free(mcn->pn); mcn->pn = NULL;
+        free(mcn->gradpn); mcn->gradpn = NULL;
         free(mcn); mcn = NULL;
-        
-        /* //        free_dd(mcn->N,mcn->gp); mcn->gp = NULL; */
-        /* if (mcn->N > 0){ */
-        /*     mcnode_free_array(mcn->neighbors,mcn->N); */
-        /*     free(mcn->neighbors); mcn->neighbors = NULL; */
-        /* } */
     }
 }
 
-/**********************************************************//**
-    Initialize a node by referencing an array x of size d, 
-    node has no neighbors and only transitions to itself
-**************************************************************/
-struct MCNode * mcnode_init(size_t d, const double * x)
-{
-    struct MCNode * mm = mcnode_alloc(d);
-    assert (mm != NULL);
-    mm->x = (double *)x;
-    mm->pself = 1.0;
-    return mm;
-}
-
-/**********************************************************//**
-    Set pself;
-**************************************************************/
-void mcnode_set_pself(struct MCNode * mcn,double pself)
-{
-    assert (mcn != NULL);
-    mcn->pself = pself;
-}
-
-/**********************************************************//**
-    Add gradient for mcnode
-**************************************************************/
-void mcnode_set_gradient(struct MCNode * mcn,size_t du,double * grad)
-{
-    assert (mcn != NULL);
-    mcn->du = du;
-    mcn->gpself = grad;
-}
-
-/**********************************************************//**
-    Initialize gradient of prob of transitioning to oneself
-**************************************************************/
-void mcnode_init_self_grad(struct MCNode * mcn, size_t du)
-{
-    mcn->du = du;
-    mcn->galloc = 1;
-    mcn->gpself = calloc_double(du);
-}
-
-/**********************************************************//**
-    Add Neighbor
-**************************************************************/
-void mcnode_prepend_neigh(struct MCNode * mcn, size_t dir, int plusminus,
-                          double val, double p, double * grad)
-{
-    mcnlist_prepend(&(mcn->neigh),dir,plusminus,val,p,grad);
-}
-
-size_t mcnode_get_d(const struct MCNode * mcn){ return mcn->d; }
-double * mcnode_get_xref(const struct MCNode * mcn){ return mcn->x;}
-double mcnode_get_pself(const struct MCNode * mcn){ return mcn->pself; }
+size_t mcnode_get_d(const struct MCNode * mcn){ return mcn->node->d; }
+double * mcnode_get_xref(const struct MCNode * mcn){ return mcn->node->x;}
+double mcnode_get_pself(const struct MCNode * mcn){ return mcn->p; }
 size_t mcnode_get_du(const struct MCNode * mcn){ return mcn->du;}
-double * mcnode_get_gpself(const struct MCNode * mcn){ return mcn->gpself;}
-struct MCNList * mcnode_get_neigh(const struct MCNode * mcn){ return mcn->neigh;}
-size_t mcnode_get_n(const struct MCNode * mcn){ return mcnlist_length(mcn->neigh);}
+double * mcnode_get_gpself(const struct MCNode * mcn){ return mcn->gradp;}
 
 //////////////////////////////////
 
-struct MCNList
-{
-    double p; // probability to transition to this node
-    int galloc;
-    double * gradp; // gradient of transition probability
-    size_t dir; // dimension of neighbor
-    int plusminus;
-    double val;
-    struct MCNList * next;
-};
-
-double mcnlist_get_p(const struct MCNList * mcn){return mcn->p;}
-double * mcnlist_get_gradp(const struct MCNList * mcn){return mcn->gradp;}
-size_t mcnlist_get_dir(const struct MCNList * mcn){return mcn->dir;}
-int mcnlist_get_plusminus(const struct MCNList * mcn){return mcn->plusminus;}
-double mcnlist_get_val(const struct MCNList * mcn){return mcn->val;}
-struct MCNList * mcnlist_get_next(const struct MCNList * mcn){return mcn->next;}
-
-size_t mcnlist_length(const struct MCNList * mcn)
-{
-    size_t N = 0;
-    const struct MCNList * temp = mcn;
-    while (temp != NULL){
-        N++;
-        temp = temp->next;
-    }
-    return N;
-}
-
-
-/**********************************************************//**
-    Allocate memory for a list
-
-    \return allocated list
-**************************************************************/
-struct MCNList * mcnlist_alloc()
-{
-    struct MCNList * mcnl = malloc(sizeof(struct MCNList));
-    if (mcnl == NULL){
-        fprintf(stderr,"Error allocating memory for MCNList\n");
-        exit(1);
-    }
-    mcnl->p = 0;
-    mcnl->galloc = 0;
-    mcnl->gradp = NULL;
-    mcnl->next = NULL;
-    return mcnl;
-}
-
-/**********************************************************//**
-    Free a list
-**************************************************************/
-void mcnlist_free(struct MCNList * mcnl)
-{
-    if (mcnl != NULL){
-        if (mcnl->galloc == 1){
-            free(mcnl->gradp); mcnl->gradp = NULL;
-        }
-        //mcnode_free(mcnl->node); mcnl->node = NULL;
-        mcnlist_free(mcnl->next); mcnl->next = NULL;
-        free(mcnl); mcnl = NULL;
-    }
-}
-
-/**********************************************************//**
-    Add a neighbor to the front of the list
-**************************************************************/
-struct MCNList * mcnlist_prepend(struct MCNList ** mcn, size_t dir,int plusminus,
-                                 double val, double p, double * grad)
-{
-    struct MCNList * node = mcnlist_alloc();
-    node->p = p;
-    node->gradp = grad;
-    node->dir = dir;
-    node->plusminus = plusminus;
-    node->val = val;
-    node->next = *mcn;
-    *mcn = node;
-    return node;
-}
-
-/**********************************************************//**
-    Prepend an empty element
-**************************************************************/
-struct MCNList * 
-mcnlist_prepend_empty(struct MCNList ** mcn, size_t dir,
-                      int plusminus,
-                      double val, size_t dgrad)
-{
-    struct MCNList * node = mcnlist_alloc();
-    node->dir = dir;
-    node->plusminus = plusminus;
-    node->val = val;
-//    node->p = p;
-    if (dgrad > 0){
-        node->galloc = 1;
-        node->gradp = calloc_double(dgrad);
-    }
-    node->next = *mcn;
-    *mcn = node;
-    return node;
-}
-
 /**********************************************************//**
     Compute the expectation of a function around a node
 
     \param[in]     mc   - node
-    \param[in]     f    - function(nvals,times,states,evas,arg)
-    \param[in]     arg  - additional function arguments
-    \param[in,out] grad - If (!NULL) return gradient
-
-    \return average
-**************************************************************/
-double mcnode_expectation(
-    const struct MCNode * mc,
-    //void (*f)(size_t,double*,double**x,double*,void*),
-    double (*f)(double,const double*,void*),
-    void * arg,double * grad)
-{
-
-    if (grad!= NULL){
-        for (size_t ii = 0; ii < mc->du; ii++){
-            grad[ii] = 0.0;
-        }
-    }
-
-    double * point2 = calloc_double(mc->d);
-    memmove(point2,mc->x,mc->d * sizeof(double));
-
-    double avg = 0.0;
-    double time = 0.0;
-    double eval;
-    // take care of self transition
-    if (mc->pself > 0.0){
-        eval = f(time,point2,arg);
-        avg += mc->pself * eval;
-        if (grad != NULL){
-            cblas_daxpy(mc->du,eval,mc->gpself,1,grad,1);
-        }
-    }
-    
-    // take care of transitions to neighbors
-    if (mc->neigh != NULL){
-        struct MCNList * temp = mc->neigh;
-        while (temp != NULL){
-            point2[temp->dir] = temp->val;
-           
-            eval = f(time,point2,arg);
-            avg += temp->p * eval;
-            if (grad != NULL){
-                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);
-            }
-            point2[temp->dir] = mc->x[temp->dir];
-            temp = temp->next;
-        }
-        
-        /* mcnlist_to_coordinate_pert(temp,pert); */
-
-    }
-    free(point2); point2 = NULL;
-    return avg;
-}
-
-/**********************************************************//**
-    Compute the expectation of a function around a node
-
-    \param[in]     mc   - node
-    \param[in]     cost - cost function
-    \param[in,out] grad - If (!NULL) return gradient
-
-    \return average
-**************************************************************/
-double mcnode_expectation_cost(
-    const struct MCNode * mc,
-    struct Cost * cost,
-    //void (*f)(size_t,double*,double**x,double*,void*),
-    /* double (*f)(double,double*,void*), */
-    /* void * arg, */
-    double * grad)
-{
-
-    if (grad!= NULL){
-        for (size_t ii = 0; ii < mc->du; ii++){
-            grad[ii] = 0.0;
-        }
-    }
-
-    double * point2 = calloc_double(mc->d);
-    memmove(point2,mc->x,mc->d * sizeof(double));
-
-    double avg = 0.0;
-    double time = 0.0;
-
-    /* printf("here!\n"); */
-    // take care of transitions to neighbors
-    /* printf("mcn->neigh == NULL? = %d\n",mc->neigh==NULL); */
-    if (mc->neigh != NULL){
-        double * pert = calloc_double(2 * mc->d);
-        // default
-        for (size_t ii = 0; ii < mc->d; ii++){
-            pert[2*ii] = mc->x[ii];
-            pert[2*ii+1] = mc->x[ii];
-        }
-        struct MCNList * temp = mc->neigh;
-        /* printf("fill in pert\n"); */
-        while (temp != NULL){
-            int dir = temp->dir;
-            if (temp->plusminus == 1){
-                pert[2*dir+1] = temp->val;
-            }
-            else if (temp->plusminus == -1){
-                pert[2*dir] = temp->val;
-            }
-            temp = temp->next;
-        }
-        /* printf("got pert\n"); */
-        /* dprint(2*mc->d,pert); */
-        double * evals = calloc_double(2*mc->d);
-        double peval = 0.0;
-        int res = cost_eval_neigh(cost,time,point2,&peval,pert,evals);
-        /* printf("evalueted cost\n"); */
-        assert (res == 0);
-        temp = mc->neigh;
-        while (temp != NULL){
-            int dir = temp->dir;
-            double eval;
-            if (temp->val > mc->x[dir]){
-                eval = evals[2*temp->dir+1];
-            }
-            else{
-                eval = evals[2*temp->dir];
-            }
-            avg += temp->p * eval;
-            if (grad != NULL){
-                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);
-            }
-            temp = temp->next;
-        }
-
-        // take care of self transition
-        if (mc->pself > 0.0){
-            assert (res == 0);
-            avg += mc->pself * peval;
-            if (grad != NULL){
-                cblas_daxpy(mc->du,peval,mc->gpself,1,grad,1);
-            }
-        }
-        
-        free(pert); 
-        free(evals);
-    }
-    else{
-        double eval;
-        int res = cost_eval(cost,time,point2,&eval);
-        assert (res == 0);
-        avg += mc->pself * eval;
-        if (grad != NULL){
-            cblas_daxpy(mc->du,eval,mc->gpself,1,grad,1);
-        }
-    }
-    /* printf("finished!\n"); */
-    free(point2); point2 = NULL;
-    return avg;
-}
-
-/**********************************************************//**
-    Compute the expectation of a function around a node
-
-    \param[in]     mc   - node
-    \param[in]     n - node with costs computed
     \param[in,out] grad - If (!NULL) return gradient
 
     \return average
 **************************************************************/
 double mcnode_expectation2(
     const struct MCNode * mc,
-    struct Node * n,
-    //void (*f)(size_t,double*,double**x,double*,void*),
-    /* double (*f)(double,double*,void*), */
-    /* void * arg, */
     double * grad)
 {
 
+    assert (mc != NULL);
+    assert (mc->node != NULL);
+    
     if (grad!= NULL){
         for (size_t ii = 0; ii < mc->du; ii++){
             grad[ii] = 0.0;
         }
     }
 
-    double * point2 = calloc_double(mc->d);
-    memmove(point2,mc->x,mc->d * sizeof(double));
 
+    struct Node * node = mc->node;
+    /* printf("lets go in exp !\n"); */
+    /* iprint(2*node->d,node->use); */
     double avg = 0.0;
-    /* double time = 0.0; */
-
-    /* printf("here!\n"); */
-    // take care of transitions to neighbors
-    /* printf("mcn->neigh == NULL? = %d\n",mc->neigh==NULL); */
-    if (mc->neigh != NULL){
-        /* double * pert = calloc_double(2 * mc->d); */
-        /* // default */
-        /* for (size_t ii = 0; ii < mc->d; ii++){ */
-        /*     pert[2*ii] = mc->x[ii]; */
-        /*     pert[2*ii+1] = mc->x[ii]; */
-        /* } */
-        /* struct MCNList * temp = mc->neigh; */
-        /* /\* printf("fill in pert\n"); *\/ */
-        /* while (temp != NULL){ */
-        /*     int dir = temp->dir; */
-        /*     if (temp->plusminus == 1){ */
-        /*         pert[2*dir+1] = temp->val; */
-        /*     } */
-        /*     else if (temp->plusminus == -1){ */
-        /*         pert[2*dir] = temp->val; */
-        /*     } */
-        /*     temp = temp->next; */
-        /* } */
-        /* /\* printf("got pert\n"); *\/ */
-        /* /\* dprint(2*mc->d,pert); *\/ */
-        /* double * evals = calloc_double(2*mc->d); */
-        /* double peval = 0.0; */
-        /* int res = cost_eval_neigh(cost,time,point2,&peval,pert,evals); */
-        /* printf("evalueted cost\n"); */
-        /* assert (res == 0); */
-        /* temp = mc->neigh; */
-        struct MCNList * temp = mc->neigh;
-        while (temp != NULL){
-            int dir = temp->dir;
-            double eval;
-            if (temp->val > mc->x[dir]){
-                eval = n->cost[2*temp->dir+1];
-            }
-            else{
-                eval = n->cost[2*temp->dir];
-            }
-            avg += temp->p * eval;
+    for (size_t ii = 0; ii < 2*node->d; ii++){
+        /* printf("ii = %zu\n",ii); */
+        if (node->use[ii] == 1){
+            /* printf("prob = %G, cost = %G\n",mc->pn[ii],node->cost[ii]); */
+            /* assert(isinf(mc->pn[ii]) == 0); */
+            avg += mc->pn[ii] * node->cost[ii];
             if (grad != NULL){
-                cblas_daxpy(mc->du,eval,temp->gradp,1,grad,1);
-            }
-            temp = temp->next;
-        }
-
-        // take care of self transition
-        if (mc->pself > 0.0){
-            /* assert (res == 0); */
-            avg += mc->pself * n->c; // self eval;
-            if (grad != NULL){
-                cblas_daxpy(mc->du,n->c,mc->gpself,1,grad,1);
+                cblas_daxpy(mc->du,node->cost[ii],mc->gradpn + ii*mc->du,1,grad,1);
             }
         }
-        
-        /* free(pert);  */
-        /* free(evals); */
     }
-    else{
-        /* double eval; */
-        /* int res = cost_eval(cost,time,point2,&eval); */
-        /* assert (res == 0); */
-        avg += mc->pself * n->c;
+    /* printf("got it in exp \n"); */
+    if (mc->p > 0.0){
+        avg += mc->p * node->c; // self eval;
         if (grad != NULL){
-            cblas_daxpy(mc->du,n->c,mc->gpself,1,grad,1);
+            cblas_daxpy(mc->du,node->c,mc->gradp,1,grad,1);
         }
     }
-    /* printf("finished!\n"); */
-    free(point2); point2 = NULL;
     return avg;
 }
 
@@ -652,34 +277,23 @@ double mcnode_expectation2(
 **************************************************************/
 void mcnode_print(struct MCNode * n, FILE * fp, int prec)
 {
+    
+
     if (n == NULL){
         fprintf(fp,"NULL");
         return;
     }
-    else if (n->x == NULL){
+    else if (n->node == NULL){
         fprintf(fp,"NULL");
         return;
     }
 
     fprintf(fp,"Node is ");
-    for (size_t ii = 0; ii < n->d; ii++){
-        fprintf(fp,"%3.*G ",prec,n->x[ii]);
+    for (size_t ii = 0; ii < n->node->d; ii++){
+        fprintf(fp,"%3.*G ",prec,n->node->x[ii]);
     }
     fprintf(fp,"\n");
 
-    size_t N = 0;
-    if (n->neigh != NULL){
-        struct MCNList * temp = n->neigh;
-        while (temp != NULL){
-            N++;
-            temp = temp->next;
-        }
-    }
-    fprintf(fp,"Number of neighbors are %zu\n",N);
-    /* for (size_t ii = 0; ii < n->N; ii++){ */
-    /*     fprintf(fp,"\t"); */
-    /*     mcnode_print(n->neighbors[ii],fp,prec); */
-    /* } */
 }
 
 /** \struct MCA
@@ -907,847 +521,151 @@ size_t mca_get_du(struct MCA * mca)
 }
 
 /**********************************************************//**
-    Generate a node that is outside the boundays
+    Generate a node of the Markov chain
     
-    \param[in] mca  - markov chain approximation 
-    \param[in] time - time (not used)
-    \param[in] x    - current state
-    
-    \return node
+    \param[in]     mca    - markov chain approximation 
+    \param[in]     time   - time
+    \param[in]     node   - graph node information
+    \param[in]     u      - current control
+    \param[in,out] dt     - time step
+    \param[in,out] gdt    - gradient of time step
+    \param[in]     grad   - flag for specifying whether or not to
+                            compute gradients of transitions with 
+                            respect to control (NULL for no)
 **************************************************************/
 struct MCNode *
-mca_outbound_node(struct MCA * mca, double time, const double * x)
-{
-    (void)(time);
-    struct MCNode * mcn = mcnode_init(mca->d,x);
-    size_t du = mca_get_du(mca);
-    mcnode_init_self_grad(mcn,du);
-    return mcn;
-}
-
-/**********************************************************//**
-    Generate a node that is inside the boundarys and its 
-    transitions
-    
-    \param[in]     mca  - markov chain approximation 
-    \param[in]     time - time
-    \param[in]     x    - current state
-    \param[in]     u    - current control
-    \param[in,out] dt   - output transition time
-    \param[in,out] gdt  - allocated space for gradient of dt
-    \param[in]     grad - flag for specifying whether or not to
-                          compute gradients of transitions with
-                          respect to control (NULL for no)
-
-    \return node
-
-    \note 
-    No funny boundary conditions
-**************************************************************/
-struct MCNode *
-mca_inbound_node(struct MCA * mca, double time, const double * x,
-                 const double * u, double *dt,double * gdt, double *grad)
+mca_get_node2(struct MCA * mca, double time, struct Node * node,
+              const double * u, double * dt, double * gdt,
+              double *grad)
 {
 
     assert(mca->dyn != NULL);
     assert (mca->dw == mca->d);
 
-    struct MCNode * mcn = mcnode_init(mca->d,x);
-    
-    //double * probs = calloc_double(2*mca->d);
-    double * dQ = NULL;
+    size_t du = dyn_get_du(mca->dyn);
+
+    /* printf("alloc node\n"); */
+    struct MCNode * mcn = mcnode_alloc(node,du);
+    /* printf("allocated\n"); */
 
     int res;
-    size_t du = dyn_get_du(mca->dyn);
+    double * dQ = NULL;
     size_t ngrad = 0;
     if (grad != NULL){
         ngrad = du;
-        mcnode_init_self_grad(mcn,du);
-            
         //gprob = malloc_dd(2*mca->d);
-        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+        res = dyn_eval(mca->dyn,time,node->x,u,mca->drift,
                        mca->gdrift,mca->diff,mca->gdiff);
         dQ = calloc_double(du);
-
     }
     else{
-        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+        res = dyn_eval(mca->dyn,time,node->x,u,mca->drift,
                        NULL,mca->diff,NULL);
     }
 
-    assert(res == 0);
+
+    /* printf("drift = "); dprint(mca->d,mca->drift); */
     
-//    printf("got through first part\n");
-    double diff,t;
     double Qh = 0.0;
     double minh2 = pow(mca->minh,2);
     double hrel;
     for (size_t ii = 0; ii < mca->d; ii++){
-        // prepend the - and + nodes.
-        // mcn->neigh points to plus node
-        // mcn->neigh->next points to minus node
-        int map;
-        double xl, xr;
-        double xmap = outer_bound_dim(mca->bound,ii,x[ii]-mca->h[ii],&map);
-        if (map == 0){
-            xl = xmap;
-        }
-        else if (map == 1){ // left size periodic
-            xl = xmap - mca->h[ii];
-        }
-        else{
-            assert (1 == 0);
-        }
-
-        xmap = outer_bound_dim(mca->bound,ii,x[ii]+mca->h[ii],&map);
-        if (map == 0){
-            xr = xmap;
-        }
-        else if (map == 2){// right size periodic
-            xr = xmap + mca->h[ii];
-        }
-        else{
-            assert (1 == 0);
-        }
-
-        // xl = x[ii]-mca->h[ii]
-
-        mcnlist_prepend_empty(&(mcn->neigh),ii,-1,xl,ngrad);
-        mcnlist_prepend_empty(&(mcn->neigh),ii,1,xr,ngrad);
-        struct MCNList * node_plus = mcn->neigh;
-        struct MCNList * node_minus = mcn->neigh->next;
-            
         hrel = (minh2/mca->h[ii]);
-
-        diff = pow(mca->diff[ii*mca->d+ii],2);
-        // general case (also needs further modifications)
-        //diff = cblas_ddot(mca->dw,
-        //                  mca->diff+ii,mca->d,
-        //                  mca->diff+ii,mca->d);
-        t = pow(mca->minh/mca->h[ii],2);
+        double diff = pow(mca->diff[ii*mca->d+ii],2);
+        double t = pow(mca->minh/mca->h[ii],2);
+        /* printf("ii=%zu, hrel = %G\n",ii,hrel); */
         
-        node_minus->p = t * diff/2.0;
-        node_plus->p  = t * diff/2.0;
-
-        if (grad != NULL){
-            cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
-            cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                        node_plus->gradp,1);
-            cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                        node_minus->gradp,1);
-        }
-        
-        Qh += t*diff;
-        
-        if (mca->drift[ii] > 0){
-            node_plus->p += hrel * mca->drift[ii];
-            Qh += hrel*mca->drift[ii];
+        // minus node
+        if (node->use[2*ii] == 1){
+            mcn->pn[2*ii] = t * diff/2.0;
+            Qh += t/2.0*diff;
             if (grad != NULL){
-                cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,node_plus->gradp,1);
-                cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
-            }
-
-        }
-        else{
-            node_minus->p += hrel * (-mca->drift[ii]);
-            Qh += hrel * (-mca->drift[ii]);
-            if (grad != NULL){
-                cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,node_minus->gradp,1);
-                cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
-            }
-        }
-        // printf("%G\n",mcn->neigh->p);
-//        dprint(du,node_minus)
-    }
-
-//    printf("got through second part \n");
-//    printf("Qh = %G\n",Qh);
-    *dt = minh2 / Qh;
-
-    double pself = 1.0;
-    if (grad != NULL){
-        double Qh2 = pow(Qh,2);
-        for (size_t jj = 0; jj < du; jj++){
-//            printf("dQ[%zu]=%3.15G\n",jj,dQ[jj]);
-            gdt[jj] = -minh2 * dQ[jj] / Qh2;
-        }
-        struct MCNList * temp = mcn->neigh;
-        while (temp != NULL){
-            for (size_t jj = 0; jj < du; jj++){
-                temp->gradp[jj] = (Qh * temp->gradp[jj] - dQ[jj]*temp->p)/Qh2;
-            }
-            temp->p /= Qh;
-            pself -= temp->p;
-            
-            cblas_daxpy(du,-1.0,temp->gradp,1,mcn->gpself,1);
-            
-            temp = temp->next; 
-        }
-        free(dQ); dQ = NULL;
-    }
-    else{
-        struct MCNList * temp = mcn->neigh;
-        while (temp != NULL){
-            temp->p /= Qh;
-            pself -= temp->p;
-            temp = temp->next; 
-        }
-    }
-//    printf("got through last part\n");
-    if (pself < 0){
-        pself = 0.0;
-    }
-    mcnode_set_pself(mcn,pself);
-//    printf("return\n");
-    return mcn;
-}
-
-void mca_upwind_dim(struct MCA * mca, struct MCNode * mcn,
-                    const double * x, size_t ngrad,
-                    double minh2, double * Qh, double * dQ, size_t ii,
-                    double * grad)
-{
-    size_t du = mca_get_du(mca);
-    // prepend the - and + nodes.
-    // mcn->neigh points to plus node
-    // mcn->neigh->next points to minus node
-    mcnlist_prepend_empty(&(mcn->neigh),ii,-1,x[ii]-mca->h[ii],ngrad);
-    mcnlist_prepend_empty(&(mcn->neigh),ii,1,x[ii]+mca->h[ii],ngrad);
-    struct MCNList * node_plus = mcn->neigh;
-    struct MCNList * node_minus = mcn->neigh->next;
-            
-    double hrel = (minh2/mca->h[ii]);
-
-    double diff = pow(mca->diff[ii*mca->d+ii],2);
-    // general case (also needs further modifications)
-    //diff = cblas_ddot(mca->dw,
-    //                  mca->diff+ii,mca->d,
-    //                  mca->diff+ii,mca->d);
-    double t = pow(mca->minh/mca->h[ii],2);
-        
-    node_minus->p = t * diff/2.0;
-    node_plus->p  = t * diff/2.0;
-
-    if (grad != NULL){
-        cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
-        cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                    node_plus->gradp,1);
-        cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                    node_minus->gradp,1);
-    }
-        
-    *Qh += t*diff;
-        
-    if (mca->drift[ii] > 0){
-        node_plus->p += hrel * mca->drift[ii];
-        *Qh += hrel*mca->drift[ii];
-        if (grad != NULL){
-            cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,node_plus->gradp,1);
-            cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
-        }
-
-    }
-    else{
-        node_minus->p += hrel * (-mca->drift[ii]);
-        *Qh += hrel * (-mca->drift[ii]);
-        if (grad != NULL){
-            cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,node_minus->gradp,1);
-            cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
-        }
-    }    
-
-}
-
-/**********************************************************//**
-    Generate a node that is part of a reflective boundary and its 
-    transitions
-    
-    \param[in]     mca  - markov chain approximation 
-    \param[in]     time - time
-    \param[in]     x    - current state
-    \param[in]     u    - current control
-    \param[in,out] dt   - output transition time
-    \param[in,out] gdt  - allocated space for gradient of dt
-    \param[in]     grad - flag for specifying whether or not to
-                          compute gradients of transitions with
-                          respect to control (NULL for no)
-    \param[in]     bi   - boundary info
-
-    \return node
-
-    \note 
-    No funny boundary conditions
-**************************************************************/
-struct MCNode *
-mca_reflect_node(struct MCA * mca, double time, const double * x,
-                 const double * u, double *dt,double * gdt, double *grad,
-                 struct BoundInfo * bi)
-{
-
-
-    assert(mca->dyn != NULL);
-    assert (mca->dw == mca->d);
-
-    struct MCNode * mcn = mcnode_init(mca->d,x);
-    
-    //double * probs = calloc_double(2*mca->d);
-    double * dQ = NULL;
-
-    int res;
-    size_t du = dyn_get_du(mca->dyn);
-    size_t ngrad = 0;
-    if (grad != NULL){
-        ngrad = du;
-        mcnode_init_self_grad(mcn,du);
-            
-        //gprob = malloc_dd(2*mca->d);
-        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
-                       mca->gdrift,mca->diff,mca->gdiff);
-        dQ = calloc_double(du);
-
-    }
-    else{
-        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
-                       NULL,mca->diff,NULL);
-    }
-
-    if (res != 0){
-        fprintf(stderr, "Warning: exiting mca_reflect_node with NULL ");
-        fprintf(stderr, "because dynamics evaluated to an error\n");
-        fprintf(stderr, "\t x = ");
-        for (size_t ii = 0; ii < mca->d; ii++ ){
-            fprintf(stderr,"%G ",x[ii]);
-        }
-        fprintf(stderr,"\n\tControl = ");
-        for (size_t ii = 0; ii < du; ii++){
-            fprintf(stderr,"%G ",u[ii]);
-        }
-        fprintf(stderr,"\n");
-        fprintf(stderr,"\tBoundary info is ?????\n");
-        free(dQ); dQ = NULL;
-        mcnode_free(mcn); mcn = NULL;
-        return mcn;
-//        exit(1);
-    }
-
-    
-//    printf("got through first part\n");
-    /* printf("this node is reflecting "); */
-    /* dprint(mca->d,x); */
-    double Qh = 0.0;
-    double minh2 = pow(mca->minh,2);
-    double hrel;
-    for (size_t ii = 0; ii < mca->d; ii++){
-        //printf("ii=%zu\n",ii);
-        int on_bound = bound_info_onbound_dim(bi,ii);
-
-        if (on_bound == 0){
-            mca_upwind_dim(mca,mcn,x,ngrad,minh2,&Qh,dQ,ii,grad);
-        }
-        else{
-            // general case needs modification
-            double diff = pow(mca->diff[ii*mca->d+ii],2);
-            double t = pow(mca->minh/mca->h[ii],2);
-            Qh += t*diff;
-            hrel = (minh2/mca->h[ii]);
-            int reflect = bound_info_reflect(bi);
-            assert (reflect == 1);
-            int reflect_dir = bound_info_reflect_dim_dir(bi,ii);
-            //printf("before\n");
-            if (reflect_dir == -1){ // just do right side poition
-                mcnlist_prepend_empty(&(mcn->neigh),ii,1,x[ii]+mca->h[ii],ngrad);
-                struct MCNList * node_plus = mcn->neigh;
-                node_plus->p  = t * diff/2.0;
-
-                if (grad != NULL){
-                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                                dQ,1);
-                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                                node_plus->gradp,1);
-                }
-                if (mca->drift[ii] > 0){
-                    node_plus->p += hrel * mca->drift[ii];
-                    Qh += hrel*mca->drift[ii];
-                    if (grad != NULL){
-                        cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,
-                                    node_plus->gradp,1);
-                        cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
-                    }
-                }
-                else{
-                    Qh += hrel * (-mca->drift[ii]);
-                    if (grad != NULL){
-                        cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
-                    }
-                }
-            }
-            else{ // just do left side portion
-                mcnlist_prepend_empty(&(mcn->neigh),ii,-1,x[ii]-mca->h[ii],ngrad);
-                struct MCNList * node_minus = mcn->neigh;
-                node_minus->p  = t * diff/2.0;
-                if (grad != NULL){
-                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                                dQ,1);
-                    cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                                node_minus->gradp,1);
-                }
-                if (mca->drift[ii] < 0){
-                    node_minus->p += hrel * (-mca->drift[ii]);
-                    Qh += hrel * (-mca->drift[ii]);
-                    if (grad != NULL){
-                        cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,
-                                    node_minus->gradp,1);
-                        cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
-                    }
-                }
-                else{
-                    Qh += hrel*mca->drift[ii];
-                    if (grad != NULL){
-                        cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
-                    }
-                }
-            }
-        }
-    }
-
-    *dt = minh2 / Qh;
-    double pself = 1.0;
-    if (grad != NULL){
-        double Qh2 = pow(Qh,2);
-        for (size_t jj = 0; jj < du; jj++){
-            gdt[jj] = -minh2 * dQ[jj] / Qh2;
-        }
-        struct MCNList * temp = mcn->neigh;
-        while (temp != NULL){
-            for (size_t jj = 0; jj < du; jj++){
-                temp->gradp[jj] = (Qh * temp->gradp[jj] - dQ[jj]*temp->p)/Qh2;
-            }
-            temp->p /= Qh;
-            pself -= temp->p;
-            
-            cblas_daxpy(du,-1.0,temp->gradp,1,mcn->gpself,1);
-            
-            temp = temp->next; 
-        }
-        free(dQ); dQ = NULL;
-    }
-    else{
-        struct MCNList * temp = mcn->neigh;
-        while (temp != NULL){
-            temp->p /= Qh;
-            pself -= temp->p;
-            temp = temp->next; 
-        }
-    }
-    if (pself < 0){
-        pself = 0.0;
-    }
-    mcnode_set_pself(mcn,pself);
-    return mcn;
-}
-
-/**********************************************************//**
-    Generate a node that is part of a periodic boundary and its 
-    transitions
-    
-    \param[in]     mca  - markov chain approximation 
-    \param[in]     time - time
-    \param[in]     x    - current state
-    \param[in]     u    - current control
-    \param[in,out] dt   - output transition time
-    \param[in,out] gdt  - allocated space for gradient of dt
-    \param[in]     grad - flag for specifying whether or not to
-                          compute gradients of transitions with
-                          respect to control (NULL for no)
-    \param[in]     bi   - boundary info
-
-    \return node
-
-    \note 
-    No funny boundary conditions
-**************************************************************/
-struct MCNode *
-mca_period_node(struct MCA * mca, double time, const double * x,
-                const double * u, double *dt,double * gdt, double *grad,
-                struct BoundInfo * bi)
-{
-
-
-    assert(mca->dyn != NULL);
-    assert (mca->dw == mca->d);
-
-    struct MCNode * mcn = mcnode_init(mca->d,x);
-    
-    //double * probs = calloc_double(2*mca->d);
-    double * dQ = NULL;
-
-    int res;
-    size_t du = dyn_get_du(mca->dyn);
-    size_t ngrad = 0;
-    if (grad != NULL){
-        ngrad = du;
-        mcnode_init_self_grad(mcn,du);
-            
-        //gprob = malloc_dd(2*mca->d);
-        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
-                       mca->gdrift,mca->diff,mca->gdiff);
-        dQ = calloc_double(du);
-    }
-    else{
-        res = dyn_eval(mca->dyn,time,x,u,mca->drift,
-                       NULL,mca->diff,NULL);
-    }
-
-    assert(res == 0);
-    
-//    printf("got through first part\n");
-    /* printf("this node is reflecting "); */
-    /* dprint(mca->d,x); */
-    double Qh = 0.0;
-    double minh2 = pow(mca->minh,2);
-    double hrel;
-    for (size_t ii = 0; ii < mca->d; ii++){
-
-        int on_bound = bound_info_onbound_dim(bi,ii);
-        /* printf("ii=%zu\n",ii); */
-        /* printf("\t on bound=%d\n",on_bound); */
-        if (on_bound == 0){
-            mca_upwind_dim(mca,mcn,x,ngrad,minh2,&Qh,dQ,ii,grad);
-        }
-        else{
-            // general case needs modification
-            double diff = pow(mca->diff[ii*mca->d+ii],2);
-            double t = pow(mca->minh/mca->h[ii],2);
-            Qh += t*diff;
-            hrel = (minh2/mca->h[ii]);
-            int period = bound_info_period(bi);
-            assert (period == 1);
-            int period_dir = bound_info_period_dim_dir(bi,ii);
-            double xmap = bound_info_period_xmap(bi,ii);
-            /* printf("period_dir= %d \n",period_dir); */
-            if (period_dir == -1){ // left maps to something
-                mcnlist_prepend_empty(&(mcn->neigh),ii,-1,xmap-mca->h[ii],ngrad);
-                mcnlist_prepend_empty(&(mcn->neigh),ii,1,x[ii]+mca->h[ii],ngrad);
-
-            }
-            else{ // just do left side portion
-                /* printf("should be here  xmap=%G\n",xmap); */
-                mcnlist_prepend_empty(&(mcn->neigh),ii,-1,x[ii]-mca->h[ii],ngrad);
-                mcnlist_prepend_empty(&(mcn->neigh),ii,1,xmap+mca->h[ii],ngrad);
-            }
-
-            /* printf("\t mcn->neigh->dir=%zu\n",mcn->neigh->dir); */
-            /* printf("\t mcn->neigh->vval=%G\n",mcn->neigh->val); */
-            /* printf("\t mcn->neigh->next->dir=%zu\n",mcn->neigh->next->dir); */
-            /* printf("\t mcn->neigh->next->dir=%G\n",mcn->neigh->next->val); */
-
-            struct MCNList * node_plus = mcn->neigh;
-            struct MCNList * node_minus = mcn->neigh->next;
-            node_minus->p = t * diff/2.0;
-            node_plus->p  = t * diff/2.0;
-
-            if (grad != NULL){
-                cblas_daxpy(du,t*2.0,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
+                cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
                 cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                            node_plus->gradp,1);
-                cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
-                            node_minus->gradp,1);
+                            mcn->gradpn + (2*ii)*du,1);
             }
-        
-            if (mca->drift[ii] > 0){
-                node_plus->p += hrel * mca->drift[ii];
-                Qh += hrel*mca->drift[ii];
-                if (grad != NULL){
-                    cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,node_plus->gradp,1);
-                    cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
-                }
-
-            }
-            else{
-                node_minus->p += hrel * (-mca->drift[ii]);
+            if (mca->drift[ii] <= 0){
+                /* printf("drift less than zero\n"); */
+                mcn->pn[2*ii] += hrel * (-mca->drift[ii]);
                 Qh += hrel * (-mca->drift[ii]);
                 if (grad != NULL){
-                    cblas_daxpy(du,-hrel,mca->gdrift+ii,
-                                mca->d,node_minus->gradp,1);
+
+                    cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,mcn->gradpn + (2*ii)*du,1);
                     cblas_daxpy(du,-hrel,mca->gdrift+ii,mca->d,dQ,1);
+                    /* printf("computed gradpn = "); */
+                    /* dprint(du,mcn->gradpn + 2*ii*du); */
+                }
+            }
+        }
+
+        // plus node
+        if (node->use[2*ii+1] == 1){
+            mcn->pn[2*ii+1] = t * diff/2.0;
+            Qh += t/2.0*diff;
+            if (grad != NULL){
+                cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,dQ,1);
+                cblas_daxpy(du,t,mca->gdiff+ii*mca->d+ii,mca->d*mca->dw,
+                            mcn->gradpn + (2*ii+1)*du,1);
+            }
+            if (mca->drift[ii] > 0){
+                /* printf("drift greather than zero\n"); */
+                mcn->pn[2*ii+1] += hrel * mca->drift[ii];
+                Qh += hrel*mca->drift[ii];
+                if (grad != NULL){
+                    cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,mcn->gradpn + (2*ii+1)*du,1);
+                    cblas_daxpy(du,hrel,mca->gdrift+ii,mca->d,dQ,1);
+                    /* printf("computed gradpn = "); */
+                    /* dprint(du,mcn->gradpn + (2*ii+1)*du); */
                 }
             }
         }
     }
+
+    if (fabs(Qh) < 1e-14){
+        *dt = 0;
+        mcn->p = 1.0;
+        free(dQ); dQ = NULL;
+        return mcn;
+    }
+    // dela with normalization
     *dt = minh2 / Qh;
-    double pself = 1.0;
+    mcn->p = 1.0;
     if (grad != NULL){
         double Qh2 = pow(Qh,2);
         for (size_t jj = 0; jj < du; jj++){
             gdt[jj] = -minh2 * dQ[jj] / Qh2;
         }
-        struct MCNList * temp = mcn->neigh;
-        while (temp != NULL){
-            for (size_t jj = 0; jj < du; jj++){
-                temp->gradp[jj] = (Qh * temp->gradp[jj] - dQ[jj]*temp->p)/Qh2;
+        for (size_t ii = 0; ii < 2*mca->d; ii++){
+            if (node->use[ii] == 1){
+                for (size_t jj = 0; jj < du; jj++){
+                    mcn->gradpn[ii*du+jj] = (Qh * mcn->gradpn[ii*du+jj] - dQ[jj]*mcn->pn[ii])/Qh2;
+                }
+                mcn->pn[ii] /= Qh;
+                mcn->p -= mcn->pn[ii];
+                cblas_daxpy(du,-1.0,mcn->gradpn+ii*du,1,mcn->gradp,1);
             }
-            temp->p /= Qh;
-            pself -= temp->p;
-            
-            cblas_daxpy(du,-1.0,temp->gradp,1,mcn->gpself,1);
-            
-            temp = temp->next; 
         }
         free(dQ); dQ = NULL;
     }
     else{
-        struct MCNList * temp = mcn->neigh;
-        while (temp != NULL){
-            temp->p /= Qh;
-            pself -= temp->p;
-            temp = temp->next; 
+        for (size_t ii = 0; ii < 2*mca->d; ii++){
+            if (node->use[ii] == 1){
+                mcn->pn[ii] /= Qh;
+                mcn->p -= mcn->pn[ii];
+            }
         }
     }
-    if (pself < 0){
-        pself = 0.0;
-    }
-    mcnode_set_pself(mcn,pself);
-    /* printf("mcn->neigh == NULL? = %d\n",mcn->neigh==NULL); */
+
+    /* printf("u = "); dprint(du,u); */
+    /* printf("transition probabilities are "); */
+    /* dprint(2*mca->d,mcn->pn); */
+    /* printf("grad == NULL = %d\n", grad == NULL); */
+    /* printf("gradients are\n"); */
+    /* for (size_t ii = 0; ii < 2*mca->d; ii++){ */
+    /*     dprint(du,mcn->gradpn+ii*du); */
+    /* } */
+
     return mcn;
-}
-
-/**********************************************************//**
-    Generate a node of the Markov chain
-    
-    \param[in]     mca    - markov chain approximation 
-    \param[in]     time   - time
-    \param[in]     x      - current state
-    \param[in]     u      - current control
-    \param[in,out] dt     - time step
-    \param[in,out] gdt    - gradient of time step
-    \param[in,out] bi     - boundary info
-    \param[in]     grad   - flag for specifying whether or not to
-                            compute gradients of transitions with 
-                            respect to control (NULL for no)
-**************************************************************/
-struct MCNode *
-mca_get_node(struct MCA * mca, double time, const double * x,
-             const double * u, double * dt, double * gdt,
-             struct BoundInfo ** bi,
-             double *grad)
-{
-
-    *bi = boundary_type(mca->bound,time,x);
-    struct MCNode * mcn = NULL;
-    
-
-    /* printf("get node\n"); dprint(mca->d, x); */
-    int onbound = bound_info_onbound(*bi);
-    /* printf("onbound = %d\n",onbound); */
-    
-    if (onbound == 0){
-        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad);
-    }
-    else{
-        int absorb = bound_info_absorb(*bi);
-        //      printf("absorb = %d\n",absorb);
-        if (absorb == 1){
-            *dt = 0;
-            if (gdt != NULL){
-                for (size_t ii = 0; ii < mca->du; ii++){
-                    gdt[ii] = 0.0;
-                }
-            }
-            mcn = mca_outbound_node(mca,time,x);            
-        }
-        else{
-            int reflect = bound_info_reflect(*bi);
-            if (reflect != 0){
-//                assert (1 == 0);
-                mcn = mca_reflect_node(mca,time,x,u,dt,gdt,grad,*bi);
-            }
-            else{
-                int period = bound_info_period(*bi);
-                if (period != 0){
-                    /* printf("periodic\n"); */
-                    /* assert (1 == 0); */
-                    mcn = mca_period_node(mca,time,x,u,dt,gdt,grad,*bi);
-                }
-                else{
-                    fprintf(stderr,"Not sure what to do with this node\n");
-                    printf("onbound = %d\n",onbound);
-                    dprint(mca->d,x);
-                    exit(1);                
-                }
-            }
-        }
-    }
-    // printf("got node\n");
-    //bound_info_free(bi); bi = NULL;
-    return mcn;
-}
-/**********************************************************//**
-    Generate a node of the Markov chain
-    
-    \param[in]     mca    - markov chain approximation 
-    \param[in]     time   - time
-    \param[in]     x      - current state
-    \param[in]     u      - current control
-    \param[in,out] dt     - time step
-    \param[in,out] gdt    - gradient of time step
-    \param[in,out] bi     - boundary info
-    \param[in]     grad   - flag for specifying whether or not to
-                            compute gradients of transitions with 
-                            respect to control (NULL for no)
-**************************************************************/
-struct MCNode *
-mca_get_node2(struct MCA * mca, double time, const double * x,
-             const double * u, double * dt, double * gdt,
-             struct BoundInfo * bi,
-             double *grad)
-{
-
-    struct MCNode * mcn = NULL;
-    
-
-    /* printf("get node\n"); dprint(mca->d, x); */
-    int onbound = bound_info_onbound(bi);
-    /* printf("onbound = %d\n",onbound); */
-    
-    if (onbound == 0){
-        mcn = mca_inbound_node(mca,time,x,u,dt,gdt,grad);
-    }
-    else{
-        int absorb = bound_info_absorb(bi);
-        //      printf("absorb = %d\n",absorb);
-        if (absorb == 1){
-            *dt = 0;
-            if (gdt != NULL){
-                for (size_t ii = 0; ii < mca->du; ii++){
-                    gdt[ii] = 0.0;
-                }
-            }
-            mcn = mca_outbound_node(mca,time,x);            
-        }
-        else{
-            int reflect = bound_info_reflect(bi);
-            if (reflect != 0){
-//                assert (1 == 0);
-                mcn = mca_reflect_node(mca,time,x,u,dt,gdt,grad,bi);
-            }
-            else{
-                int period = bound_info_period(bi);
-                if (period != 0){
-                    /* printf("periodic\n"); */
-                    /* assert (1 == 0); */
-                    mcn = mca_period_node(mca,time,x,u,dt,gdt,grad,bi);
-                }
-                else{
-                    fprintf(stderr,"Not sure what to do with this node\n");
-                    printf("onbound = %d\n",onbound);
-                    dprint(mca->d,x);
-                    exit(1);                
-                }
-            }
-        }
-    }
-    // printf("got node\n");
-    //bound_info_free(bi); bi = NULL;
-    return mcn;
-}
-
-/**********************************************************//**
-    Compute expectation of a function
-    
-    \param[in]     mca  - markov chain approximation 
-    \param[in]     time - time
-    \param[in]     x    - current state
-    \param[in]     u    - current control
-    \param[in,out] dt   - time step
-    \param[in]     f    - function(npts,times,states,out,arg)
-    \param[in,out] arg  - function arguments
-    \param[in,out] bi   - boundary information
-    \param[in,out] grad - gradient
-    \param[in,out] info - 0 if successfull 1 if error
-
-    \return expectation of f
-**************************************************************/
-double
-mca_expectation(struct MCA * mca, double time,
-                const double * x, const double * u, double * dt, double * gdt,
-//              void (*f)(size_t,double *,double **,double*,void*),
-                double (*f)(double,const double *,void*),
-                void * arg, struct BoundInfo ** bi, double * grad,
-                int * info)
-{
-
-//    printf("compute expectation\n");
-    struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,bi,grad);
-    double val = 0.0;
-    if (mcn == NULL){
-        fprintf(stderr, "Warning: MCNode obtained in mca_expectation is NULL\n");
-        fprintf(stderr, "\tx = ");
-        for (size_t ii = 0; ii < mca->d; ii++ ){
-            fprintf(stderr,"%G ",x[ii]);
-        }
-        fprintf(stderr,"\n\tControl = ");
-        for (size_t ii = 0; ii < mca->du; ii++){
-            fprintf(stderr,"%G ",u[ii]);
-        }
-        fprintf(stderr,"\n");
-        fprintf(stderr,"\tBoundary info is ?????\n");
-        *info = 1;
-    }
-    else{
-        val = mcnode_expectation(mcn,f,arg,grad);
-        mcnode_free(mcn); mcn = NULL;
-        *info = 0;
-    }
-    return val;
-}
-
-/**********************************************************//**
-    Compute expectation of a cost function
-    
-    \param[in]     mca  - markov chain approximation 
-    \param[in]     time - time
-    \param[in]     x    - current state
-    \param[in]     u    - current control
-    \param[in,out] dt   - time step
-    \param[in]     cost - 
-    \param[in,out] bi   - boundary information
-    \param[in,out] grad - gradient
-    \param[in,out] info - 0 if successfull 1 if error
-
-    \return expectation of f
-**************************************************************/
-double
-mca_expectation_cost(struct MCA * mca, double time,
-                     const double * x, const double * u,
-                     double * dt, double * gdt,
-//                void (*f)(size_t,double *,double **,double*,void*),
-                     struct Cost * cost, struct BoundInfo ** bi, double * grad,
-                     int * info)
-{
-
-//    printf("compute expectation\n");
-    struct MCNode * mcn = mca_get_node(mca,time,x,u,dt,gdt,bi,grad);
-    double val = 0.0;
-    if (mcn == NULL){
-        fprintf(stderr, "Warning: MCNode obtained in mca_expectation is NULL\n");
-        fprintf(stderr, "\tx = ");
-        for (size_t ii = 0; ii < mca->d; ii++ ){
-            fprintf(stderr,"%G ",x[ii]);
-        }
-        fprintf(stderr,"\n\tControl = ");
-        for (size_t ii = 0; ii < mca->du; ii++){
-            fprintf(stderr,"%G ",u[ii]);
-        }
-        fprintf(stderr,"\n");
-        fprintf(stderr,"\tBoundary info is ?????\n");
-        *info = 1;
-    }
-    else{
-        val = mcnode_expectation_cost(mcn,cost,grad);
-        mcnode_free(mcn); mcn = NULL;
-        *info = 0;
-    }
-    return val;
 }
 
 /**********************************************************//**
@@ -1758,24 +676,37 @@ mca_expectation_cost(struct MCA * mca, double time,
     \param[in]     node - current state with cost info for neighbors
     \param[in]     u    - current control
     \param[in,out] dt   - time step
-    \param[in,out] bi   - boundary information
     \param[in,out] grad - gradient
     \param[in,out] info - 0 if successfull 1 if error
 
     \return expectation of f
 **************************************************************/
 double
-mca_expectation_cost2(struct MCA * mca, double time, struct Node * node,
+mca_expectation_cost2(struct MCA * mca, double time,
+                      struct Node * node,
                       const double * u,
                       double * dt, double * gdt,
-//                void (*f)(size_t,double *,double **,double*,void*),
-                      struct BoundInfo * bi, double * grad,
+                      double * grad,
                       int * info)
 {
 
 //    printf("compute expectation\n");
     double * x = node->x;
-    struct MCNode * mcn = mca_get_node2(mca,time,x,u,dt,gdt,bi,grad);
+    if (grad != NULL){
+        int res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+                           mca->gdrift,mca->diff,mca->gdiff);
+        assert (res == 0);
+    }
+    else{
+        int res = dyn_eval(mca->dyn,time,x,u,mca->drift,
+                           NULL,mca->diff,NULL);
+        assert (res == 0);
+    }
+
+    /* printf("get mcn\n"); */
+    struct MCNode * mcn = mca_get_node2(mca,time,node,u,dt,gdt,grad);
+    /* printf("got it\n"); */
+
     double val = 0.0;
     if (mcn == NULL){
         fprintf(stderr, "Warning: MCNode obtained in mca_expectation is NULL\n");
@@ -1792,7 +723,9 @@ mca_expectation_cost2(struct MCA * mca, double time, struct Node * node,
         *info = 1;
     }
     else{
-        val = mcnode_expectation2(mcn,node,grad);
+        /* printf("compute mcnode expectation\n"); */
+        val = mcnode_expectation2(mcn,grad);
+        /* printf("computed\n"); */
         mcnode_free(mcn); mcn = NULL;
         *info = 0;
     }
@@ -1974,27 +907,27 @@ mca_expectation_cost2(struct MCA * mca, double time, struct Node * node,
 
     \return Array of N nodes set to NULL;
 **************************************************************/
-struct MCNode ** mcnode_alloc_array(size_t N)
-{
-    struct MCNode ** mcn;
-    mcn = malloc(N * sizeof(struct MCNode *));
-    assert (mcn != NULL);
-    for (size_t ii = 0; ii < N; ii++){
-        mcn[ii] = NULL;
-    }
+/* struct MCNode ** mcnode_alloc_array(size_t N) */
+/* { */
+/*     struct MCNode ** mcn; */
+/*     mcn = malloc(N * sizeof(struct MCNode *)); */
+/*     assert (mcn != NULL); */
+/*     for (size_t ii = 0; ii < N; ii++){ */
+/*         mcn[ii] = NULL; */
+/*     } */
     
-    return mcn;
-}
+/*     return mcn; */
+/* } */
 
 /**********************************************************//**
     Free an array of N nodes
 **************************************************************/
-void mcnode_free_array(struct MCNode ** mcn, size_t N)
-{
-    if (mcn != NULL){
-        for (size_t ii = 0; ii < N; ii++){
-            mcnode_free(mcn[ii]); mcn[ii] = NULL;
-        }
-        //free(mcn); mcn = NULL;
-    }
-}
+/* void mcnode_free_array(struct MCNode ** mcn, size_t N) */
+/* { */
+/*     if (mcn != NULL){ */
+/*         for (size_t ii = 0; ii < N; ii++){ */
+/*             mcnode_free(mcn[ii]); mcn[ii] = NULL; */
+/*         } */
+/*         //free(mcn); mcn = NULL; */
+/*     } */
+/* } */
