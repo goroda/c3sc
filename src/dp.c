@@ -513,6 +513,7 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
         /*     ind =  */
         /* } */
         
+        /* printf("serialized value\n"); */
         char * ser = serialize_darray_to_text(dx,(double *)dpx.node->x);
         char * sval = lookup_key(ip->fm[0],ser);
         /* if (1 == 0){ */
@@ -531,11 +532,36 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
             assert (opt != NULL);
             assert (cost != NULL);
             assert (mca != NULL);
-            double val = 0.0;
-            /* c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx); */
+
             c3opt_add_objective(opt,dpih_bellman_evalu,&dpx);
-            /* printf("minimize \n"); */
+            double * lb = c3opt_get_lb(opt);
+            double * ub = c3opt_get_ub(opt);
+
+            double * utemp = calloc_double(du);
+            size_t nsamples = 100;
+            double mincost = c3opt_eval(opt,utemp,NULL);
+            for (size_t kk = 0; kk < nsamples; kk++){
+                for (size_t ii = 0; ii < du; ii++){
+                    utemp[ii] = (ub[ii]-lb[ii])*randu() + lb[ii];
+                }
+                double out = c3opt_eval(opt,utemp,NULL);
+                /* printf("(cost = %G for control \n \t",out); */
+                /* dprint(du,utemp);  */
+                if (out < mincost){
+                    mincost = out;
+                    memmove(u,utemp,du*sizeof(double));
+                }
+            }
+            double val = 0.0;
             int res = c3opt_minimize(opt,u,&val);
+
+            /* printf("minimized res=%d,val=%G,mincost=%G\n",res,val,mincost); */
+            /* assert (val <= mincost); */
+            /* dprint(du,u); */
+            free(utemp); utemp = NULL;
+
+            /* printf("minimize \n"); */
+            /* int res = c3opt_minimize(opt,u,&val); */
             /* printf("minimized!\n"); */
             if (res < -1){
                 printf("max iter reached in optimization res=%d\n",res);
@@ -569,11 +595,38 @@ int implicit_policy_eval(struct ImplicitPolicy * ip,double t,
         assert (opt != NULL);
         assert (cost != NULL);
         assert (mca != NULL);
-        double val = 0.0;
-        /* c3opt_add_objective(opt,dpih_rhs_opt_bb,&dpx); */
+
         c3opt_add_objective(opt,dpih_bellman_evalu,&dpx);
-        /* printf("minimize \n"); */
-        int res = c3opt_minimize(opt,u,&val);
+        double * lb = c3opt_get_lb(opt);
+        double * ub = c3opt_get_ub(opt);
+
+        double * utemp = calloc_double(du);
+        size_t nsamples = 1000;
+        double mincost = c3opt_eval(opt,utemp,NULL);
+        for (size_t kk = 0; kk < nsamples; kk++){
+            for (size_t ii = 0; ii < du; ii++){
+                utemp[ii] = (ub[ii]-lb[ii])*randu() + lb[ii];
+            }
+            double out = c3opt_eval(opt,utemp,NULL);
+            /* printf("(cost = %G for control \n \t",out); */
+            /* dprint(du,utemp);  */
+            if (out < mincost){
+                mincost = out;
+                memmove(u,utemp,du*sizeof(double));
+            }
+        }
+        /* double val = 0.0; */
+        /* int res = c3opt_minimize(opt,u,&val); */
+
+        /* printf("minimized res = %d, val = %G, mincost = %G\n",res,val,mincost); */
+        /* assert (val <= mincost); */
+        /* dprint(du,u); */
+        int res = 1;
+        double val = mincost;
+        free(utemp); utemp = NULL;
+
+        /* /\* printf("minimize \n"); *\/ */
+        /* int res = c3opt_minimize(opt,u,&val); */
         /* printf("minimized!\n"); */
         if (res < -1){
             printf("max iter reached in optimization res=%d\n",res);

@@ -120,9 +120,9 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 36; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e0;
-    double vspeed = 1e0;
-    double vspeed_last = 1e0;
+    double vpos = 1e-1;
+    double vspeed = 1e-1;
+    double vspeed_last = 1e-1;
 
     out[0] = vpos;
     out[7] = vpos;
@@ -153,18 +153,18 @@ int stagecost(double t,const double * x,const double * u, double * out,
 
     // controls
 //    double c = 37.18;
-    double wu1 = 1e0;
-    double wu2 = 1e0;
-    double wu3 = 1e0;
+    double wu1 = 1e-1;
+    double wu2 = 1e-1;
+    double wu3 = 1e-1;
     *out = *out + wu1 * pow(u[0],2) + wu2 * pow(u[1],2) +
                                         wu3 * pow(u[2],2);
-    *out += 5e0;
-    /* *out += pow(x[0],2); */
-    *out += 10.0*pow(x[1],2);
-    /* *out += pow(x[2],2); */
-    *out += 0.5*pow(x[3],2);
-    *out += 0.5*pow(x[4],2);
-    *out += 0.5*pow(x[5],2);
+    /* *out += 1e0; */
+    *out += 100.0*pow(x[0],2);
+    *out += 20.0*pow(x[1],2);
+    *out += 10.0*pow(x[2],2);
+    *out += pow(x[3],2);
+    *out += pow(x[4],2);
+    *out += pow(x[5],2);
 
     //*out = 5.0;
     
@@ -191,9 +191,10 @@ int boundcost(double t, const double * x, double * out)
 
 int ocost(const double * x,double * out)
 {
+    /* printf("absorbed \n"); */
     /* dprint(6,x); */
     (void)(x);
-    *out = -1e2;
+    *out = 0.0;
     return 0;
 }
 
@@ -201,7 +202,7 @@ double startcost(const double * x, void * args)
 {
     (void)(args);
     (void)(x);
-    return 1.0;
+    return 1e3;
 }
 
 int main(int argc, char * argv[])
@@ -304,9 +305,9 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-8);
-    c3opt_set_relftol(opt,1e-8);
-    c3opt_set_gtol(opt,1e-8);
+    c3opt_set_absxtol(opt,1e-15);
+    c3opt_set_relftol(opt,1e-15);
+    c3opt_set_gtol(opt,1e-15);
     
     c3opt_ls_set_maxiter(opt,200);
     c3opt_ls_set_alpha(opt,0.1);
@@ -317,10 +318,10 @@ int main(int argc, char * argv[])
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-5);
-    approx_args_set_round_tol(aargs,1e-5);
+    approx_args_set_round_tol(aargs,1e-10);
     approx_args_set_kickrank(aargs,15);
-    approx_args_set_maxrank(aargs,5);
-    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,10);
+    approx_args_set_startrank(aargs,10);
 
     double beta = 1.0;
 
@@ -340,7 +341,7 @@ int main(int argc, char * argv[])
     }
     double center[6] = {0.0,0.0,0.0,0.0,0.0};
     /* double width[6] = {ub[0]-lb[0],ub[1]-lb[1],ub[2]-lb[2],0.4,0.4,0.2}; */
-    double width[6] = {0.2, 0.2, 0.2, 1.0, 1.0, 1.0};
+    double width[6] = {0.2, 0.2, 0.2, 0.25, 0.25, 0.2};
     /* dprint(6,width); */
     /* c3sc_add_obstacle(sc,center,width); */
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
@@ -364,14 +365,14 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     for (size_t ii = 0; ii < niter; ii++){
 
-        /* if (ii > 0){ */
-        /*     c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs); */
-        /* } */
+        if (ii > 2){
+            c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
+        }
         double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
 
         struct Cost * cost = c3sc_get_cost(sc);
-        /* int saved = cost_save(cost,"saved_cost.dat"); */
-        /* assert (saved == 0); */
+        int saved = cost_save(cost,"saved_cost.dat");
+        assert (saved == 0);
 
         size_t * ranks = cost_get_ranks(cost);
         double normval = cost_norm2(cost);
@@ -380,21 +381,21 @@ int main(int argc, char * argv[])
             iprint_sz(7,ranks);
         }
         sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
-        /* int dres = c3sc_diagnostic_save(diag,filename,4); */
-        /* assert (dres == 0); */
+        int dres = c3sc_diagnostic_save(diag,filename,4);
+        assert (dres == 0);
         if (diff < 1e-2){
             break;
         }
     }
-    exit(1);
+    /* exit(1); */
     struct Cost * cost = c3sc_get_cost(sc);
     int saved = cost_save(cost,"saved_cost.dat");
     assert (saved == 0);
     /* exit(1); */
 
-    /* sprintf(filename,"%s/%s.dat",dirout,"diagnostic"); */
-    /* int dres = c3sc_diagnostic_save(diag,filename,4); */
-    /* assert (dres == 0); */
+    sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
+    int dres = c3sc_diagnostic_save(diag,filename,4);
+    assert (dres == 0);
 
     struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
 //    printf("created policy\n");
@@ -404,12 +405,13 @@ int main(int argc, char * argv[])
         integrator_create_controlled(6,3,f1,NULL,implicit_policy_controller,pol);
     integrator_set_type(ode_sys,odename);
     /* integrator_set_adaptive_opts(ode_sys,1e-5,1e-2,1e-7); */
-    integrator_set_dt(ode_sys,1e-4);
+    integrator_set_dt(ode_sys,1e-3);
     integrator_set_verbose(ode_sys,0);
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-    double state[6] = {-0.2, 0.3, 0.0, 0.4, 0.4, 0.04};
+    /* double state[6] = {0.3, 0.2, 0.1, 0.1, 0.1, 0.02}; */
+    double state[6] = {0.3, 0.2, 0.1, 0.0, 0.0, 0.0};
 //    double state[6] = {0.1, 0.6, -0.2, 0.4, 0.2, 0.04};
     double con[3] = {0.0, 0.0, 0.0};
 
@@ -418,8 +420,8 @@ int main(int argc, char * argv[])
     trajectory_add(&traj,6,3,time,state,con);
     printf("initialized trajectory\n");
 
-    double final_time = 3.0;
-    double dt = 3e-3;
+    double final_time = 1.0;
+    double dt = 1e-2;
     int res;
     while (time < final_time){
         /* printf("time = %G\n",time); */

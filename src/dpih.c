@@ -404,22 +404,56 @@ double dpih_bellman_minimize(const double * x,void * dp)
     /* printf("node->cost = "); dprint(2*dx,node->cost); */
     dpx.node = node;
     dpx.bi = bi;
-    
-    double * ustart = calloc_double(du);
-    /* ustart[0] = 0.001; */
-    
-    double val = 0.0;
-    struct c3Opt * opt = dpx.dp->opt;
+
+    struct c3Opt * opt = dpx.dp->opt;    
     c3opt_add_objective(opt,dpih_bellman_evalu,&dpx);
+
+    double * ustart = calloc_double(du);
+    double * utemp = calloc_double(du);
+    double * lb = c3opt_get_lb(opt);
+    double * ub = c3opt_get_ub(opt);
+
+    size_t nsamples = 20;
+    for (size_t ii = 0; ii < du; ii++){
+        utemp[ii] = (ub[ii]-lb[ii])*randu() + lb[ii];
+    }
+    double mincost = c3opt_eval(opt,utemp,NULL);;
+    memmove(ustart,utemp,du*sizeof(double));
+    /* printf("(cost = %G for control \n \t",mincost); */
+    /* dprint(du,utemp); */
+    for (size_t kk = 0; kk < nsamples; kk++){
+      
+        for (size_t ii = 0; ii < du; ii++){
+            utemp[ii] = (ub[ii]-lb[ii])*randu() + lb[ii];
+        }
+        double out = c3opt_eval(opt,utemp,NULL);
+        /* printf("(cost = %G for control \n \t",out); */
+        /* dprint(du,utemp); */
+        if (out < mincost){
+            mincost = out;
+            memmove(ustart,utemp,du*sizeof(double));
+        }
+
+    }
+
+    double val = mincost;
+    int res = 1;
+    /* double val = 0.0; */
+    /* printf("ustart = "); */
+    /* dprint(du,ustart); */
+    /* int res = c3opt_minimize(opt,ustart,&val); */
+    /* printf("minimized res = %d,val = %G,mincost=%G\n",res,val,mincost); */
+    /* dprint(du,ustart); */
+    /* assert (val <= mincost); */
+    free(utemp); utemp = NULL;
+    /* exit(1); */
+
 
 //    printf("before = ");
 //    dprint(dx,x);
 
     /* printf("do minimize\n"); */
-    int res = c3opt_minimize(opt,ustart,&val);
-    /* printf("minimized res = %d, val = %G\n",res,val); */
-    /* dprint(du,ustart); */
-    /* exit(1); */
+
     if (res < -1){
         printf("max iter reached in optimization res=%d\n",res);
 

@@ -189,7 +189,8 @@ int stagecost(double t,const double * x,const double * u, double * out,
     // states
     *out += 20.0 * x[0]*x[0];
     *out += 50.0 * x[1]*x[1];
-    *out += 10.0 * x[2]*x[2];
+    /* *out += 10.0 * x[2]*x[2]; // original */
+    *out +=  1.0 * x[2]*x[2]; 
     *out +=  1.0 * x[3]*x[3];
     *out +=  1.0 * x[4]*x[4];
     *out +=  1.0 * x[5]*x[5];
@@ -209,14 +210,14 @@ int boundcost(double t,const double * x, double * out)
     /* printf("not here!!\n"); */
     (void)(t);
     *out = 0.0;
-//    *out += 600.0    * x[0]*x[0]; // original
-    *out += 400.0    * x[0]*x[0];
-//    *out += 400.0    * x[1]*x[1];// original
-    *out += 800.0    * x[1]*x[1];
+    *out += 600.0    * x[0]*x[0]; // original
+    /* *out += 400.0    * x[0]*x[0]; */
+    *out += 400.0    * x[1]*x[1];// original
+    /* *out += 800.0    * x[1]*x[1]; */
     *out += 1.0/9.0  * x[2]*x[2];
     *out += 1.0/9.0  * x[3]*x[3];
-//    *out +=  1.0     * x[4]*x[4]; // original
-    *out +=  100.0     * x[4]*x[4];
+    *out +=  1.0     * x[4]*x[4]; // original
+    /* *out +=  100.0     * x[4]*x[4]; */
     *out +=  1.0     * x[5]*x[5]; // original
     *out += 1.0/9.0  * (x[6]+0.5)*(x[6]+0.5);
     
@@ -311,13 +312,13 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,2e-2);
-    approx_args_set_round_tol(aargs,1e-8);
-    approx_args_set_kickrank(aargs,6);
-    approx_args_set_maxrank(aargs,10);
-    approx_args_set_startrank(aargs,10);
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_maxrank(aargs,5);
+    approx_args_set_startrank(aargs,5);
 
-    double beta = 0.0;
+    double beta = 1.0;
 
     /* double * xt = linspace(lb[4],ub[4],N); */
     /* dprint(N,xt); */
@@ -390,19 +391,21 @@ int main(int argc, char * argv[])
         integrator_create_controlled(7,1,f1,NULL,implicit_policy_controller,pol);
     integrator_set_type(ode_sys,odename);
     /* integrator_set_adaptive_opts(ode_sys,1e-5,1e-2,1e-7); */
-    integrator_set_dt(ode_sys,1e-2);
+    integrator_set_dt(ode_sys,1e-4);
     integrator_set_verbose(ode_sys,0);
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-    double state[7] = {-2.8, -0.2, 0.0, 0.0, 6.0, 0.0, 0.0};
-//    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
+    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
+    /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 6.0, 0.0, 0.0}; */
+    /* double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     double con[1] = {0.0};
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");
     trajectory_add(&traj,7,1,time,state,con);
     printf("initialized trajectory\n");
-    double final_time = 1.2;
+    /* double final_time = 2.5; */
+    double final_time = 0.5;
     double dt = 1e-2;
     int res;
     while (time < final_time){
