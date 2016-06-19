@@ -23,6 +23,7 @@ struct Cost
     size_t d;
     struct BoundingBox * bds;
     struct FunctionTrain * cost;
+    double ** cores;
 
     struct c3Vector ** grid;
     struct HashGrid ** hashgrid;
@@ -47,6 +48,7 @@ struct Cost * cost_alloc(size_t d,double * lb, double * ub)
     cost->d = d;
     cost->bds = bounding_box_vec(d,lb,ub);
     cost->cost = NULL;
+    cost->cores = malloc_dd(d);
     cost->cost_eval_grid = 1;
     cost->grid = NULL;
     cost->hashgrid = NULL;
@@ -134,7 +136,7 @@ void cost_free(struct Cost * c)
         c3vector_array_free(c->d,c->grid);
         hash_grid_free_ndgrid(c->d,c->hashgrid);
         function_monitor_free(c->fm); c->fm = NULL;
-
+        free_dd(c->d,c->cores);
         if (c->Nobs != NULL){
             free(c->Nobs); c->Nobs = NULL;
         }
@@ -485,7 +487,7 @@ void cost_approx(struct Cost * c,
 
     /* printf("start approximation\n"); */
     int adapt = 0;
-    c->cost = c3approx_do_cross(c3a,fw,0);
+    c->cost = c3approx_do_cross(c3a,fw,adapt);
     /* printf("approx end\n"); */
     
 
@@ -788,14 +790,40 @@ int cost_eval_neigh(struct Cost * cost,
     return 0;
 }
 
-
 void cost_eval_fiber_ind(struct Cost * cost, const size_t * fixed_ind, 
                          size_t N, const size_t * ind, size_t fiber_dim,
                          double * out)
 {
-
     assert (cost != NULL);
     assert (cost->cost != NULL);
     function_train_eval_fiber_ind(cost->cost, fixed_ind, N, ind, fiber_dim, out);
+}
 
+
+void cost_precompute_cores(struct Cost * cost)
+{
+    assert (cost != NULL);
+    assert (cost->cost != NULL);
+    size_t nrows, ncols, nvals;
+    size_t * ranks = function_train_get_ranks(cost->cost);
+    for (size_t ii = 0; ii < cost->d; ii++){
+        free(cost->cores[ii]);
+        nrows = ranks[ii];
+        ncols = ranks[ii+1];
+        nvals = cost->grid[ii]->size;
+        struct GenericFunction ** arr = cost->cost->cores[ii]->funcs;
+        cost->cores[ii] = calloc_double(nrows * ncols * nvals);
+        for (size_t jj = 0; jj < nvals; jj++){
+            generic_function_1darray_eval2_ind(nrows * ncols,arr,jj,
+                                               cost->cores[ii] + jj * nrows * ncols);
+        }
+    }
+}
+
+
+void cost_eval_fiber_ind_nn(struct Cost * cost, const size_t * fixed_ind,
+                            size_t N, const size_t * ind, size_t fiber_dim,
+                            size_t * neighbors, double ** out)
+{
+    
 }

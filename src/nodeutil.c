@@ -181,7 +181,8 @@ size_t convert_x_to_ind(double x, size_t N, double * grid)
             1 if evaluation location is not on the grid
             2 if number of evaluations does not match up with discretization size
 **************************************************************/
-int convert_fiber_to_ind(size_t d, size_t N, const double ** x, const size_t * Ngrid, double ** xgrid,
+int convert_fiber_to_ind(size_t d, size_t N, const double * x,
+                         const size_t * Ngrid, double ** xgrid,
                          size_t * fixed_ind, size_t * dim_vary)
 {
     

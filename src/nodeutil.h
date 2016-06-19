@@ -9,7 +9,7 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
                         double * prob, double * grad_prob,
                         double * dt,   double * grad_dt, double * space);
 
-int convert_fiber_to_ind(size_t d, size_t N, const double ** x, 
+int convert_fiber_to_ind(size_t d, size_t N, const double * x, 
                          const size_t * Ngrid, double ** xgrid,
                          size_t * fixed_ind, size_t * dim_vary);
 #endif
