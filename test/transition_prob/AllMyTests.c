@@ -10,6 +10,7 @@
 #include "CuTest.h"
 
 CuSuite * TProbGetSuite();
+CuSuite * ValueFGetSuite();
 
 void RunAllTests(void) {
     
@@ -18,8 +19,10 @@ void RunAllTests(void) {
     CuSuite * suite = CuSuiteNew();
     
     CuSuite * mca = TProbGetSuite();
+    CuSuite * val = ValueFGetSuite();
 
-    CuSuiteAddSuite(suite, mca);
+    /* CuSuiteAddSuite(suite, mca); */
+    CuSuiteAddSuite(suite, val);
 
     CuSuiteRun(suite);
     CuSuiteSummary(suite, output);
@@ -27,6 +30,7 @@ void RunAllTests(void) {
     printf("%s \n", output->buffer);
     
     CuSuiteDelete(mca);
+    CuSuiteDelete(val);
     
     CuStringDelete(output);
     free(suite);

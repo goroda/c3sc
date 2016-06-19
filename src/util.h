@@ -32,4 +32,6 @@ void hash_grid_print(struct HashGrid *, FILE *);
 size_t hash_grid_get_ind(struct HashGrid *,double,int *);
 int hash_grid_ndgrid_get_ind(struct HashGrid **, size_t, const double *, size_t *);
 void hash_grid_free(struct HashGrid *);
+
+size_t uniform_stride(size_t, size_t);
 #endif

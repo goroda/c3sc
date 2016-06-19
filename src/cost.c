@@ -34,6 +34,7 @@ struct Cost
 
     struct FunctionMonitor * fm; // for storing evaluations
 };
+
 /**********************************************************//**
     Allocate the cost
 **************************************************************/
@@ -800,30 +801,7 @@ void cost_eval_fiber_ind(struct Cost * cost, const size_t * fixed_ind,
 }
 
 
-void cost_precompute_cores(struct Cost * cost)
-{
-    assert (cost != NULL);
-    assert (cost->cost != NULL);
-    size_t nrows, ncols, nvals;
-    size_t * ranks = function_train_get_ranks(cost->cost);
-    for (size_t ii = 0; ii < cost->d; ii++){
-        free(cost->cores[ii]);
-        nrows = ranks[ii];
-        ncols = ranks[ii+1];
-        nvals = cost->grid[ii]->size;
-        struct GenericFunction ** arr = cost->cost->cores[ii]->funcs;
-        cost->cores[ii] = calloc_double(nrows * ncols * nvals);
-        for (size_t jj = 0; jj < nvals; jj++){
-            generic_function_1darray_eval2_ind(nrows * ncols,arr,jj,
-                                               cost->cores[ii] + jj * nrows * ncols);
-        }
-    }
-}
 
 
-void cost_eval_fiber_ind_nn(struct Cost * cost, const size_t * fixed_ind,
-                            size_t N, const size_t * ind, size_t fiber_dim,
-                            size_t * neighbors, double ** out)
-{
-    
-}
+
+

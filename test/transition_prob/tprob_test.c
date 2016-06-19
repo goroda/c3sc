@@ -12,6 +12,8 @@
 
 #include "c3.h"
 #include "nodeutil.h"
+#include "valuefunc.h"
+#include "c3sc.h"
 
 int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
@@ -304,6 +306,92 @@ CuSuite * TProbGetSuite()
     SUITE_ADD_TEST(suite, Test_tprob_probsum);
     SUITE_ADD_TEST(suite, Test_tprob_grad);
     SUITE_ADD_TEST(suite, Test_tprob_grad2);
+
+    return suite;
+}
+
+
+double quad(const double * x, void * arg)
+{
+    (void) (arg);
+    double out = x[0]*x[0] + x[0]*x[1] + x[2]*x[2];
+    return out;
+}
+
+void Test_cost_neighbor_eval(CuTest * tc)
+{
+    printf("Testing Functions associated with evaluating neighbors \n");
+
+    size_t dim = 3;
+
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_maxrank(aargs,5);
+    size_t start_rank = 5;
+    approx_args_set_startrank(aargs,start_rank);
+
+    //initialize
+    const size_t N[3] = {10, 12, 14};
+    double * xgrid[3];
+    double * start[3];
+    for (size_t ii = 0; ii < 3; ii++){
+        xgrid[ii] = linspace(-1.0,2.0,N[ii]);
+        start[ii] = calloc_double(5);
+        size_t stride = uniform_stride(N[ii],start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+        printf("start[%zu] = ",ii); dprint(start_rank,start[ii]);
+    }
+
+    //interpolate
+    struct ValueF * vf = valuef_interp(3,quad,NULL,N,xgrid,start,aargs,0);
+
+    // check neighbor cost computation function
+    size_t fixed_ind[3] = { 3, 5, 9};
+    size_t dim_vary = 1;
+    size_t neighbors[4] = { 1, 4, 4, 6};
+    size_t nevals = N[dim_vary]*2*(dim-1);
+    printf("size think = %zu\n",nevals);
+    double * vals = calloc_double(nevals);
+
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+
+    dprint(nevals,vals);
+    double pt[3];
+    for (size_t ii = 0; ii < dim_vary; ii++){
+        for (size_t jj = 0; jj < N[dim_vary]; jj++){
+            // first point
+            pt[0] = xgrid[0][neighbors[0]];
+            pt[1] = xgrid[1][jj];
+            pt[2] = xgrid[2][fixed_ind[2]];
+            
+            double val_should = valuef_eval(vf,pt);
+            printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should);
+        }
+    }
+
+    printf("done sdaskd\n");
+    free(vals); vals = NULL;
+    valuef_destroy(vf); vf = NULL;
+    for (size_t ii = 0; ii < dim; ii++){
+        free(xgrid[ii]); xgrid[ii] = NULL;
+        free(start[ii]); start[ii] = NULL;
+    }
+    approx_args_free(aargs); aargs = NULL;
+
+}
+
+
+CuSuite * ValueFGetSuite()
+{
+    //printf("----------------------------\n");
+
+    CuSuite * suite = CuSuiteNew();
+    SUITE_ADD_TEST(suite, Test_cost_neighbor_eval);
 
     return suite;
 }
