@@ -787,3 +787,15 @@ int cost_eval_neigh(struct Cost * cost,
     /* printf("done evaluating neighbor\n ----------------------\n\n\n"); */
     return 0;
 }
+
+
+void cost_eval_fiber_ind(struct Cost * cost, const size_t * fixed_ind, 
+                         size_t N, const size_t * ind, size_t fiber_dim,
+                         double * out)
+{
+
+    assert (cost != NULL);
+    assert (cost->cost != NULL);
+    function_train_eval_fiber_ind(cost->cost, fixed_ind, N, ind, fiber_dim, out);
+
+}
