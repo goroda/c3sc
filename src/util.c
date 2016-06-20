@@ -68,6 +68,7 @@ struct ApproxArgs
     size_t kickrank;
     size_t startrank;
     size_t maxrank;
+    int adapt;
 };
 
 struct ApproxArgs * approx_args_init()
@@ -83,6 +84,7 @@ struct ApproxArgs * approx_args_init()
     aargs->kickrank = 10;
     aargs->startrank = 5;
     aargs->maxrank = 40;
+    aargs->adapt = 1;
 
     return aargs;
 }
@@ -152,6 +154,18 @@ size_t approx_args_get_startrank(const struct ApproxArgs * aargs)
 {
     assert (aargs != NULL);
     return aargs->startrank;
+}
+
+void approx_args_set_adapt(struct ApproxArgs * aargs, int adapt)
+{
+    assert (aargs != NULL);
+    aargs->adapt = adapt;
+}
+
+int approx_args_get_adapt(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->adapt;
 }
 
 int c3sc_check_bounds(size_t dx, double * lbx,

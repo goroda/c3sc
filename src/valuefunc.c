@@ -384,7 +384,7 @@ struct ValueF * valuef_interp(size_t d, double (*f)(const double *,void*),void *
     struct Fwrap * fw = fwrap_create(d,"general");
     fwrap_set_f(fw,f,args);
 
-    int adapt = 1;
+    int adapt = approx_args_get_adapt(aargs);;
     vf->cost = c3approx_do_cross(c3a,fw,adapt);
     valuef_precompute_cores(vf);
     /* iprint_sz(4,vf->cost->ranks); */

@@ -329,12 +329,13 @@ void Test_cost_neighbor_eval(CuTest * tc)
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
     approx_args_set_kickrank(aargs,10);
-    approx_args_set_maxrank(aargs,5);
-    size_t start_rank = 5;
+    approx_args_set_adapt(aargs,0);
+    size_t start_rank = 40;
     approx_args_set_startrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,start_rank);
 
     //initialize
-    const size_t N[3] = {10, 12, 14};
+    const size_t N[3] = {100, 200, 120};
     double * xgrid[3];
     double * start[3];
     for (size_t ii = 0; ii < 3; ii++){
