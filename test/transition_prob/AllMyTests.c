@@ -11,6 +11,7 @@
 
 CuSuite * TProbGetSuite();
 CuSuite * ValueFGetSuite();
+CuSuite * BellmanGetSuite();
 
 void RunAllTests(void) {
     
@@ -20,9 +21,11 @@ void RunAllTests(void) {
     
     CuSuite * mca = TProbGetSuite();
     CuSuite * val = ValueFGetSuite();
+    CuSuite * bel = BellmanGetSuite();
 
     /* CuSuiteAddSuite(suite, mca); */
-    CuSuiteAddSuite(suite, val);
+    /* CuSuiteAddSuite(suite, val); */
+    CuSuiteAddSuite(suite, bel);
 
     CuSuiteRun(suite);
     CuSuiteSummary(suite, output);
@@ -31,6 +34,7 @@ void RunAllTests(void) {
     
     CuSuiteDelete(mca);
     CuSuiteDelete(val);
+    CuSuiteDelete(bel);
     
     CuStringDelete(output);
     free(suite);

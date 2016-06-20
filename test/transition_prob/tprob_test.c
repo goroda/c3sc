@@ -330,17 +330,17 @@ void Test_cost_neighbor_eval(CuTest * tc)
     approx_args_set_round_tol(aargs,1e-7);
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,0);
-    size_t start_rank = 40;
+    size_t start_rank = 20;
     approx_args_set_startrank(aargs,start_rank);
     approx_args_set_maxrank(aargs,start_rank);
 
     //initialize
-    const size_t N[3] = {100, 200, 120};
+    const size_t N[3] = {30, 43, 24};
     double * xgrid[3];
     double * start[3];
     for (size_t ii = 0; ii < 3; ii++){
         xgrid[ii] = linspace(-1.0,2.0,N[ii]);
-        start[ii] = calloc_double(5);
+        start[ii] = calloc_double(start_rank);
         size_t stride = uniform_stride(N[ii],start_rank);
         for (size_t jj = 0; jj < start_rank; jj++){
             start[ii][jj] = xgrid[ii][stride*jj];
@@ -360,18 +360,32 @@ void Test_cost_neighbor_eval(CuTest * tc)
     size_t dim_vary = 1;
     size_t nevals = N[dim_vary]*2*(dim-1);
     double * vals = calloc_double(nevals);
-    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+    double * fiber_vals = calloc_double(N[dim_vary]);
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals,fiber_vals);
+
     /* printf("size think = %zu\n",nevals); */
     /* dprint(nevals,vals); */
     for (size_t jj = 0; jj < N[dim_vary]; jj++){
+       
+        // no neighbors
+        pt[0] = xgrid[0][fixed_ind[0]];
+        pt[1] = xgrid[1][jj];
+        pt[2] = xgrid[2][fixed_ind[2]];
+        
+        double val_should = valuef_eval(vf,pt);
+        double val_is = fiber_vals[jj];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
         size_t ii = 0;
         // first point
         pt[0] = xgrid[0][neighbors[0]];
         pt[1] = xgrid[1][jj];
         pt[2] = xgrid[2][fixed_ind[2]];
             
-        double val_should = valuef_eval(vf,pt);
-        double val_is = vals[jj*2*(dim-1) + 2*ii];
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii];
         /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
         /* printf("\t val=%G\n",val_is); */
         CuAssertDblEquals(tc,val_should,val_is,1e-14);
@@ -409,23 +423,37 @@ void Test_cost_neighbor_eval(CuTest * tc)
         CuAssertDblEquals(tc,val_should,val_is,1e-14);
     }
     free(vals); vals = NULL;
+    free(fiber_vals); fiber_vals = NULL;
 
 
     dim_vary = 0;
     nevals = N[dim_vary]*2*(dim-1);
     vals = calloc_double(nevals);
-    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+    fiber_vals = calloc_double(N[dim_vary]);
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals,fiber_vals);
     /* printf("size think = %zu\n",nevals); */
     /* dprint(nevals,vals); */
     for (size_t jj = 0; jj < N[dim_vary]; jj++){
+
+        // no neighbors
+        pt[0] = xgrid[0][jj];
+        pt[1] = xgrid[1][fixed_ind[1]];
+        pt[2] = xgrid[2][fixed_ind[2]];
+        
+        double val_should = valuef_eval(vf,pt);
+        double val_is = fiber_vals[jj];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
         size_t ii = 0;
         // first point
         pt[0] = xgrid[0][jj];
         pt[1] = xgrid[1][neighbors[0]];
         pt[2] = xgrid[2][fixed_ind[2]];
             
-        double val_should = valuef_eval(vf,pt);
-        double val_is = vals[jj*2*(dim-1) + 2*ii];
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii];
         /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
         /* printf("\t val=%G\n",val_is); */
         CuAssertDblEquals(tc,val_should,val_is,1e-14);
@@ -463,23 +491,37 @@ void Test_cost_neighbor_eval(CuTest * tc)
         CuAssertDblEquals(tc,val_should,val_is,1e-14);
     }
     free(vals); vals = NULL;
+    free(fiber_vals); fiber_vals = NULL;
 
     dim_vary = 2;
     nevals = N[dim_vary]*2*(dim-1);
     vals = calloc_double(nevals);
-    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+    fiber_vals = calloc_double(N[dim_vary]);
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals,fiber_vals);
     /* printf("size think = %zu\n",nevals); */
     /* dprint(nevals,vals); */
     for (size_t jj = 0; jj < N[dim_vary]; jj++){
-        size_t ii = 0;
+
+        // no neighbors
+        pt[0] = xgrid[0][fixed_ind[0]];
+        pt[1] = xgrid[1][fixed_ind[1]];
+        pt[2] = xgrid[2][jj];
+        
+        double val_should = valuef_eval(vf,pt);
+        double val_is = fiber_vals[jj];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
         // first point
+        size_t ii = 0;
 
         pt[0] = xgrid[0][neighbors[0]];
         pt[1] = xgrid[1][fixed_ind[1]];
         pt[2] = xgrid[2][jj];
             
-        double val_should = valuef_eval(vf,pt);
-        double val_is = vals[jj*2*(dim-1) + 2*ii];
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii];
         /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
         /* printf("\t val=%G\n",val_is); */
         CuAssertDblEquals(tc,val_should,val_is,1e-14);
@@ -518,6 +560,7 @@ void Test_cost_neighbor_eval(CuTest * tc)
         CuAssertDblEquals(tc,val_should,val_is,1e-14);
     }
     free(vals); vals = NULL;
+    free(fiber_vals); fiber_vals = NULL;
 
 
     /* printf("done sdaskd\n"); */
@@ -531,13 +574,91 @@ void Test_cost_neighbor_eval(CuTest * tc)
 
 }
 
-
 CuSuite * ValueFGetSuite()
 {
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, Test_cost_neighbor_eval);
+
+    return suite;
+}
+
+
+void Test_bellman_grad1(CuTest * tc)
+{
+    printf("Testing Function: transition_assemble (2)\n");
+
+    int res;
+    size_t dx = 2;
+    size_t du = 1;
+    size_t dw = 2;
+    double h[2] = {1e-1, 1e-2};
+    double hmin = h[1];
+
+    double drift[2];
+    double grad_drift[2];
+    double diff[4];
+    double grad_diff[4];
+
+    double space[1];
+    double prob[5];
+    double prob2[5];
+    double grad_prob[5*1];
+    double dt,dt2;
+    double dt_grad[1];
+
+    size_t nrand = 1000;
+    for (size_t kk = 0; kk < nrand; kk++){
+        /* printf("kk = %zu\n",kk); */
+        /* double pt[2] = {1.0,2.0}; */
+        double pt[2] = {randu()*3.0-1.5,randu()*3.0-1.5};
+        
+        double t = 0.2;
+
+        double u[1] = {randu()*3.0-1.5};
+        /* double u[1] = {0.0}; */
+    
+        res =f1(t,pt,u,drift,grad_drift,NULL);
+        CuAssertIntEquals(tc,0,res);
+        res = s1(t,pt,u,diff,grad_diff,NULL);
+        CuAssertIntEquals(tc,0,res);
+        res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift,
+                                  diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
+        CuAssertIntEquals(tc,0,res);
+
+        /* printf("drift = (%G,%G)\n",drift[0],drift[1]); */
+        /* printf("gdrift = (%G,%G)\n",grad_drift[0],grad_drift[1]); */
+        double delta = 1e-10;
+        u[0] += delta;
+        res =f1(t,pt,u,drift,grad_drift,NULL);
+        CuAssertIntEquals(tc,0,res);
+        res = s1(t,pt,u,diff,grad_diff,NULL);
+        CuAssertIntEquals(tc,0,res);
+        u[0] -= delta;
+        res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
+                                  &dt2,NULL,NULL);
+        CuAssertIntEquals(tc,0,res);
+
+        /* printf("prob transitions = "); dprint(5,prob); */
+        for (size_t ii = 0; ii < 2*dx+1; ii++){
+            /* printf("ii=(%zu/%zu)\n",ii,2*dx); */
+            double fdgrad = (prob2[ii] - prob[ii])/delta;
+            CuAssertDblEquals(tc,fdgrad,grad_prob[ii],1e-5);
+            /* printf("(%G,%G) \n",grad_prob[ii],fdgrad); */
+        }
+        double fddtgrad = (dt2-dt)/delta;
+        CuAssertDblEquals(tc,fddtgrad,dt_grad[0],1e-5);
+            
+    }
+}
+
+CuSuite * BellmanGetSuite()
+{
+    //printf("----------------------------\n");
+
+    CuSuite * suite = CuSuiteNew();
+    SUITE_ADD_TEST(suite, Test_bellman_grad1);
 
     return suite;
 }

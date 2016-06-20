@@ -6,6 +6,8 @@
 
 #include "c3.h"
 
+#include "boundary.h"
+
 /**********************************************************//**
     Assemble transition probabilities
 
@@ -211,5 +213,80 @@ int convert_fiber_to_ind(size_t d, size_t N, const double * x,
         return 2;
     }
 
+    return 0;
+}
+
+
+/**********************************************************//**
+    Process fibers to figure out boundary information                                                           
+
+    \param[in]     d         - dimension of state space
+    \param[in]     N         - number of evaluations
+    \param[in]     x         - (Nd,) evaluation locations
+    \param[in,out] boundv    - (N,) boundary condition specifies 
+    \param[in,out] neighbors - (2Nd,) neighbor specifiers
+    \param[in]     bound     - structure holding bc information
+
+    \return 0 if everything is ok, 
+            
+    \note
+    boundv[ii] = -1 if absorbed in an obstacle
+    boundv[ii] = 0  if not absorbed
+    boundv[ii] = 1  if absored in a boundary
+**************************************************************/
+int process_fibers(size_t d, size_t nvals, const double * x, int * boundv, int * neighbors, 
+                   struct Boundary * bound)
+{
+    double time = 0.0;
+    for (size_t ii = 0; ii < nvals; ii++){
+        struct BoundInfo * bi = boundary_type(bound,time,x+ii*d);
+        boundv[ii] = bound_info_onbound(bi);
+        if (boundv[ii] == 0){ // use all neighbors
+            for (size_t jj = 0; jj < d; jj++){
+                neighbors[ii*(2*d) + 2*jj] = 1;
+                neighbors[ii*(2*d) + 2*jj+1] = 1;
+            }
+        }
+        else{
+            if (bound_info_absorb(bi) == 1){ // absorbed
+                int in_obstacle = bound_info_get_in_obstacle(bi);
+                if (in_obstacle >= 0){
+                    boundv[ii] = -1;
+                }
+                for (size_t jj = 0; jj < d; jj++){ // use none of the neighbors
+                    neighbors[ii*(2*d) + 2*jj] = 0;
+                    neighbors[ii*(2*d) + 2*jj+1] = 0;
+                }   
+            }
+            else{
+                if (bound_info_reflect(bi) == 0){ // reflected back
+                    for (size_t jj = 0; jj < d; jj++){
+                        int on_bound = bound_info_onbound_dim(bi,ii);
+                        if (on_bound == 0){
+                            neighbors[ii*(2*d) + 2*jj] = 1;
+                            neighbors[ii*(2*d) + 2*jj+1] = 1;
+                        }
+                        else{
+                            int reflect_dir = bound_info_reflect_dim_dir(bi,ii);
+                            //printf("before\n");
+                            if (reflect_dir == -1){ // just do right side poition
+                                neighbors[ii*(2*d) + 2*jj] = 0;
+                                neighbors[ii*(2*d) + 2*jj+1] = 1;
+                            }
+                            else{
+                                neighbors[ii*(2*d) + 2*jj] = 1;
+                                neighbors[ii*(2*d) + 2*jj+1] = 0;
+                            }
+                        }
+                    }
+                }
+                else{
+                    fprintf(stderr, "Have not dealt with periodic boundaries yet\n");
+                    exit(1);
+                }
+            }
+        }
+        bound_info_free(bi); bi = NULL;
+    }
     return 0;
 }

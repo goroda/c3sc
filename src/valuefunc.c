@@ -5,7 +5,6 @@
 
 #include "c3.h"
 #include "util.h"
-#include "cost.h"
 
 /** \struct ValueF
 \brief Value Function
@@ -121,9 +120,16 @@ void valuef_precompute_cores(struct ValueF * cost)
 /**********************************************************//**
    Evaluate the cost of a fiber and associated neighbors
 
+   \param[in]     vf        - value function
+   \param[in]     fixed_ind - (d,) indices of fixed points
+   \param[in]     dim_vary  - dimension along which fiber exists
+   \param[in]     neighbors - (2*(d-1)*N[dim_vary],) array of neighbors (2 in each dim)
+   \param[in,out] out       - value function value at neighbors of each element of the fiber
+   \param[in,out] out_fiber - value function along fiber
 **************************************************************/
 void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
-                            size_t dim_vary, const size_t * neighbors, double * out)
+                            size_t dim_vary, const size_t * neighbors, double * out,
+                            double * out_fiber)
 {
     assert (vf != NULL);
     assert (vf->cost != NULL);
@@ -264,6 +270,7 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
     }
 
     /* printf("precomputed everything\n"); */
+    memmove(out_fiber,bprod[0],nvals*sizeof(double));
 
     size_t stride = 2 * (dim-1);
     // now have everything and only need to assemble
