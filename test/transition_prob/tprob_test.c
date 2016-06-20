@@ -344,7 +344,7 @@ void Test_cost_neighbor_eval(CuTest * tc)
         for (size_t jj = 0; jj < start_rank; jj++){
             start[ii][jj] = xgrid[ii][stride*jj];
         }
-        printf("start[%zu] = ",ii); dprint(start_rank,start[ii]);
+        /* printf("start[%zu] = ",ii); dprint(start_rank,start[ii]); */
     }
 
     //interpolate
@@ -352,30 +352,175 @@ void Test_cost_neighbor_eval(CuTest * tc)
 
     // check neighbor cost computation function
     size_t fixed_ind[3] = { 3, 5, 9};
-    size_t dim_vary = 1;
     size_t neighbors[4] = { 1, 4, 4, 6};
-    size_t nevals = N[dim_vary]*2*(dim-1);
-    printf("size think = %zu\n",nevals);
-    double * vals = calloc_double(nevals);
-
-    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
-
-    dprint(nevals,vals);
     double pt[3];
-    for (size_t ii = 0; ii < dim_vary; ii++){
-        for (size_t jj = 0; jj < N[dim_vary]; jj++){
-            // first point
-            pt[0] = xgrid[0][neighbors[0]];
-            pt[1] = xgrid[1][jj];
-            pt[2] = xgrid[2][fixed_ind[2]];
-            
-            double val_should = valuef_eval(vf,pt);
-            printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should);
-        }
-    }
 
-    printf("done sdaskd\n");
+    
+    size_t dim_vary = 1;
+    size_t nevals = N[dim_vary]*2*(dim-1);
+    double * vals = calloc_double(nevals);
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+    /* printf("size think = %zu\n",nevals); */
+    /* dprint(nevals,vals); */
+    for (size_t jj = 0; jj < N[dim_vary]; jj++){
+        size_t ii = 0;
+        // first point
+        pt[0] = xgrid[0][neighbors[0]];
+        pt[1] = xgrid[1][jj];
+        pt[2] = xgrid[2][fixed_ind[2]];
+            
+        double val_should = valuef_eval(vf,pt);
+        double val_is = vals[jj*2*(dim-1) + 2*ii];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        pt[0] = xgrid[0][neighbors[1]];
+        pt[1] = xgrid[1][jj];
+        pt[2] = xgrid[2][fixed_ind[2]];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii+1];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        ii = 1;
+        // second point
+        pt[0] = xgrid[0][fixed_ind[0]];
+        pt[1] = xgrid[1][jj];
+        pt[2] = xgrid[2][neighbors[2]];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        pt[0] = xgrid[0][fixed_ind[0]];
+        pt[1] = xgrid[1][jj];
+        pt[2] = xgrid[2][neighbors[3]];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii+1];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+    }
     free(vals); vals = NULL;
+
+
+    dim_vary = 0;
+    nevals = N[dim_vary]*2*(dim-1);
+    vals = calloc_double(nevals);
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+    /* printf("size think = %zu\n",nevals); */
+    /* dprint(nevals,vals); */
+    for (size_t jj = 0; jj < N[dim_vary]; jj++){
+        size_t ii = 0;
+        // first point
+        pt[0] = xgrid[0][jj];
+        pt[1] = xgrid[1][neighbors[0]];
+        pt[2] = xgrid[2][fixed_ind[2]];
+            
+        double val_should = valuef_eval(vf,pt);
+        double val_is = vals[jj*2*(dim-1) + 2*ii];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        pt[0] = xgrid[0][jj];
+        pt[1] = xgrid[1][neighbors[1]];
+        pt[2] = xgrid[2][fixed_ind[2]];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii+1];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        ii = 1;
+        // second point
+        pt[0] = xgrid[0][jj];
+        pt[1] = xgrid[1][fixed_ind[1]];
+        pt[2] = xgrid[2][neighbors[2]];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        pt[0] = xgrid[0][jj];
+        pt[1] = xgrid[1][fixed_ind[1]];
+        pt[2] = xgrid[2][neighbors[3]];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii+1];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+    }
+    free(vals); vals = NULL;
+
+    dim_vary = 2;
+    nevals = N[dim_vary]*2*(dim-1);
+    vals = calloc_double(nevals);
+    cost_eval_fiber_ind_nn(vf,fixed_ind,dim_vary,neighbors,vals);
+    /* printf("size think = %zu\n",nevals); */
+    /* dprint(nevals,vals); */
+    for (size_t jj = 0; jj < N[dim_vary]; jj++){
+        size_t ii = 0;
+        // first point
+
+        pt[0] = xgrid[0][neighbors[0]];
+        pt[1] = xgrid[1][fixed_ind[1]];
+        pt[2] = xgrid[2][jj];
+            
+        double val_should = valuef_eval(vf,pt);
+        double val_is = vals[jj*2*(dim-1) + 2*ii];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        pt[0] = xgrid[0][neighbors[1]];
+        pt[1] = xgrid[1][fixed_ind[1]];
+        pt[2] = xgrid[2][jj];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii+1];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        ii = 1;
+        // second point
+        pt[0] = xgrid[0][fixed_ind[0]];
+        pt[1] = xgrid[1][neighbors[2]];
+        pt[2] = xgrid[2][jj];
+        
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+
+        // second point
+        pt[0] = xgrid[0][fixed_ind[0]];
+        pt[1] = xgrid[1][neighbors[3]];
+        pt[2] = xgrid[2][jj];
+            
+        val_should = valuef_eval(vf,pt);
+        val_is = vals[jj*2*(dim-1) + 2*ii+1];
+        /* printf("f(%G,%G,%G) = %G\n",pt[0],pt[1],pt[2],val_should); */
+        /* printf("\t val=%G\n",val_is); */
+        CuAssertDblEquals(tc,val_should,val_is,1e-14);
+    }
+    free(vals); vals = NULL;
+
+
+    /* printf("done sdaskd\n"); */
+
     valuef_destroy(vf); vf = NULL;
     for (size_t ii = 0; ii < dim; ii++){
         free(xgrid[ii]); xgrid[ii] = NULL;

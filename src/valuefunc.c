@@ -167,6 +167,7 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
     size_t nrows, ncols, nvals;
     size_t * ranks = function_train_get_ranks(vf->cost);
     for (size_t ii = 0; ii < dim_vary; ii++){
+        /* printf("not here\n"); */
         nrows = ranks[ii];
         ncols = ranks[ii+1];
 
@@ -180,7 +181,7 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
                         fprod[ii-1], 1, 0.0, fprod[ii], 1);
         }
     }
-    printf("got front to back\n");
+    /* printf("got front to back\n"); */
 
     // for back to front until dim_vary
     for (size_t ii = vf->d-1; ii > dim_vary; ii--){
@@ -198,26 +199,42 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
                         bprod[ii+1], 1, 0.0, bprod[ii], 1);
         }
     }
-    printf("got back to front\n");
+    /* printf("got back to front\n"); */
 
     // dim_vary for forward 
     nrows = ranks[dim_vary];
     ncols = ranks[dim_vary+1];
     nvals = vf->N[dim_vary];
-    for (size_t jj = 0; jj < nvals; jj++){
-        cblas_dgemv(CblasColMajor,CblasTrans, nrows, ncols,
-                    1.0, vf->cores[dim_vary] + jj * nrows * ncols, 
-                    nrows, fprod[dim_vary-1], 1, 0.0, fprod[dim_vary]+jj*ncols, 1);
+    if (dim_vary == 0){
+        for (size_t jj = 0; jj < nvals; jj++){
+            memmove(fprod[dim_vary]+jj*ncols,vf->cores[dim_vary] + jj * nrows * ncols,
+                    nrows * ncols * sizeof(double));
+        }   
+    }
+    else{
+        for (size_t jj = 0; jj < nvals; jj++){
+            cblas_dgemv(CblasColMajor,CblasTrans, nrows, ncols,
+                        1.0, vf->cores[dim_vary] + jj * nrows * ncols, 
+                        nrows, fprod[dim_vary-1], 1, 0.0, fprod[dim_vary]+jj*ncols, 1);
+        }
     }
 
     // for backward
-    for (size_t jj = 0; jj < nvals; jj++){
-        cblas_dgemv(CblasColMajor,CblasNoTrans, nrows, ncols,
-                    1.0, vf->cores[dim_vary] + jj * nrows * ncols, 
-                    nrows, bprod[dim_vary+1], 1, 0.0, bprod[dim_vary]+jj*nrows, 1);
+    if (dim_vary == (vf->d-1)){
+        for (size_t jj = 0; jj < nvals; jj++){
+            memmove(bprod[dim_vary]+jj*nrows,vf->cores[dim_vary] + jj * nrows * ncols,
+                    nrows * ncols * sizeof(double));
+        }
+    }
+    else{
+        for (size_t jj = 0; jj < nvals; jj++){
+            cblas_dgemv(CblasColMajor,CblasNoTrans, nrows, ncols,
+                        1.0, vf->cores[dim_vary] + jj * nrows * ncols, 
+                        nrows, bprod[dim_vary+1], 1, 0.0, bprod[dim_vary]+jj*nrows, 1);
+        }
     }
     
-    printf("got dim_vary\n");
+    /* printf("got dim_vary\n"); */
 
     // after dim_vary for front-to back
     for (size_t ii = dim_vary+1; ii < vf->d; ii++){
@@ -246,7 +263,7 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
 
     }
 
-    printf("precomputed everything\n");
+    /* printf("precomputed everything\n"); */
 
     size_t stride = 2 * (dim-1);
     // now have everything and only need to assemble
@@ -276,20 +293,20 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
             }
         }
     }
-    printf("got everything before\n");
+    /* printf("got everything before\n"); */
 
     for (size_t ii = dim_vary+1; ii < dim; ii++){
-        printf("ii = %zu\n",ii);
+        /* printf("ii = %zu\n",ii); */
         nrows = ranks[ii];
         ncols = ranks[ii+1];
 
         if (ii == dim-1){
-            printf("here!\n");
+            /* printf("here!\n"); */
             for (size_t jj = 0; jj < nvals; jj++){
-                printf("jj=%zu, neighbor=%zu\n",jj,neighbors[2*(ii-1)]);
+                /* printf("jj=%zu, neighbor=%zu\n",jj,neighbors[2*(ii-1)]); */
                 out[jj*stride + 2*(ii-1)] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)]*nrows,1,
                                                    fprod[ii-1]+jj*nrows,1);
-                printf("\tgot first\n");
+                /* printf("\tgot first\n"); */
                 out[jj*stride + 2*(ii-1)+1] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)+1]*nrows,1,
                                                      fprod[ii-1]+jj*nrows,1);
             }
@@ -297,7 +314,7 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
         else{
             for (size_t jj = 0; jj < nvals; jj++){
                 cblas_dgemv(CblasColMajor,CblasTrans, nrows, ncols,
-                            1.0, vf->cores[ii] + neighbors[2*(ii-1)+1] * nrows * ncols, 
+                            1.0, vf->cores[ii] + neighbors[2*(ii-1)] * nrows * ncols, 
                             nrows, fprod[ii-1] + jj * nrows, 1, 0.0, space1, 1);
                 out[jj*stride + 2*(ii-1)] = cblas_ddot(ncols,space1,1,bprod[ii+1],1);
 
@@ -307,9 +324,9 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
                 out[jj*stride + 2*(ii-1)+1] = cblas_ddot(ncols,space1,1,bprod[ii+1],1);
             }   
         }
-        printf("last ind = %zu\n",(nvals-1)*stride+2*ii+1);
+        /* printf("last ind = %zu\n",(nvals-1)*stride+2*ii+1); */
     }
-    printf("got everything after\n");
+    /* printf("got everything after\n"); */
 }
 
 
@@ -367,9 +384,10 @@ struct ValueF * valuef_interp(size_t d, double (*f)(const double *,void*),void *
     struct Fwrap * fw = fwrap_create(d,"general");
     fwrap_set_f(fw,f,args);
 
-    int adapt = 0;
+    int adapt = 1;
     vf->cost = c3approx_do_cross(c3a,fw,adapt);
     valuef_precompute_cores(vf);
+    /* iprint_sz(4,vf->cost->ranks); */
     
 
     for (size_t ii = 0; ii < d; ii++){
