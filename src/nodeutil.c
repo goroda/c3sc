@@ -221,7 +221,7 @@ int convert_fiber_to_ind(size_t d, size_t N, const double * x,
     Process fibers to figure out boundary information                                                           
 
     \param[in]     d         - dimension of state space
-    \param[in]     N         - number of evaluations
+    \param[in]     nvals     - number of evaluations
     \param[in]     x         - (Nd,) evaluation locations
     \param[in,out] boundv    - (N,) boundary condition specifies 
     \param[in,out] neighbors - (2Nd,) neighbor specifiers
@@ -249,8 +249,10 @@ int process_fibers(size_t d, size_t nvals, const double * x, int * boundv, int *
         }
         else{
             if (bound_info_absorb(bi) == 1){ // absorbed
+                /* printf("x = "); dprint(d,x+ii*d); */
                 int in_obstacle = bound_info_get_in_obstacle(bi);
                 if (in_obstacle >= 0){
+                    /* printf("in obstacle\n"); */
                     boundv[ii] = -1;
                 }
                 for (size_t jj = 0; jj < d; jj++){ // use none of the neighbors

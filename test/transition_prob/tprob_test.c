@@ -584,7 +584,6 @@ CuSuite * ValueFGetSuite()
     return suite;
 }
 
-
 void Test_bellman_grad1(CuTest * tc)
 {
     printf("Testing Function: transition_assemble (2)\n");
@@ -653,12 +652,106 @@ void Test_bellman_grad1(CuTest * tc)
     }
 }
 
+void Test_bound_nodes(CuTest * tc)
+{
+    size_t d = 3;
+    double lb[3] = {-1.0, -2.0, -3.0};
+    double ub[3] = { 1.0, 2.0, 3.0 };
+
+    double center[3] = {0.0,0.0,0.0};
+    double lengths[3] = {0.2,0.2,0.8};
+    
+    struct Boundary * bound = boundary_alloc(d,lb,ub);
+    boundary_add_obstacle(bound,center,lengths);
+
+    size_t N[3] = {20, 40, 60};
+    double * grid[3];
+    size_t nvals = 1;
+    for (size_t ii = 0; ii < d; ii++){
+        grid[ii] = linspace(lb[ii],ub[ii],N[ii]);
+        nvals *= N[ii];
+    }
+
+    double * x = calloc_double(d * nvals);
+    
+    size_t onval = 0;
+    int * bound_true = calloc_int(nvals);
+    for (size_t ii = 0; ii < N[0]; ii++){
+        for (size_t jj = 0; jj < N[1]; jj++){
+            for (size_t kk = 0; kk < N[2]; kk++){
+                x[onval*d+0] = grid[0][ii];
+                x[onval*d+1] = grid[1][jj];
+                x[onval*d+2] = grid[2][kk];
+                if ( (fabs(grid[0][ii]) < (lengths[0]/2.0)) &&
+                     (fabs(grid[1][jj]) < (lengths[1]/2.0)) &&
+                     (fabs(grid[2][kk]) < (lengths[2]/2.0)))
+                {
+                    /* printf("here\n"); */
+                    bound_true[onval] = -1;
+                }
+                else if ( (ii == 0) || (ii == (N[0]-1)) ||
+                          (jj == 0) || (jj == (N[1]-1)) ||
+                          (kk == 0) || (kk == (N[2]-1)))
+                {
+                    /* printf("there\n"); */
+                    bound_true[onval] = 1;
+                }
+                onval++;
+            }
+        }
+    }
+    
+
+    int * neighbors = calloc_int(2*d*nvals);
+    int * boundaries = calloc_int(nvals);
+    int res = process_fibers(d,nvals,x,boundaries,neighbors,bound);
+    CuAssertIntEquals(tc,0,res);
+    for (size_t ii = 0; ii < nvals; ii++){
+        /* printf("ii = %zu ",ii); dprint(3,x + ii*d); */
+        CuAssertIntEquals(tc,bound_true[ii],boundaries[ii]);
+        if (bound_true[ii] == 1){
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+1]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+2]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+3]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+4]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+5]);
+        }
+        else if (bound_true[ii] == -1){
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+1]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+2]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+3]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+4]);
+            CuAssertIntEquals(tc,0,neighbors[ii*2*d+5]);
+        }
+        else{
+            CuAssertIntEquals(tc,1,neighbors[ii*2*d]);
+            CuAssertIntEquals(tc,1,neighbors[ii*2*d+1]);
+            CuAssertIntEquals(tc,1,neighbors[ii*2*d+2]);
+            CuAssertIntEquals(tc,1,neighbors[ii*2*d+3]);
+            CuAssertIntEquals(tc,1,neighbors[ii*2*d+4]);
+            CuAssertIntEquals(tc,1,neighbors[ii*2*d+5]);
+        }
+    }
+
+    free(x); x = NULL;
+    free(neighbors); neighbors = NULL;
+    free(boundaries); boundaries = NULL;
+    free(bound_true); bound_true = NULL;
+    for (size_t ii = 0; ii < d; ii++){
+        free(grid[ii]); grid[ii] = NULL;
+    }
+    boundary_free(bound); bound = NULL;
+}
+
 CuSuite * BellmanGetSuite()
 {
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, Test_bellman_grad1);
+    /* SUITE_ADD_TEST(suite, Test_bellman_grad1); */
+    SUITE_ADD_TEST(suite, Test_bound_nodes);
 
     return suite;
 }
