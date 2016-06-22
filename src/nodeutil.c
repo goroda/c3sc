@@ -7,6 +7,7 @@
 #include "c3.h"
 
 #include "boundary.h"
+#include "valuefunc.h"
 
 /**********************************************************//**
     Assemble transition probabilities
@@ -153,7 +154,6 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
     return 0;
 }
 
-
 size_t convert_x_to_ind(double x, size_t N, double * grid)
 {
     double tol = 1e-14;
@@ -213,6 +213,182 @@ int convert_fiber_to_ind(size_t d, size_t N, const double * x,
         return 2;
     }
 
+    return 0;
+}
+
+
+/**********************************************************//**
+    Convert double-based fibers obtained during cross
+    to index based
+
+    \param[in]     d               - dimension of state space
+    \param[in]     fixed_ind       - (d,) vector of fixed indices
+    \param[in]     dim_vary        - dimension that varies
+    \param[in]     x               - values of the fiber
+    \param[in,out] absorbed        - (0,no), (1,yes), (2,obstacle)
+    \param[in,out] neighbors_vary  - (2*ngrid[dim_vary],)  neighbor indices in varying dimension
+    \param[in,out] neighbors_fixed - (2*(d-1),) neighbor indices for fixed dimension
+    \param[in]     ngrid           - size of grid in each dimension
+    \param[in]     bound           - boundary information
+
+    \return 0 if everything is ok, 
+**************************************************************/
+int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary, 
+                            const double * x, int * absorbed, size_t * neighbors_vary,
+                            size_t * neighbors_fixed, const size_t * ngrid, 
+                            const struct Boundary * bound)
+{
+
+    for (size_t ii = 0; ii < ngrid[dim_vary]; ii++){
+        int inobs = boundary_in_obstacle(bound,x+ii*d);
+        if (inobs == 0){
+            absorbed[ii] = 0;
+        }
+        else{
+            absorbed[ii] = -1;
+        }
+    }
+
+    size_t onind = 0;
+    for (size_t ii = 0; ii < d; ii++){
+        if (ii != dim_vary){
+            if ( fixed_ind[ii] == 0){ // left boundary
+                enum EBTYPE b = boundary_type_dim(bound,ii,0);
+                if (b == ABSORB){
+                    neighbors_fixed[onind  ] = fixed_ind[ii];
+                    neighbors_fixed[onind+1] = fixed_ind[ii];
+                    for (size_t jj = 0; jj < ngrid[dim_vary]; jj++){
+                        absorbed[jj] = 1;
+                    }
+                }
+                else if (b == REFLECT){
+                    neighbors_fixed[onind  ] = fixed_ind[ii];
+                    neighbors_fixed[onind+1] = fixed_ind[ii]+1;
+                }
+                else if (b == PERIODIC){
+                    neighbors_fixed[onind  ] = ngrid[ii]-2;
+                    neighbors_fixed[onind+1] = fixed_ind[ii]+1;
+                }
+                else{
+                    fprintf(stderr,"No boundary specified!\n");
+                    assert(1 == 0);
+                }
+            } 
+            else if (fixed_ind[ii] == (ngrid[ii]-1)){ // right boundary
+                enum EBTYPE b = boundary_type_dim(bound,ii,1);
+                if (b == ABSORB){
+                    neighbors_fixed[onind  ] = fixed_ind[ii];
+                    neighbors_fixed[onind+1] = fixed_ind[ii];
+                    for (size_t jj = 0; jj < ngrid[dim_vary]; jj++){
+                        absorbed[jj] = 1;
+                    }
+                }
+                else if (b == REFLECT){
+                    neighbors_fixed[onind  ] = fixed_ind[ii]-1;
+                    neighbors_fixed[onind+1] = fixed_ind[ii];
+                }
+                else if (b == PERIODIC){
+                    neighbors_fixed[onind  ] = fixed_ind[ii]-1;
+                    neighbors_fixed[onind+1] = 1;
+                }
+                else{
+                    fprintf(stderr,"No boundary specified!\n");
+                    assert(1 == 0);
+                }
+                // handle boundary
+            }
+            else{
+                neighbors_fixed[onind  ] = fixed_ind[ii]-1;
+                neighbors_fixed[onind+1] = fixed_ind[ii]+1;
+            }
+            onind += 2;
+        }
+    }
+    
+    /* printf("now\n"); */
+    // first point
+    enum EBTYPE b = boundary_type_dim(bound,dim_vary,0);
+    if (b == ABSORB){
+        neighbors_vary[0] = 0;
+        neighbors_vary[1] = 0;
+        absorbed[0] = 1;
+    }
+    else if (b == REFLECT){
+        neighbors_vary[0] = 0;
+        neighbors_vary[1] = 1;
+    }
+    else if (b == PERIODIC){
+        neighbors_vary[0] = ngrid[dim_vary]-2;
+        neighbors_vary[1] = 1;
+    }
+    else{
+        fprintf(stderr,"Should not be here!\n");
+        assert(1 == 0);
+    }
+    
+    /* printf("on last point\n"); */
+    // last point
+    b = boundary_type_dim(bound,dim_vary,1);
+    if (b == ABSORB){
+        neighbors_vary[2*(ngrid[dim_vary]-1)] = ngrid[dim_vary]-1;
+        neighbors_vary[2*(ngrid[dim_vary]-1)+1] = ngrid[dim_vary]-1;
+        absorbed[ngrid[dim_vary]-1] = 1;
+    }
+    else if (b == REFLECT){
+        neighbors_vary[2*(ngrid[dim_vary]-1)] =  ngrid[dim_vary]-2;
+        neighbors_vary[2*(ngrid[dim_vary]-1)+1] =  ngrid[dim_vary]-1;
+    }
+    else if (b == PERIODIC){
+        neighbors_vary[2*(ngrid[dim_vary]-1)] = ngrid[dim_vary]-2;
+        neighbors_vary[2*(ngrid[dim_vary]-1)+1] = 1;
+    }
+    else{
+        fprintf(stderr,"Should not be here!\n");
+        assert(1 == 0);
+    }
+    
+    /* printf("lets go\n"); */
+    for (size_t ii = 1; ii < ngrid[dim_vary]-1; ii++){
+        if (absorbed[ii] == 0){
+            neighbors_vary[2*ii] = ii-1;
+            neighbors_vary[2*ii+1] = ii+1;
+        }
+        else{
+            neighbors_vary[2*ii] = ii;
+            neighbors_vary[2*ii+1] = ii;
+        }
+    }
+    /* printf("finished\n"); */
+    return 0;
+}
+
+int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
+                           struct ValueF * vf, const size_t * ngrid, double ** xgrid,
+                           double * out)
+{
+    // BellmanParam must have
+
+    // convert fibers to indices
+    size_t * fixed_ind = calloc_size_t(d);
+    size_t dim_vary;
+    int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,&dim_vary);
+    assert (res == 0);
+
+    int * absorbed = calloc_int(N);
+    size_t * neighbors_vary = calloc_size_t(2*N);
+    size_t * neighbors_fixed = calloc_size_t(2*(d-1));
+    res = process_fibers_neighbor(d,fixed_ind,dim_vary,x,absorbed,
+                                  neighbors_vary,neighbors_fixed,
+                                  ngrid,bound);
+    assert (res == 0);
+
+    // evaluate cost associated with all neighbors
+    res = valuef_eval_fiber_ind_nn(vf, fixed_ind, dim_vary,
+                                   neighbors_fixed, neighbors_vary,
+                                   out);
+
+    assert (res == 0);
+    
     return 0;
 }
 

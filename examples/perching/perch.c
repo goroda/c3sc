@@ -182,8 +182,6 @@ int stagecost(double t,const double * x,const double * u, double * out,
               double * grad)
 {
     (void)(t);
-    (void)(u);
-    (void)(x);
     *out = 0.0;
 
     // states

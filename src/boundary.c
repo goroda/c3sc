@@ -551,6 +551,23 @@ double outer_bound_dim(const struct Boundary * bound, size_t dim,
 }
 
 /**********************************************************//**
+    Get external boundary type for a particular dimension.
+    So far can't have different types on left and right but 
+    in the future one might want to
+**************************************************************/
+enum EBTYPE boundary_type_dim(const struct Boundary * bound, size_t dim, int right)
+{
+    enum EBTYPE type;
+    if (right == 0){ // left boundary
+        type = external_boundary_get_type(bound->eb[dim]);
+    }
+    else{
+        type = external_boundary_get_type(bound->eb[dim]);
+    }
+    return type;
+}
+
+/**********************************************************//**
     Return boundary info
 **************************************************************/
 struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const double * x)
@@ -596,6 +613,21 @@ struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const
         }
     }
     return bi;
+}
+
+/**********************************************************//**
+    Return 1 if in an obstacle
+    Return 0 if not
+**************************************************************/
+int boundary_in_obstacle(const struct Boundary * bound, const double * x)
+{
+    for (size_t ii = 0; ii < bound->n; ii++){
+        int inobs = bound_rect_inside(bound->br[ii],x);
+        if (inobs == 1){
+            return 1;
+        }
+    }
+    return 0;
 }
 
 /**********************************************************//**

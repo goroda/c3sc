@@ -19,6 +19,9 @@ void boundary_free(struct Boundary *);
 void boundary_external_set_type(struct Boundary *,size_t,char *);
 double outer_bound_dim(const struct Boundary *, size_t, 
                        double, int *);
+enum EBTYPE boundary_type_dim(const struct Boundary *,size_t, int);
+int boundary_in_obstacle(const struct Boundary *, const double *);
+
 struct BoundInfo * boundary_type(const struct Boundary *,double,const double *);
 
 enum BOUNDRESULT {

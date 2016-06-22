@@ -117,6 +117,7 @@ void valuef_precompute_cores(struct ValueF * cost)
     }
 }
 
+
 /**********************************************************//**
    Evaluate the cost of a fiber and associated neighbors
 
@@ -126,10 +127,12 @@ void valuef_precompute_cores(struct ValueF * cost)
    \param[in]     neighbors - (2*(d-1)*N[dim_vary],) array of neighbors (2 in each dim)
    \param[in,out] out       - value function value at neighbors of each element of the fiber
    \param[in,out] out_fiber - value function along fiber
+
+   \returns  0 if successfull
 **************************************************************/
-void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
-                            size_t dim_vary, const size_t * neighbors, double * out,
-                            double * out_fiber)
+int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
+                              size_t dim_vary, const size_t * neighbors,
+                              const size_t * neighbors_vary, double * out)
 {
     assert (vf != NULL);
     assert (vf->cost != NULL);
@@ -269,10 +272,16 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
 
     }
 
-    /* printf("precomputed everything\n"); */
-    memmove(out_fiber,bprod[0],nvals*sizeof(double));
+    /* /\* printf("precomputed everything\n"); *\/ */
+    /* memmove(out_fiber,bprod[0],nvals*sizeof(double)); */
 
-    size_t stride = 2 * (dim-1);
+    size_t stride = 2 * dim + 1;
+    for (size_t ii = 0; ii < nvals; ii++){
+        out[ii*stride + 2*dim_vary] = bprod[0][neighbors_vary[2*ii]];
+        out[ii*stride + 2*dim_vary+1] = bprod[0][neighbors_vary[2*ii+1]];
+        out[ii*stride + 2*dim] = bprod[0][ii];
+    }
+
     // now have everything and only need to assemble
     for (size_t ii = 0; ii < dim_vary; ii++){
         nrows = ranks[ii];
@@ -300,8 +309,7 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
             }
         }
     }
-    /* printf("got everything before\n"); */
-
+    
     for (size_t ii = dim_vary+1; ii < dim; ii++){
         /* printf("ii = %zu\n",ii); */
         nrows = ranks[ii];
@@ -311,10 +319,10 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
             /* printf("here!\n"); */
             for (size_t jj = 0; jj < nvals; jj++){
                 /* printf("jj=%zu, neighbor=%zu\n",jj,neighbors[2*(ii-1)]); */
-                out[jj*stride + 2*(ii-1)] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)]*nrows,1,
+                out[jj*stride + 2*ii] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)]*nrows,1,
                                                    fprod[ii-1]+jj*nrows,1);
                 /* printf("\tgot first\n"); */
-                out[jj*stride + 2*(ii-1)+1] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)+1]*nrows,1,
+                out[jj*stride + 2*ii+1] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)+1]*nrows,1,
                                                      fprod[ii-1]+jj*nrows,1);
             }
         }
@@ -323,19 +331,19 @@ void cost_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
                 cblas_dgemv(CblasColMajor,CblasTrans, nrows, ncols,
                             1.0, vf->cores[ii] + neighbors[2*(ii-1)] * nrows * ncols, 
                             nrows, fprod[ii-1] + jj * nrows, 1, 0.0, space1, 1);
-                out[jj*stride + 2*(ii-1)] = cblas_ddot(ncols,space1,1,bprod[ii+1],1);
+                out[jj*stride + 2*ii] = cblas_ddot(ncols,space1,1,bprod[ii+1],1);
 
                 cblas_dgemv(CblasColMajor,CblasTrans, nrows, ncols,
                             1.0, vf->cores[ii] + neighbors[2*(ii-1)+1] * nrows * ncols, 
                             nrows, fprod[ii-1] + jj * nrows, 1, 0.0, space1, 1);
-                out[jj*stride + 2*(ii-1)+1] = cblas_ddot(ncols,space1,1,bprod[ii+1],1);
+                out[jj*stride + 2*ii+1] = cblas_ddot(ncols,space1,1,bprod[ii+1],1);
             }   
         }
         /* printf("last ind = %zu\n",(nvals-1)*stride+2*ii+1); */
     }
-    /* printf("got everything after\n"); */
-}
 
+    return 0;
+}
 
 /**********************************************************//**
    Create a value function through interpolation

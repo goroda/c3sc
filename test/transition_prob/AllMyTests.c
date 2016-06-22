@@ -15,7 +15,7 @@ CuSuite * BellmanGetSuite();
 
 void RunAllTests(void) {
     
-    printf("Running test suite for: lib_linalg\n");
+    printf("Running test suite\n");
     CuString * output = CuStringNew();
     CuSuite * suite = CuSuiteNew();
     
@@ -24,8 +24,8 @@ void RunAllTests(void) {
     CuSuite * bel = BellmanGetSuite();
 
     /* CuSuiteAddSuite(suite, mca); */
-    /* CuSuiteAddSuite(suite, val); */
-    CuSuiteAddSuite(suite, bel);
+    CuSuiteAddSuite(suite, val);
+    /* CuSuiteAddSuite(suite, bel); */
 
     CuSuiteRun(suite);
     CuSuiteSummary(suite, output);

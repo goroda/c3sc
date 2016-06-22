@@ -14,6 +14,11 @@ int process_fibers(size_t d, size_t nvals, const double * x,
                    int * boundv, int * neighbors, 
                    struct Boundary * bound);
 
+int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary, 
+                            const double * x, int * absorbed, size_t * neighbors_vary,
+                            size_t * neighbors_fixed, const size_t * ngrid, 
+                            const struct Boundary * bound); 
+
 int convert_fiber_to_ind(size_t d, size_t N, const double * x, 
                          const size_t * Ngrid, double ** xgrid,
                          size_t * fixed_ind, size_t * dim_vary);

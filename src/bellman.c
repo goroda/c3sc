@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include "c3.h"
 #include "util.h"
@@ -67,9 +68,9 @@ double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_
         for (size_t jj = 0; jj < du; jj++){
             // derivative of stage cost
             grad[jj] = stage_grad[jj] * dt + dtgrad[jj]*stage_cost ;
-            grad[jj] += (-discount) * dtgrad[jj] * ebt;
+            grad[jj] += (-discount) * dtgrad[jj] * ebt * cost_to_go;
             for (size_t ii = 0; ii < 2*dx+1; ii++){
-                grad[jj] += ebt * prob_grad[jj*(2*dx+1) +ii];
+                grad[jj] += ebt * prob_grad[jj*(2*dx+1) +ii] * cost[ii];
             }
         }
     }
