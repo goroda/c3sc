@@ -121,12 +121,13 @@ void valuef_precompute_cores(struct ValueF * cost)
 /**********************************************************//**
    Evaluate the cost of a fiber and associated neighbors
 
-   \param[in]     vf        - value function
-   \param[in]     fixed_ind - (d,) indices of fixed points
-   \param[in]     dim_vary  - dimension along which fiber exists
-   \param[in]     neighbors - (2*(d-1)*N[dim_vary],) array of neighbors (2 in each dim)
-   \param[in,out] out       - value function value at neighbors of each element of the fiber
-   \param[in,out] out_fiber - value function along fiber
+   \param[in]     vf             - value function
+   \param[in]     fixed_ind      - (d,) indices of fixed points
+   \param[in]     dim_vary       - dimension along which fiber exists
+   \param[in]     neighbors      - (2*(d-1),) array of neighbors (2 in each dim that is not varying)
+   \param[in]     neighbors_vary - (2*N,) array of neighbors in dim_vary direction
+   \param[in,out] out            - value function value at neighbors of each element of the fiber
+
 
    \returns  0 if successfull
 **************************************************************/

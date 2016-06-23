@@ -78,3 +78,29 @@ double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_
     return out;
 }
 
+
+double bellman_wrapper(size_t dx, size_t du, size_t dw, size_t N, const double * x,
+                       const double * u, double * grad_u,
+                       struct Dynamics * dyn, struct Boundary * bound,
+                       struct ValueF * vf, struct MCAparam * mca)
+
+{
+    double * costs = calloc_double(N * (2*dx+1));
+    int * absorbed = calloc_int(N);
+    int res = mca_get_neighbor_costs(dx,N,x,bound,vf,ngrid,xgrid,absorbed,costs);
+    
+    assert (res == 0);
+    for (size_t ii = 0; ii < N; ii++){
+        //get drift
+        // get diff
+        // stage cost
+        // absorbed cost
+
+        res = transition_assemble(dx,du,dw,mca->h,mca->hvec,drift,NULL,diff,NULL,prob,
+                                  NULL,dt,NULL,space);
+
+        val[ii] = bellmanrhs(dx,du,stage_cost,NULL,discount,prob,NULL,dt,NULL,
+                             costs+ii*(2*dx+1),NULL);
+    }
+    
+}

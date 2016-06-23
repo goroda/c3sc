@@ -364,6 +364,7 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
 
 int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
                            struct ValueF * vf, const size_t * ngrid, double ** xgrid,
+                           int * absorbed,
                            double * out)
 {
     // BellmanParam must have
@@ -374,7 +375,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,&dim_vary);
     assert (res == 0);
 
-    int * absorbed = calloc_int(N);
+    /* int * absorbed = calloc_int(N); */
     size_t * neighbors_vary = calloc_size_t(2*N);
     size_t * neighbors_fixed = calloc_size_t(2*(d-1));
     res = process_fibers_neighbor(d,fixed_ind,dim_vary,x,absorbed,
@@ -387,6 +388,10 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
                                    neighbors_fixed, neighbors_vary,
                                    out);
 
+    free(fixed_ind); fixed_ind = NULL;
+    /* free(absorbed); absorbed = NULL; */
+    free(neighbors_vary); neighbors_vary = NULL;
+    free(neighbors_fixed); neighbors_fixed = NULL;
     assert (res == 0);
     
     return 0;
