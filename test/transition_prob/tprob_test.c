@@ -1248,6 +1248,7 @@ void Test_bellman_control1d(CuTest * tc)
     free(start[1]); start[1] = NULL;
     dp_param_destroy(dp); dp = NULL;
     valuef_destroy(vf); vf = NULL;
+    approx_args_free(aargs); aargs = NULL;
 
     /* double space[1]; */
     /* double prob[5]; */
