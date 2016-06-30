@@ -23,8 +23,8 @@ void RunAllTests(void) {
     CuSuite * val = ValueFGetSuite();
     CuSuite * bel = BellmanGetSuite();
 
-    CuSuiteAddSuite(suite, mca);
-    CuSuiteAddSuite(suite, val);
+    /* CuSuiteAddSuite(suite, mca); */
+    /* CuSuiteAddSuite(suite, val); */
     CuSuiteAddSuite(suite, bel);
 
     CuSuiteRun(suite);

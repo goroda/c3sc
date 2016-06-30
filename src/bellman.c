@@ -80,6 +80,10 @@ double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_
     return out;
 }
 
+
+////////////////////////////////////////////////
+/// MCA
+///////////////////////////////////////////////
 struct MCAparam{
     
     size_t dx;
@@ -99,10 +103,55 @@ struct MCAparam{
     double * workspace; //(du,1);
 };
 
+struct MCAparam * mca_param_create(size_t dx, size_t du)
+{
+    struct MCAparam * mca = malloc(sizeof(struct MCAparam));
+    assert (mca != NULL);
+    mca->dx = dx;
+    mca->du = du;
+    mca->grad_dt = calloc_double(du);
+    mca->prob = calloc_double(2*dx+1);
+    mca->grad_prob = calloc_double(du * (2*dx+1));
+    mca->workspace = calloc_double(du);
+
+    mca->ngrid = NULL;
+    mca->xgrid = NULL;
+    mca->hvec = NULL;
+    mca->hmin = 0;
+    
+    return mca;
+}
+
+void mca_add_grid_refs(struct MCAparam * mca, size_t * ngrid, double ** xgrid,
+                       double hmin, double * hvec)
+{
+    assert (mca != NULL);
+    mca->ngrid = ngrid;
+    mca->xgrid = xgrid;
+    mca->hmin = hmin;
+    mca->hvec = hvec;
+}
+
+void mca_param_destroy(struct MCAparam * mca)
+{
+    if (mca != NULL){
+        free(mca->grad_dt); mca->grad_dt = NULL;
+        free(mca->prob); mca->prob = NULL;
+        free(mca->grad_prob); mca->grad_prob = NULL;
+        free(mca->workspace); mca->workspace = NULL;
+        free(mca); mca = NULL;
+    }
+}
+
+////////////////////////////////////////////////
+/// DP
+///////////////////////////////////////////////
+
 struct DPparam{
 
     // dynamics and storage space
-    struct Dyn * dyn;
+    struct Drift * dyn_drift;
+    struct Diff * dyn_diff;
     double * drift;
     double * grad_drift;
     double * diff;
@@ -116,22 +165,174 @@ struct DPparam{
     int (*obscost)(const double*,double*);
 };
 
-double bellman_control(size_t du, const double * u, double * grad_u,
-                       double time, size_t dx, size_t dw, const double * x, 
-                       int absorbed, double * costs,
-                       struct DPparam * dp, struct MCAparam * mca)
+struct DPparam * dp_param_create(size_t dx, size_t du, size_t dw, double discount)
 {
+    struct DPparam * dp = malloc(sizeof(struct DPparam));
+    assert (dp != NULL);
+    
+    dp->dyn_drift = drift_alloc(dx,du);
+    dp->dyn_diff = diff_alloc(dx,du,dw);
+
+    dp->drift = calloc_double(dx);
+    dp->grad_drift = calloc_double(dx*du);
+    dp->diff = calloc_double(dx*dw);
+    /* printf("allocated diff\n"); */
+    /* dprint2d_col(dx,dw,dp->diff); */
+    dp->grad_diff = calloc_double(dx*dw*du);
+
+    dp->discount = discount;
+    dp->grad_stage = calloc_double(du);
+
+    dp->stagecost = NULL;
+    dp->boundcost = NULL;
+    dp->obscost = NULL;
+
+    return dp;
+}
+
+void dp_param_destroy(struct DPparam * dp)
+{
+    if (dp != NULL){
+        drift_free(dp->dyn_drift); dp->dyn_drift = NULL;
+        diff_free(dp->dyn_diff); dp->dyn_diff = NULL;
+        free(dp->drift); dp->drift = NULL;
+        free(dp->grad_drift); dp->grad_drift = NULL;
+        free(dp->diff); dp->diff = NULL;
+        free(dp->grad_diff); dp->grad_diff = NULL;
+        free(dp->grad_stage); dp->grad_stage = NULL;
+        free(dp); dp = NULL;
+    }
+}
+
+void dp_param_add_drift(struct DPparam * dp, int (*b)(double,const double*,const double*,
+                                                      double*,double*,void*),
+                        void * bargs)
+{
+    assert (dp != NULL);
+    drift_add_func(dp->dyn_drift,b,bargs);
+}
+
+void dp_param_add_diff(struct DPparam * dp, int (*s)(double,const double*,const double*,
+                                                     double*,double*,void*),
+                        void * sargs)
+{
+    assert (dp != NULL);
+    diff_add_func(dp->dyn_diff,s,sargs);
+}
+
+void dp_param_add_stagecost(struct DPparam * dp, int (*stagecost)(double,const double*,
+                                                                  const double*,double*,double*))
+{
+    assert (dp != NULL);
+    dp->stagecost = stagecost;
+}
+
+void dp_param_add_boundcost(struct DPparam * dp, int (*boundcost)(double,const double*,double*))
+{
+    assert (dp != NULL);
+    dp->boundcost = boundcost;
+}
+
+void dp_param_add_obscost(struct DPparam * dp, int (*obscost)(const double*,double*))
+{
+    assert (dp != NULL);
+    dp->obscost = obscost;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+struct ControlParams
+{
+    double time;
+    size_t dx;
+    size_t dw;
+    const double * x;
+    int absorbed;
+    const double * costs;
+    struct DPparam * dp;
+    struct MCAparam * mca;
+    
+};
+
+struct ControlParams * control_params_create(size_t dx, size_t dw, struct DPparam * dp,
+                                             struct MCAparam * mca)
+{
+    struct ControlParams * c = malloc(sizeof(struct ControlParams));
+    assert (c != NULL);
+    c->dx = dx;
+    c->dw = dw;
+    c->dp = dp;
+    c->mca = mca;
+
+    return c;
+}
+
+void control_params_add_state_info(struct ControlParams * cp,
+                                   double time, const double * x, int absorbed,
+                                   const double * costs)
+{
+    assert (cp != NULL);
+    cp->time = time;
+    cp->x = x;
+    cp->absorbed = absorbed;
+    cp->costs = costs;
+}
+
+void control_params_destroy(struct ControlParams * cp)
+{
+    if (cp != NULL){
+        free(cp); cp = NULL;
+    }
+
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+double bellman_control(size_t du, double * u, double * grad_u, void * args)
+{
+    struct ControlParams * param = args;
+
+    // unpack
+    struct DPparam * dp = param->dp;
+    struct MCAparam * mca = param->mca;
+    const double * costs = param->costs;
+    const double * x = param->x;
+    double time = param->time;
+    size_t dx = param->dx;
+    size_t dw = param->dw;
+    int absorbed = param->absorbed;
+        
     //get drift and diffusion
     int res;
     if (grad_u != NULL){
         for (size_t ii = 0; ii < du; ii++){
             grad_u[ii] = 0.0;
         }
-        res = dyn_eval(dp->dyn,time,x,u,
-                       dp->drift,dp->grad_drift,dp->diff,dp->grad_diff);
+        res = drift_eval(dp->dyn_drift,time,x,u,
+                         dp->drift,dp->grad_drift);
+        assert (res == 0);
+        res = diff_eval(dp->dyn_diff,time,x,u,
+                        dp->diff,dp->grad_diff);
     }
     else{
-        res = dyn_eval(dp->dyn,time,x,u,dp->drift,NULL,dp->diff,NULL);
+        /* printf("x = ");dprint(dx,x); */
+        res = drift_eval(dp->dyn_drift,time,x,u,
+                         dp->drift,NULL);
+        assert (res == 0);
+        /* printf("drift = "); dprint(dx,dp->drift); */
+        res = diff_eval(dp->dyn_diff,time,x,u,
+                        dp->diff,NULL);
+        /* printf("diffusion = \n"); */
+        /* dprint2d_col(dx,dw,dp->diff); */
+        /* exit(1); */
     }
     assert (res == 0);
 
@@ -152,18 +353,28 @@ double bellman_control(size_t du, const double * u, double * grad_u,
                              costs, grad_u);
         }
         else{
+            /* printf("here\n"); */
             res = dp->stagecost(time,x,u,&stage_cost,NULL);
+            /* printf("stagecost = %G\n",stage_cost); */
+            /* printf("drift = "); dprint(dx,dp->drift); */
+            /* printf("diff =  "); dprint2d_col(dx,dw,dp->diff); */
             assert (res == 0);
+            /* printf("assemble transition\n"); */
             res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec,
                                       dp->drift,NULL,dp->diff,NULL,mca->prob,
-                                      NULL,&(mca->dt),NULL,mca->workspace);
+                                      NULL,&(mca->dt),NULL,NULL);
+            /* printf("bellmanrhs \n"); */
+            /* printf("mca->prob = \n"); */
+            /* dprint(2*dx+1,mca->prob); */
             assert (res == 0);
             val = bellmanrhs(dx,du,stage_cost,NULL,dp->discount,mca->prob,NULL,mca->dt,NULL,
                              costs,NULL);
         }
     }
     else if (absorbed == 1){ // absorbed cost
+        /* printf("asborbed\n"); */
         res = dp->boundcost(time,x,&val);
+        /* printf("val = %G\n",val); */
         assert (res == 0);
     }
     else if (absorbed == -1){

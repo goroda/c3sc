@@ -185,12 +185,16 @@ void diff_add_func(struct Diff * df,
 int diff_eval(struct Diff * b, double time, const double * x, 
               const double * u, double * out, double * jac)
 {
+    assert (b != NULL);
+    assert (b->s != NULL);
+
     int res;
     if (b->s == NULL){
         fprintf(stderr,"Warning: Diff dynamics (Diff->s) are not\n");
         fprintf(stderr,"         yet specified\n");
         return 1;
     }
+    
     res = b->s(time,x,u,out,jac,b->sargs);
     return res;
 }
