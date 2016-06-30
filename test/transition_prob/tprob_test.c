@@ -16,6 +16,10 @@
 #include "bellman.h"
 #include "c3sc.h"
 
+//////////////////////////////////////////////////////
+// Dynamics 
+//////////////////////////////////////////////////////
+
 int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
 {
@@ -48,6 +52,78 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
         grad[2] = 0.0;
         grad[3] = 0.0;
     }
+    return 0;
+}
+
+// 3 u
+// 3 x
+int f2(double t, const double * x, const double * u, double * out,
+       double * jac, void * args)
+{
+    (void)(t);
+    (void)(args);
+    out[0] = x[0]*pow(x[2],2)*u[0] * cos(u[1]);
+    out[1] = -x[1]  * u[2];
+    out[2] = x[0]*x[1]*u[0] + 2 * u[1];
+    if (jac != NULL){
+        //df1/du
+        jac[0] = x[0]*pow(x[2],2) * cos(u[1]); 
+        jac[1] = 0.0;                           
+        jac[2] =  x[0]*x[1];                    
+        
+        jac[3] = x[0]*pow(x[2],2)* u[0] * (- sin(u[1]));
+        jac[4] = 0.0;
+        jac[5] = 2.0;
+
+        jac[6] = 0.0;
+        jac[7] = -x[1];
+        jac[8] = 0.0;
+    }
+    return 0;
+}
+
+int s2(double t,const double * x,const double * u,double * out, double * grad,
+       void * args)
+{
+    (void)(t);
+    (void)(x);
+    (void)(u);
+    (void)(args);
+    for (size_t ii = 0; ii < 9; ii++){
+        out[ii] = 0.0;
+    }
+    for (size_t jj = 0; jj < 3; jj++){
+        out[jj*3+jj] = 1e-2;
+    }
+
+    if (grad != NULL){
+        for (size_t ii = 0; ii < 27; ii++){
+            grad[ii] = 0.0;
+        }
+    }
+    return 0;
+}
+
+////////////////////////////////////////////////////////////////
+// Cost functions
+////////////////////////////////////////////////////////////////
+int stagecost2d(double t,const double * x,const double * u, double * out, 
+              double * grad)
+{
+    (void)(t);
+
+    *out = 0.0;
+
+    // states
+    *out += 20.0 * x[0]*x[0];
+    *out += 50.0 * x[1]*x[1];
+
+    // control
+    *out += 0.1 * u[0] * u[0];
+    if (grad!= NULL){
+        grad[0] = 0.1 * 2.0 * u[0];
+    }
+
     return 0;
 }
 
@@ -89,21 +165,6 @@ void Test_tprob_probsum(CuTest * tc)
     }
     CuAssertDblEquals(tc,1,psum,1e-15);
 }
-
-/* void fd_grad(size_t d, double * u, double h, double * out, */
-/*              double (*f)(double * u, void *), void * arg ) */
-/* { */
-/*     double * utemp = calloc_double(d); */
-/*     memmove(utemp,u,d*sizeof(double)); */
-/*     double val1 = f(u,arg); */
-/*     for (size_t ii = 0; ii < d; ii++){ */
-/*         utemp[ii] += h */
-/*         double val2 = f(utemp,arg); */
-/*         utemp[ii] -= h; */
-/*         out[ii] = (val2 - val1)/h; */
-/*     } */
-/*     free (utemp); */
-/* } */
 
 void Test_tprob_grad(CuTest * tc)
 {
@@ -171,55 +232,6 @@ void Test_tprob_grad(CuTest * tc)
         CuAssertDblEquals(tc,fddtgrad,dt_grad[0],1e-5);
             
     }
-}
-
-// 3 u
-// 3 x
-int f2(double t, const double * x, const double * u, double * out,
-       double * jac, void * args)
-{
-    (void)(t);
-    (void)(args);
-    out[0] = x[0]*pow(x[2],2)*u[0] * cos(u[1]);
-    out[1] = -x[1]  * u[2];
-    out[2] = x[0]*x[1]*u[0] + 2 * u[1];
-    if (jac != NULL){
-        //df1/du
-        jac[0] = x[0]*pow(x[2],2) * cos(u[1]); 
-        jac[1] = 0.0;                           
-        jac[2] =  x[0]*x[1];                    
-        
-        jac[3] = x[0]*pow(x[2],2)* u[0] * (- sin(u[1]));
-        jac[4] = 0.0;
-        jac[5] = 2.0;
-
-        jac[6] = 0.0;
-        jac[7] = -x[1];
-        jac[8] = 0.0;
-    }
-    return 0;
-}
-
-int s2(double t,const double * x,const double * u,double * out, double * grad,
-       void * args)
-{
-    (void)(t);
-    (void)(x);
-    (void)(u);
-    (void)(args);
-    for (size_t ii = 0; ii < 9; ii++){
-        out[ii] = 0.0;
-    }
-    for (size_t jj = 0; jj < 3; jj++){
-        out[jj*3+jj] = 1e-2;
-    }
-
-    if (grad != NULL){
-        for (size_t ii = 0; ii < 27; ii++){
-            grad[ii] = 0.0;
-        }
-    }
-    return 0;
 }
 
 void Test_tprob_grad2(CuTest * tc)
@@ -299,8 +311,10 @@ void Test_tprob_grad2(CuTest * tc)
     }
 }
 
+
 CuSuite * TProbGetSuite()
 {
+    // tests assembly of transition probabilities
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
@@ -321,7 +335,8 @@ double quad(const double * x, void * arg)
 
 void Test_valuef_neighbor_eval(CuTest * tc)
 {
-    printf("Testing Functions associated with evaluating neighbors \n");
+    printf("Testing Functions associated with evaluating the cost of a fibers neighbors \n");
+    printf("                  valuef_eval_fiber_ind_nn\n");
 
     size_t dim = 3;
 
@@ -748,6 +763,7 @@ void Test_valuef_fiber_to_ind(CuTest * tc)
 CuSuite * ValueFGetSuite()
 {
     //printf("----------------------------\n");
+    // tests value function
 
     CuSuite * suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, Test_valuef_neighbor_eval);
@@ -758,7 +774,7 @@ CuSuite * ValueFGetSuite()
 
 void Test_bound_nodes(CuTest * tc)
 {
-    printf("Running test_bound_nodes \n");
+    printf("Testing function: process_fibers\n");
     size_t d = 3;
     double lb[3] = {-1.0, -2.0, -3.0};
     double ub[3] = { 1.0, 2.0, 3.0 };
@@ -953,26 +969,6 @@ void Test_process_fibers_neighbor(CuTest * tc)
     }
 }
 
-int stagecost2d(double t,const double * x,const double * u, double * out, 
-              double * grad)
-{
-    (void)(t);
-
-    *out = 0.0;
-
-    // states
-    *out += 20.0 * x[0]*x[0];
-    *out += 50.0 * x[1]*x[1];
-
-    // control
-    *out += 0.1 * u[0] * u[0];
-    if (grad!= NULL){
-        grad[0] = 0.1 * 2.0 * u[0];
-    }
-
-    return 0;
-}
-
 void Test_bellman_grad1(CuTest * tc)
 {
     printf("Testing Function: bellmanrhs gradient\n");
@@ -1053,14 +1049,16 @@ void Test_bellman_grad1(CuTest * tc)
     }
 }
 
+
+
 CuSuite * BellmanGetSuite()
 {
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    /* SUITE_ADD_TEST(suite, Test_bellman_grad1); */
+    SUITE_ADD_TEST(suite, Test_bellman_grad1);
     SUITE_ADD_TEST(suite, Test_process_fibers_neighbor);
-    /* SUITE_ADD_TEST(suite, Test_bound_nodes); */
+    SUITE_ADD_TEST(suite, Test_bound_nodes);
 
     return suite;
 }

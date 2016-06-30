@@ -126,10 +126,14 @@ void valuef_precompute_cores(struct ValueF * cost)
    \param[in]     dim_vary       - dimension along which fiber exists
    \param[in]     neighbors      - (2*(d-1),) array of neighbors (2 in each dim that is not varying)
    \param[in]     neighbors_vary - (2*N,) array of neighbors in dim_vary direction
-   \param[in,out] out            - value function value at neighbors of each element of the fiber
+   \param[in,out] out            - (N*(2d+1),) array of values at neighbors of each element including fibers
 
-
-   \returns  0 if successfull
+   \returns  0 if successful
+   
+   \note
+   out ordered as an array of N arrays
+   each arary is (2d+1) ordered by cost in (- +) neighbor in each direction
+   fiber followed by the value at the fiber
 **************************************************************/
 int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
                               size_t dim_vary, const size_t * neighbors,

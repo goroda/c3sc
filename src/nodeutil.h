@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include "boundary.h"
-
+#include "valuefunc.h"
 int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec,
                         const double * drift, const double * grad_drift,
                         const double * ddiff, const double * grad_ddiff,
@@ -22,4 +22,8 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
 int convert_fiber_to_ind(size_t d, size_t N, const double * x, 
                          const size_t * Ngrid, double ** xgrid,
                          size_t * fixed_ind, size_t * dim_vary);
+
+int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
+                           struct ValueF * vf, const size_t * ngrid, double ** xgrid,
+                           int * absorbed, double * out);
 #endif

@@ -22,7 +22,7 @@
     \param[in]     ddiff      - diagonal diffusion
     \param[in]     grad_ddiff - gradient of diffusion
     \param[in,out] prob       - vector of probabililities (2d+1)
-    \param[in,out] grad_prob  - gradient of probabilities
+    \param[in,out] grad_prob  - gradient of probabilities (du*(2d+1))
     \param[in,out] dt         - interpolation interval
     \param[in,out] grad_dt    - gradient of interpolation interval
     \param[in,out] space      - workspace needed if gradients requested (du,) array
@@ -225,7 +225,7 @@ int convert_fiber_to_ind(size_t d, size_t N, const double * x,
     \param[in]     fixed_ind       - (d,) vector of fixed indices
     \param[in]     dim_vary        - dimension that varies
     \param[in]     x               - values of the fiber
-    \param[in,out] absorbed        - (0,no), (1,yes), (2,obstacle)
+    \param[in,out] absorbed        - (0,no), (1,yes), (-1,obstacle)
     \param[in,out] neighbors_vary  - (2*ngrid[dim_vary],)  neighbor indices in varying dimension
     \param[in,out] neighbors_fixed - (2*(d-1),) neighbor indices for fixed dimension
     \param[in]     ngrid           - size of grid in each dimension
@@ -362,10 +362,25 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
     return 0;
 }
 
+/**********************************************************//**
+    Process a fiber of nodes obtaining the boundary information
+    for each node and the costs of all nodes neded for the MCA method
+    
+    \param[in]     d               - dimension of state space
+    \param[in]     N               - number of elements in the fiber
+    \param[in]     x               - evaluation locations
+    \param[in]     bound           - boundary information
+    \param[in]     vf              - value function
+    \param[in]     ngrid           - size of grid in each dimension
+    \param[in]     xgrid           - size of grid in each dimension
+    \param[in,out] absorbed        - (0,no), (1,yes), (-1,obstacle)
+    \param[in,out] out             - (N*(2d+1),) array of values at neighbors of each element including fibers
+
+    \return 0 if everything is ok, 
+**************************************************************/
 int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
                            struct ValueF * vf, const size_t * ngrid, double ** xgrid,
-                           int * absorbed,
-                           double * out)
+                           int * absorbed, double * out)
 {
     // BellmanParam must have
 
@@ -388,11 +403,12 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
                                    neighbors_fixed, neighbors_vary,
                                    out);
 
+    assert (res == 0);
     free(fixed_ind); fixed_ind = NULL;
     /* free(absorbed); absorbed = NULL; */
     free(neighbors_vary); neighbors_vary = NULL;
     free(neighbors_fixed); neighbors_fixed = NULL;
-    assert (res == 0);
+
     
     return 0;
 }
