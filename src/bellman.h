@@ -34,12 +34,14 @@ void dp_param_add_obscost(struct DPparam *, int (*)(const double*,double*));
 struct ControlParams;
 struct ControlParams *
 control_params_create(size_t, size_t, struct DPparam *,
-                      struct MCAparam *);
+                      struct MCAparam *, struct c3Opt *);
 void control_params_add_state_info(struct ControlParams *,
                                    double, const double *, int,
                                    const double *);
+int control_params_get_last_res(const struct ControlParams *);
 void control_params_destroy(struct ControlParams *);
 
 ///////////////////////////////////////////////////////////////
 double bellman_control(size_t, double *, double *, void *);
+int bellman_optimal(size_t, double *, double *, void *);
 #endif

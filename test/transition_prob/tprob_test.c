@@ -67,7 +67,7 @@ int f2(double t, const double * x, const double * u, double * out,
     out[1] = -x[1]  * u[2];
     out[2] = x[0]*x[1]*u[0] + 2 * u[1];
     if (jac != NULL){
-        //df1/du
+        
         jac[0] = x[0]*pow(x[2],2) * cos(u[1]); 
         jac[1] = 0.0;                           
         jac[2] =  x[0]*x[1];                    
@@ -123,6 +123,31 @@ int stagecost2d(double t,const double * x,const double * u, double * out,
     *out += 0.1 * u[0] * u[0];
     if (grad!= NULL){
         grad[0] = 0.1 * 2.0 * u[0];
+    }
+
+    return 0;
+}
+
+int stagecost3d(double t,const double * x,const double * u, double * out, 
+              double * grad)
+{
+    (void)(t);
+
+    *out = 0.0;
+
+    // states
+    *out += 20.0 * x[0]*x[0];
+    *out += 50.0 * x[1]*x[1];
+    *out += 70.0 * x[2]*x[2];
+
+    // control
+    *out += 0.1 * u[0] * u[0];
+    *out += 0.5 * u[1] * u[1];
+    *out += 3.0 * u[2] * u[2];
+    if (grad!= NULL){
+        grad[0] = 0.1 * 2.0 * u[0];
+        grad[1] = 0.5 * 2.0 * u[1];
+        grad[2] = 3.0 * 2.0 * u[2];
     }
 
     return 0;
@@ -1076,6 +1101,145 @@ void Test_bellman_grad1(CuTest * tc)
     }
 }
 
+void Test_bellman_grad3d(CuTest * tc)
+{
+    printf("Testing Function: bellmanrhs gradient with 3d control\n");
+
+    size_t dx = 3;
+    size_t du = 3;
+    size_t dw = 3;
+    double h[3] = {1e-1,1e-2,2e-1};
+    double hmin = h[1];
+
+    double drift[3];
+    double grad_drift[9];
+    double diff[9];
+    double grad_diff[27];
+
+    double space[3];
+    double prob[7];
+    double prob2[7];
+    double prob3[7];
+    double grad_prob[7*3];
+    double dt,dt2;
+    double dt_grad[3];
+
+    double grad_stage[3];
+    double grad_bellman[3] = {0.0,0.0,0.0};
+
+    double discount = 0.1;
+
+    size_t nrand = 1000;
+    for (size_t kk = 0; kk < nrand; kk++){
+        /* printf("kk = %zu\n",kk); */
+        /* double pt[2] = {1.0,2.0}; */
+        double t = 0.2;
+        double pt[3] = {randu()*3.0-1.5,
+                        randu()*3.0-1.5,
+                        randu()*3.0-1.5,
+                       };
+        double u[3] = {randu()*3.0-1.5,
+                       randu()*3.0-1.5,
+                       randu()*3.0-1.5};
+
+        if (kk == 0){
+            pt[0] = -0.951613;
+            pt[1] = -1.305556;
+            pt[2] = -2.615385;
+            u[0] = -5.0;
+            u[1] = -5.0;
+            u[2] = 0.0;
+        }
+
+        double v[3] = {u[0],u[1],u[2]};
+        
+        double cost[7] = {randu(),
+                          randu(),
+                          randu(),
+                          randu(),
+                          randu(),
+                          randu(),
+                          randu()};
+
+        double stage_cost;
+        int res = stagecost3d(t,pt,u,&stage_cost,grad_stage);
+        CuAssertIntEquals(tc,0,res);
+    
+        res = f2(t,pt,u,drift,grad_drift,NULL);
+        CuAssertIntEquals(tc,0,res);
+        res = s2(t,pt,u,diff,grad_diff,NULL);
+        CuAssertIntEquals(tc,0,res);
+        res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift,
+                                  diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
+        CuAssertIntEquals(tc,0,res==1); // res should not be 1
+
+        
+        bellmanrhs(dx,du,stage_cost,grad_stage,
+                   discount, prob, grad_prob, dt, dt_grad,
+                   cost, grad_bellman);
+        /* printf("grad_bellman = "); dprint(3,grad_bellman); */
+
+        /* printf("drift = (%G,%G,%G)\n",drift[0],drift[1],drift[2]); */
+        /* printf("gdrift = (%G,%G,%G)\n",grad_drift[0],grad_drift[1],grad_drift[2]); */
+        double delta = 1e-7;
+        for (size_t zz = 0; zz < du; zz++){
+            v[zz] = u[zz]+delta;
+            res =f2(t,pt,v,drift,grad_drift,NULL);
+            CuAssertIntEquals(tc,0,res);
+            res = s2(t,pt,v,diff,grad_diff,NULL);
+            CuAssertIntEquals(tc,0,res);
+            res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
+                                      &dt2,NULL,NULL);
+
+            double stage_cost2;
+            res = stagecost3d(t,pt,v,&stage_cost2,NULL);
+            CuAssertIntEquals(tc,0,res);
+            double newval = bellmanrhs(dx,du,stage_cost2,NULL,
+                                       discount, prob2,NULL, dt2, NULL,
+                                       cost, NULL);
+
+            v[zz] = u[zz];//-delta;
+            res =f2(t,pt,v,drift,grad_drift,NULL);
+            CuAssertIntEquals(tc,0,res);
+            res = s2(t,pt,v,diff,grad_diff,NULL);
+            CuAssertIntEquals(tc,0,res);
+            res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob3,NULL,
+                                      &dt2,NULL,NULL);
+
+            double stage_cost3;
+            res = stagecost3d(t,pt,v,&stage_cost3,NULL);
+            CuAssertIntEquals(tc,0,res);
+            double newval3 = bellmanrhs(dx,du,stage_cost3,NULL,
+                                        discount, prob3,NULL, dt2, NULL,
+                                        cost, NULL);
+
+            /* double gstage = (stage_cost2 - stage_cost3)/2.0/delta; */
+            double gstage = (stage_cost2 - stage_cost3)/delta;
+            /* printf("\t grad stage should =  %G, grad is %G\n",gstage,grad_stage[zz]); */
+            CuAssertDblEquals(tc,gstage,grad_stage[zz],1e-3);
+            for (size_t ll = 0; ll < 2*dx+1; ll++){
+                /* double gprob = (prob2[ll]-prob3[ll])/2.0/delta; */
+                double gprob = (prob2[ll]-prob3[ll])/delta;
+                double gprob_is = grad_prob[ll*du + zz];
+                /* printf("\t\t grad prob should =  %G, grad is %G\n",gprob,gprob_is); */
+                CuAssertDblEquals(tc,gprob,gprob_is,1e-3);
+            }
+            /* printf("val = %G, newval=%G\n",val,newval); */
+            /* double fdgrad = (newval - newval3)/2.0/delta; */
+            double fdgrad = (newval - newval3)/delta;
+            /* printf("\t should = %G, is = %G\n",fdgrad,grad_bellman[zz]); */
+            double diffe = fabs(fdgrad - grad_bellman[zz]);
+            if (fabs(fdgrad) > 1){
+                diffe /= fabs(fdgrad);
+            }
+            CuAssertDblEquals(tc,0,diffe,1e-3);
+
+            v[zz] = u[zz];
+        }
+
+    }
+}
+
 double quad2d(const double * x, void * arg)
 {
     (void)(arg);
@@ -1138,7 +1302,17 @@ void Test_bellman_control1d(CuTest * tc)
     struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
 
 
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca);
+    double lbu = -5.0;
+    double ubu = 5.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,&lbu);
+    c3opt_add_ub(opt,&ubu);
+    c3opt_set_absxtol(opt,1e-15);
+    c3opt_set_relftol(opt,1e-15);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_set_verbose(opt,0);
+
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
     for (size_t kk = 0; kk < ngrid[0]; kk++){
         for (size_t ll = 0; ll < ngrid[1]; ll++){
             size_t ind[2] = {kk,ll};
@@ -1169,8 +1343,6 @@ void Test_bellman_control1d(CuTest * tc)
                 double delta = 1e-5;
                 double grad[1];
                 size_t nopts = 100;
-                double lbu = -5.0;
-                double ubu = 5.0;
                 double * uopts = linspace(lbu,ubu,nopts);
                 for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
                     /* printf("ii=%zu\n",ii); */
@@ -1203,7 +1375,16 @@ void Test_bellman_control1d(CuTest * tc)
                         CuAssertDblEquals(tc,0,err,1e-2);
                         /* printf("val=%G\n",val); */
                     }
-                    /* if (absorbed[ii] == 0){ // this breaks!!! ofcourse... */
+                    if (absorbed[ii] == 0){ // this breaks!!! ofcourse...
+                        double uopt[1];
+                        double valopt;
+                        int res2 = bellman_optimal(du,uopt,&valopt,cp);
+                        CuAssertIntEquals(tc,0,res2);
+                        /* printf("valopt = %3.10G, optbf=%3.10G\n",valopt,umin); */
+                        /* printf("locminopt = %3.10G\n",uopt[0]); */
+                        /* printf("locmin bf = %3.10G\n",minim); */
+                        CuAssertIntEquals(tc,1,valopt < umin+1e-10);
+                    }
                     /*     struct c3Opt * opt = c3opt_alloc(BFGS,du); */
                     /*     c3opt_add_lb(opt,&lbu); */
                     /*     c3opt_add_ub(opt,&ubu); */
@@ -1249,69 +1430,229 @@ void Test_bellman_control1d(CuTest * tc)
     dp_param_destroy(dp); dp = NULL;
     valuef_destroy(vf); vf = NULL;
     approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
+}
 
-    /* double space[1]; */
-    /* double prob[5]; */
-    /* double prob2[5]; */
-    /* double grad_prob[5*1]; */
-    /* double dt,dt2; */
-    /* double dt_grad[1]; */
+double quad3d(const double * x, void * arg)
+{
+    (void)(arg);
+    return x[0]*x[0] + x[1]*x[1] + x[2]*x[2];
+}
 
-    /* double grad_stage[1]; */
-    /* double grad_bellman[1]; */
+void Test_bellman_control3d(CuTest * tc)
+{
+    printf("Testing Function: bellman_control (3d) \n");
 
-    /* double discount = 0.1; */
+    size_t dx = 3;
+    size_t du = 3;
+    size_t dw = 3;
 
-    /* size_t nrand = 100; */
-    /* for (size_t kk = 0; kk < nrand; kk++){ */
-    /*     /\* printf("kk = %zu\n",kk); *\/ */
-    /*     /\* double pt[2] = {1.0,2.0}; *\/ */
-    /*     double t = 0.2; */
-    /*     double pt[2] = {randu()*3.0-1.5,randu()*3.0-1.5}; */
-    /*     double u[1] = {randu()*3.0-1.5}; */
-    /*     double cost[5] = {randu(),randu(),randu(),randu(),randu()}; */
-
-    /*     double stage_cost; */
-    /*     int res = stagecost2d(t,pt,u,&stage_cost,grad_stage); */
-    /*     CuAssertIntEquals(tc,0,res); */
+    double lb[3] = {-1.0, -2.0,-3.0};
+    double ub[3] = {2.0, 3.0,1.0 };
+    double center[3] = {0.0,0.0,0.0};
+    double lengths[3] = {0.8,0.8,0.8};
+    struct Boundary * bound = boundary_alloc(dx,lb,ub);
+    boundary_add_obstacle(bound,center,lengths);
     
-    /*     res =f1(t,pt,u,drift,grad_drift,NULL); */
-    /*     CuAssertIntEquals(tc,0,res); */
-    /*     res = s1(t,pt,u,diff,grad_diff,NULL); */
-    /*     CuAssertIntEquals(tc,0,res); */
-    /*     res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift, */
-    /*                               diff,grad_diff,prob,grad_prob,&dt,dt_grad,space); */
-    /*     CuAssertIntEquals(tc,0,res); */
 
-    /*     double val = bellmanrhs(dx,du,stage_cost,grad_stage, */
-    /*                             discount, prob, grad_prob, dt, dt_grad, */
-    /*                             cost, grad_bellman); */
+    size_t ngrid[3] = {63, 37, 53};
+    double * xgrid[3];
+    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
+    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
+    xgrid[2] = linspace(lb[2],ub[2],ngrid[2]);
+    double h[3] = {xgrid[0][1]-xgrid[0][0],
+                   xgrid[1][1]-xgrid[1][0],
+                   xgrid[2][1]-xgrid[2][0]};
+    double hmin = fmin(h[0],h[1]);
+    hmin = fmin(hmin,h[2]);
+    
+    struct MCAparam * mca = mca_param_create(dx,du);
+    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
+    
+    double discount = 0.1;
+    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
+    dp_param_add_drift(dp,f2,NULL);
+    dp_param_add_diff(dp,s2,NULL);
+    dp_param_add_stagecost(dp,stagecost3d);
+    dp_param_add_boundcost(dp,boundcost);
+    dp_param_add_obscost(dp,ocost);
 
 
-    /*     /\* printf("drift = (%G,%G)\n",drift[0],drift[1]); *\/ */
-    /*     /\* printf("gdrift = (%G,%G)\n",grad_drift[0],grad_drift[1]); *\/ */
-    /*     double delta = 1e-9; */
-    /*     u[0] += delta; */
-    /*     res =f1(t,pt,u,drift,grad_drift,NULL); */
-    /*     CuAssertIntEquals(tc,0,res); */
-    /*     res = s1(t,pt,u,diff,grad_diff,NULL); */
-    /*     CuAssertIntEquals(tc,0,res); */
-    /*     res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL, */
-    /*                               &dt2,NULL,NULL); */
+    // cross approximation tolerances
+    size_t start_rank = 10;
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_adapt(aargs,0);
+    approx_args_set_startrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,start_rank);
 
-    /*     double stage_cost2; */
-    /*     res = stagecost2d(t,pt,u,&stage_cost2,NULL); */
-    /*     CuAssertIntEquals(tc,0,res); */
-    /*     double newval = bellmanrhs(dx,du,stage_cost2,NULL, */
-    /*                                discount, prob2,NULL, dt2, NULL, */
-    /*                                cost, NULL); */
+    double * start[3];
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii],start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
 
-    /*     /\* printf("val = %G, newval=%G\n",val,newval); *\/ */
-    /*     double fdgrad = (newval - val)/delta; */
-    /*     CuAssertDblEquals(tc,fdgrad,grad_bellman[0],1e-5); */
+    double lbu = -5.0;
+    double ubu = 5.0;
+    double lbarr[3] = {lbu,lbu,lbu};
+    double ubarr[3] = {ubu,ubu,ubu};
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbarr);
+    c3opt_add_ub(opt,ubarr);
+    c3opt_set_absxtol(opt,1e-15);
+    c3opt_set_relftol(opt,1e-15);
+    c3opt_set_gtol(opt,0.0);
+    c3opt_set_verbose(opt,0);
 
-    /*     u[0] -= delta; */
-    /* } */
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+    for (size_t kk = 0; kk < ngrid[0]; kk = kk + 5){
+        for (size_t ll = 0; ll < ngrid[1]; ll = ll + 5){
+            for (size_t zz = 0; zz < ngrid[2]; zz = zz + 5){
+                size_t ind[3] = {kk,ll,zz};
+                for (size_t vary_ind = 0; vary_ind < dx; vary_ind++){
+
+                    /* size_t vary_ind = 0;; */
+                    double * x = calloc_double(dx*ngrid[vary_ind]);
+                    int * absorbed = calloc_int(ngrid[vary_ind]);
+                    double * costs = calloc_double(ngrid[vary_ind]*(2*dx+1));
+                    for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
+                        for (size_t jj = 0; jj < dx; jj++){
+                            x[ii*dx+jj] = xgrid[jj][ind[jj]];
+                        }
+                        x[ii*dx+vary_ind] = xgrid[vary_ind][ii];
+                    }
+
+                    /* printf("Hi\n"); */
+                    int res = mca_get_neighbor_costs(dx,ngrid[vary_ind],x,
+                                                     bound,vf,ngrid,xgrid,
+                                                     absorbed,costs);
+                    CuAssertIntEquals(tc,0,res);
+
+
+                    double time = 0.0;
+                    double val = 0.0;
+                    double val2 = 0.0;
+                    double val3 = 0.0;
+                    double delta = 1e-7;
+                    double grad[3];
+                    size_t nopts = 5;
+                    /* double lbu = -5.0; */
+                    /* double ubu = 5.0; */
+                    double * uopts = linspace(lbu+5e-1,ubu-5e-1,nopts);
+                    for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
+                        /* printf("ii=%zu\n",ii); */
+                        control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],
+                                                      costs+ii*(2*dx+1));
+
+                        double umin = 1000;
+                        double minim[3] = {0.0, 0.0, 0.0};
+                        for (size_t jj = 0; jj < nopts; jj++){
+                            for (size_t ff = 0; ff < nopts; ff++ ){
+                                for (size_t qq = 0; qq < nopts; qq++){
+                                    
+                                    double u[3] = {uopts[jj],uopts[ff],uopts[qq]};
+                                                                /* printf("control\n"); */
+                                    val = bellman_control(du,u,grad,cp);
+                                    if (val < umin){
+                                        umin = val;
+                                        minim[0] = u[0];
+                                        minim[1] = u[1];
+                                        minim[2] = u[2];
+                                    }
+
+
+                                    double v[3] = {u[0],u[1],u[2]};
+                                    for (size_t rr = 0; rr < du; rr++){
+                                        v[rr] = u[rr]+delta;
+                                        val2 = bellman_control(du,v,NULL,cp);
+                                        v[rr] = u[rr]-delta;
+                                        val3 = bellman_control(du,v,NULL,cp);
+                                        v[rr] = u[rr];
+                                        double diff_should = (val2-val3)/2.0/delta;
+                                        /* double diff_should = (val2-val3)/delta; */
+                                        double diff_is = grad[rr];
+                                        double err = (diff_is-diff_should);
+
+
+                                        /* if (fabs(diff_should) > 1e-13){ */
+                                        /*     err /= diff_should; */
+                                        /* } */
+                                        if (fabs(err) > 1e-2){ // make sure its due to weird deriv
+                                                               // due to 0 drift
+
+                                            int last_res = control_params_get_last_res(cp);
+                                            /* printf("last_res = %d\n",last_res); */
+                                            /* printf("u = "); dprint(3,u); */
+                                            /* printf("err = %G\n",err); */
+                                            /* printf("diff_should = %G\n",diff_should); */
+                                            /* printf("diff_is = %G\n",diff_is); */
+                                            /* printf("rr = %zu\n", rr); */
+                                            /* printf("x = "); dprint(dx,x+ii*dx); */
+                                            /* printf("absorbed = %d\n",absorbed[ii]); */
+
+                                            /* double drift[3]; */
+                                            /* f2(time,x+ii*dx,u,drift,NULL,NULL); */
+                                            /* printf("drift = "); */
+                                            /* for (size_t llf = 0; llf < dx; llf++){ */
+                                            /*     printf("%3.10G ",drift[llf]); */
+                                            /* } */
+                                            /* printf("\n"); */
+                                            CuAssertIntEquals(tc,2,last_res);
+                                        }
+                                        /* CuAssertDblEquals(tc,0,err,1e-2); */
+                                    }
+                                }
+                            }
+                        }
+                        if (absorbed[ii] == 0){ // this breaks!!! ofcourse...
+                            double uopt[3];
+                            double valopt;
+                            int res2 = bellman_optimal(du,uopt,&valopt,cp);
+                            CuAssertIntEquals(tc,0,res2);
+                            if (valopt > umin){
+                                printf("valopt = %3.10G, optbf=%3.10G\n",valopt,umin);
+                                printf("\t locminopt = %3.10G,%3.10G,%3.10G\n",
+                                       uopt[0],uopt[1],uopt[2]);
+                                printf("\t locbf     = %3.10G,%3.10G,%3.10G\n",
+                                       minim[0],minim[1],minim[2]);
+                            }
+                            /* CuAssertIntEquals(tc,1,valopt < umin+1e-10); */
+                        }
+                    }
+
+                    free(uopts); uopts = NULL;
+                    free(x); x = NULL;
+                    free(absorbed); absorbed = NULL;
+                    free(costs); costs = NULL;
+                }
+            }
+        }
+    }
+    /* printf("weird\n"); */
+    /* double drift[2]; */
+    /* double grad_drift[2]; */
+    /* double diff[4]; */
+    /* double grad_diff[4]; */
+
+    control_params_destroy(cp); cp = NULL;
+    boundary_free(bound); bound = NULL;
+    mca_param_destroy(mca); mca = NULL;
+    free(xgrid[0]); xgrid[0] = NULL;
+    free(xgrid[1]); xgrid[1] = NULL;
+    free(xgrid[1]); xgrid[2] = NULL;
+    free(start[0]); start[0] = NULL;
+    free(start[1]); start[1] = NULL;
+    free(start[2]); start[2] = NULL;
+    dp_param_destroy(dp); dp = NULL;
+    valuef_destroy(vf); vf = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
 }
 
 
@@ -1323,7 +1664,9 @@ CuSuite * BellmanGetSuite()
     /* SUITE_ADD_TEST(suite, Test_process_fibers_neighbor); */
     /* SUITE_ADD_TEST(suite, Test_bound_nodes); */
     /* SUITE_ADD_TEST(suite, Test_bellman_grad1); */
-    SUITE_ADD_TEST(suite, Test_bellman_control1d);
+    /* SUITE_ADD_TEST(suite, Test_bellman_grad3d); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_control1d); */
+    SUITE_ADD_TEST(suite, Test_bellman_control3d);
 
     return suite;
 }

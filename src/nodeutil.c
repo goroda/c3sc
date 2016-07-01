@@ -27,7 +27,7 @@
     \param[in,out] grad_dt    - gradient of interpolation interval
     \param[in,out] space      - workspace needed if gradients requested (du,) array
 
-    \return 0 if everything is ok, 1 if computed dt is infinity
+    \return 0 if everything is ok, 1 if computed dt is infinity, 2 if derivative ambiguous
 
     \note
     The probabilities are ordered as ("left", "right") for each dimension
@@ -58,7 +58,9 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
     double normalization = 0.0;
     double h2 = h * h;
     double t2, diff, t;
+    int res = 0;
     for (size_t ii = 0; ii < dx; ii++){
+        /* printf("ii = %zu\n",ii); */
         t = h2/hvec[ii];
         diff = ddiff[ii*dx+ii] * ddiff[ii*dx+ii];
         t2 = h2 / hvec[ii] / hvec[ii];
@@ -86,15 +88,16 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
             cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + (2*ii+1)*du,1);
             
             // now drifts
-            if (drift[ii] < 0){
+            if (drift[ii] < -1e-14){
                 cblas_daxpy(du,-t,grad_drift+ii,dx,grad_prob + (2*ii)*du,1);
             }
-            else if (drift[ii] > 0){
+            else if (drift[ii] > 1e-14){
                 cblas_daxpy(du,t,grad_drift+ii,dx,grad_prob + (2*ii+1)*du,1);
             }
             else{
                 /* printf("warning! not sure what to do here!\n"); */
                 for (size_t jj = 0; jj < du; jj++){
+                    /* printf("jj = %zu\n",jj); */
                     if (grad_drift[jj*dx+ii] < 0){ // wants to go left with changing u
                         cblas_daxpy(du,-t,grad_drift+ii,dx,grad_prob + (2*ii)*du,1);
                     }
@@ -102,7 +105,8 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
                         cblas_daxpy(du,t,grad_drift+ii,dx,grad_prob + (2*ii+1)*du,1);
                     }
                     else{ // do nothing because doesn't want to change!
-                        /* printf("warning! not sure what to do here!\n"); */
+                        res = 2;
+                        /* printf("warning! not sure what to do here transition assemble!\n"); */
                     }
 
                 }
@@ -151,7 +155,7 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
         }
     }
 
-    return 0;
+    return res;
 }
 
 size_t convert_x_to_ind(double x, size_t N, double * grid)

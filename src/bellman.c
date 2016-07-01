@@ -67,14 +67,26 @@ double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_
     double out = dt * stage_cost + ebt * cost_to_go;
 
     if (grad != NULL){
+        /* printf("dtgrad = "); dprint(du,dtgrad); */
+        /* printf("stagegrad = "); dprint(du,stage_grad); */
+        /* printf("stagecost = %G\n",stage_cost); */
+        /* printf("dt = %G\n",dt); */
+        /* printf("ebt = %G\n",ebt); */
         for (size_t jj = 0; jj < du; jj++){
+            /* printf("jj = %zu\n",jj); */
             // derivative of stage cost
             grad[jj] = stage_grad[jj] * dt + dtgrad[jj]*stage_cost ;
             grad[jj] += (-discount) * dtgrad[jj] * ebt * cost_to_go;
+            /* printf("grad[jj] til noow = %G\n",grad[jj]); */
             for (size_t ii = 0; ii < 2*dx+1; ii++){
-                grad[jj] += ebt * prob_grad[jj*(2*dx+1) +ii] * cost[ii];
+                /* printf("ii = %zu, cost=%G\n",ii,cost[ii]); */
+                /* printf("prob grad = %G\n",prob_grad[jj*(2*dx+1)+ii]);  */
+                grad[jj] += ebt * prob_grad[ii*du + jj] * cost[ii];
+                /* printf("grad[jj] is now %G\n",grad[jj]); */
+
             }
         }
+        /* printf("grad = ");dprint(du,grad); */
     }
 
     return out;
@@ -255,11 +267,14 @@ struct ControlParams
     const double * costs;
     struct DPparam * dp;
     struct MCAparam * mca;
+    struct c3Opt * opt;
+
+    int res_last_grad; // result of the last gradient evaluation
     
 };
 
 struct ControlParams * control_params_create(size_t dx, size_t dw, struct DPparam * dp,
-                                             struct MCAparam * mca)
+                                             struct MCAparam * mca, struct c3Opt * opt)
 {
     struct ControlParams * c = malloc(sizeof(struct ControlParams));
     assert (c != NULL);
@@ -267,7 +282,8 @@ struct ControlParams * control_params_create(size_t dx, size_t dw, struct DPpara
     c->dw = dw;
     c->dp = dp;
     c->mca = mca;
-
+    c->opt = opt;
+    c->res_last_grad = 0;
     return c;
 }
 
@@ -280,6 +296,12 @@ void control_params_add_state_info(struct ControlParams * cp,
     cp->x = x;
     cp->absorbed = absorbed;
     cp->costs = costs;
+}
+
+int control_params_get_last_res(const struct ControlParams * cp)
+{
+    assert (cp != NULL);
+    return cp->res_last_grad;
 }
 
 void control_params_destroy(struct ControlParams * cp)
@@ -318,6 +340,7 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
         }
         res = drift_eval(dp->dyn_drift,time,x,u,
                          dp->drift,dp->grad_drift);
+        /* printf("drift = "); dprint(dx,dp->drift); */
         assert (res == 0);
         res = diff_eval(dp->dyn_diff,time,x,u,
                         dp->diff,dp->grad_diff);
@@ -347,7 +370,9 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
             res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec,
                                       dp->drift,dp->grad_drift,dp->diff,dp->grad_diff,mca->prob,
                                       mca->grad_prob,&(mca->dt),mca->grad_dt,mca->workspace);
-            assert (res == 0);
+
+            param->res_last_grad = res;
+            /* assert (res == 0); */
             val = bellmanrhs(dx,du,stage_cost,dp->grad_stage,dp->discount,
                              mca->prob,mca->grad_prob,mca->dt,mca->grad_dt,
                              costs, grad_u);
@@ -386,6 +411,75 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
     }
     return val;
 }
+
+int bellman_optimal(size_t du, double * u, double * val, void * arg)
+{
+    assert (arg != NULL);
+    struct ControlParams * param = arg;
+
+    // unpack
+    struct c3Opt * opt = param->opt;
+    assert (opt != NULL);
+    double * lbu = c3opt_get_lb(opt);
+    double * ubu = c3opt_get_ub(opt);
+    double * umin = calloc_double(du);
+    double * ucurr = calloc_double(du);
+    double minval = 0.0;
+    size_t nrand = 30;
+
+    double valtemp;
+    for (size_t jj = 0; jj < nrand; jj++){
+        for (size_t kk = 0; kk < du; kk++){
+            ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
+        }
+
+        c3opt_add_objective(opt,&bellman_control,param);
+        c3opt_minimize(opt,ucurr,&valtemp);
+        if (jj != 0){
+            if (valtemp < minval){
+                minval = valtemp;
+                memmove(umin,ucurr,du*sizeof(double));
+            }
+        }
+        else{
+            minval = valtemp;
+            memmove(umin,ucurr,du*sizeof(double));
+        }
+    }
+    
+    // now compare with random samples
+    nrand = 200;
+    for (size_t jj = 0; jj < nrand; jj++){
+        for (size_t kk = 0; kk < du; kk++){
+            ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
+        }
+
+        valtemp = bellman_control(du,ucurr,NULL,arg);
+        if (valtemp < minval){
+            minval = valtemp;
+            memmove(umin,ucurr,du*sizeof(double));
+        }
+    }
+
+    memmove(u,umin,du*sizeof(double));
+    *val = minval;
+    /* c3opt_add_objective(opt,&bellman_control,param); */
+    /* c3opt_minimize(opt,u,val); */
+    /* if (*val > minval){ */
+    /*     *val = minval; */
+    /*     memmove(u,umin,du*sizeof(double)); */
+    /* } */
+
+    free(umin); umin = NULL;
+    free(ucurr); ucurr = NULL;
+    return 0;
+}
+
+/* int bellman_vi(size_t N, const double * x, double * out, void * arg) */
+/* { */
+    
+/* } */
+
 
 /* double bellman_wrapper(size_t dx, size_t du, size_t dw, size_t N, const double * x, */
 /*                        const double * u, double * grad_u, */
