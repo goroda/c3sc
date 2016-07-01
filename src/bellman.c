@@ -425,9 +425,103 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     double * umin = calloc_double(du);
     double * ucurr = calloc_double(du);
     double minval = 0.0;
-    size_t nrand = 30;
-
+    size_t nrand = 20;
+    size_t npert = 5;
     double valtemp;
+
+    c3opt_add_objective(opt,&bellman_control,param);
+    // first do zero;
+    valtemp = bellman_control(du,ucurr,NULL,arg);
+    minval = valtemp; 
+    memmove(umin,ucurr,du*sizeof(double));
+
+    // then start at each corner
+    /* printf("corners\n"); */
+    if (du == 3){
+        double ut[3];
+        for (size_t ii = 0; ii < 2; ii++){
+            double distx = (ubu[0]-lbu[0])/4.0;
+            for (size_t jj = 0; jj < 2; jj++){
+                double disty = (ubu[1]-lbu[1])/4.0;
+                for (size_t kk = 0; kk < 2; kk++){
+                    double distz = (ubu[2]-lbu[2])/4.0;
+                    if (ii == 0){
+                        ucurr[0] = lbu[0]+distx;
+                    }
+                    else{
+                        ucurr[0] = ubu[0]-distx;
+                    }
+                    if (jj == 0){
+                        ucurr[1] = lbu[1]+disty;
+                    }
+                    else{
+                        ucurr[1] = ubu[1]-disty;
+                    }
+                    if (kk == 0){
+                        ucurr[2] = lbu[2]+distz;
+                    }
+                    else{
+                        ucurr[2] = ubu[2]-distz;
+                    }
+                    c3opt_minimize(opt,ucurr,&valtemp);
+                    /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+                    if (valtemp < minval){
+                        /* printf("\t updating current min!\n"); */
+                        minval = valtemp;
+                        memmove(umin,ucurr,du*sizeof(double));
+                    }
+                    for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                        ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                        ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                        ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
+                        for (size_t zz = 0; zz < du; zz++){
+                            if (ut[zz] > ubu[zz]){
+                                ut[zz] = ubu[zz];
+                            }
+                            else if (ut[zz] < lbu[zz]){
+                                ut[zz] = lbu[zz];
+                            }
+                        }
+                        c3opt_minimize(opt,ut,&valtemp);
+                        if (valtemp < minval){
+                            /* printf("\t updating current min!\n"); */
+                            minval = valtemp;
+                            memmove(umin,ut,du*sizeof(double));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /* printf("+=\n"); */
+    /* // then += 0 */
+    /* for (size_t ii = 0; ii < du; ii++){ */
+    /*     for (size_t kk = 0; kk < du; kk++){ */
+    /*         ucurr[kk] = 0.0; */
+    /*     } */
+    /*     ucurr[ii] = ubu[ii]-1e-3; */
+    /*     c3opt_minimize(opt,ucurr,&valtemp); */
+    /*     printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+    /*     if (valtemp < minval){ */
+    /*         /\* printf("\t updating current min!\n"); *\/ */
+    /*         minval = valtemp; */
+    /*         memmove(umin,ucurr,du*sizeof(double)); */
+    /*     } */
+
+    /*     for (size_t kk = 0; kk < du; kk++){ */
+    /*         ucurr[kk] = 0.0; */
+    /*     } */
+    /*     ucurr[ii] = lbu[ii]+1e-3; */
+    /*     c3opt_minimize(opt,ucurr,&valtemp); */
+    /*     printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+    /*     if (valtemp < minval){ */
+    /*         /\* printf("\t updating current min!\n"); *\/ */
+    /*         minval = valtemp; */
+    /*         memmove(umin,ucurr,du*sizeof(double)); */
+    /*     } */
+    /* } */
+
     for (size_t jj = 0; jj < nrand; jj++){
         for (size_t kk = 0; kk < du; kk++){
             ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
@@ -435,50 +529,55 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
 
         c3opt_add_objective(opt,&bellman_control,param);
         c3opt_minimize(opt,ucurr,&valtemp);
-        if (jj != 0){
-            if (valtemp < minval){
-                minval = valtemp;
-                memmove(umin,ucurr,du*sizeof(double));
-            }
-        }
-        else{
+        if (valtemp < minval){
+            /* printf("\t updating current min!\n"); */
             minval = valtemp;
             memmove(umin,ucurr,du*sizeof(double));
         }
+        /* for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum */
+        /*     for (size_t zz = 0; zz < du; zz++){ */
+        /*         ucurr[zz] += randu()*(0.05+0.05) - 0.05; */
+        /*         if (ucurr[zz] > ubu[zz]){ */
+        /*             ucurr[zz] = ubu[zz]-0.1; */
+        /*         } */
+        /*         else if (ucurr[zz] < lbu[zz]){ */
+        /*             ucurr[zz] = lbu[zz]+0.1; */
+        /*         } */
+        /*     } */
+        /*     c3opt_minimize(opt,ucurr,&valtemp); */
+        /*     if (valtemp < minval){ */
+        /*         /\* printf("\t updating current min!\n"); *\/ */
+        /*         minval = valtemp; */
+        /*         memmove(umin,ucurr,du*sizeof(double)); */
+        /*     } */
+        /* } */
     }
     
     // now compare with random samples
-    nrand = 200;
-    for (size_t jj = 0; jj < nrand; jj++){
-        for (size_t kk = 0; kk < du; kk++){
-            ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
-        }
+    /* nrand = 200; */
+    /* for (size_t jj = 0; jj < nrand; jj++){ */
+    /*     for (size_t kk = 0; kk < du; kk++){ */
+    /*         ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk]; */
+    /*     } */
 
-        valtemp = bellman_control(du,ucurr,NULL,arg);
-        if (valtemp < minval){
-            minval = valtemp;
-            memmove(umin,ucurr,du*sizeof(double));
-        }
-    }
+    /*     valtemp = bellman_control(du,ucurr,NULL,arg); */
+    /*     if (valtemp < minval){ */
+    /*         minval = valtemp; */
+    /*         memmove(umin,ucurr,du*sizeof(double)); */
+    /*     } */
+    /* } */
 
     memmove(u,umin,du*sizeof(double));
     *val = minval;
-    /* c3opt_add_objective(opt,&bellman_control,param); */
-    /* c3opt_minimize(opt,u,val); */
-    /* if (*val > minval){ */
-    /*     *val = minval; */
-    /*     memmove(u,umin,du*sizeof(double)); */
-    /* } */
-
     free(umin); umin = NULL;
     free(ucurr); ucurr = NULL;
     return 0;
 }
 
-/* int bellman_vi(size_t N, const double * x, double * out, void * arg) */
-/* { */
+int bellman_vi(size_t N, const double * x, double * out, void * arg)
+{
     
-/* } */
+}
 
 
 /* double bellman_wrapper(size_t dx, size_t du, size_t dw, size_t N, const double * x, */

@@ -67,10 +67,10 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
 
         prob[2*ii] = t2 * diff / 2.0;
         prob[2*ii+1] = t2 * diff / 2.0;
-        if (drift[ii] < 0){ // add transition to the left
+        if (drift[ii] < -1e-14){ // add transition to the left
             prob[2*ii] -= t * drift[ii];
         }
-        else if (drift[ii] > 0){ // add transition to the right
+        else if (drift[ii] > 1e-14){ // add transition to the right
             prob[2*ii+1] += t * drift[ii];
         }
 
