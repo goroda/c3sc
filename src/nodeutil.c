@@ -242,9 +242,13 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
                             size_t * neighbors_fixed, const size_t * ngrid, 
                             const struct Boundary * bound)
 {
-
+    assert (bound != NULL);
+    /* printf("process fibers N=%zu\n",ngrid[dim_vary]); */
     for (size_t ii = 0; ii < ngrid[dim_vary]; ii++){
+        /* dprint(d,x+ii*d); */
+        /* printf("ii = %zu\n",ii); */
         int inobs = boundary_in_obstacle(bound,x+ii*d);
+        /* printf("inobs = %d\n",inobs); */
         if (inobs == 0){
             absorbed[ii] = 0;
         }
@@ -253,6 +257,7 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
         }
     }
 
+    /* printf("kk\n"); */
     size_t onind = 0;
     for (size_t ii = 0; ii < d; ii++){
         if (ii != dim_vary){
@@ -394,6 +399,10 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,&dim_vary);
     assert (res == 0);
 
+    /* printf("converted fiber, dim_vary = %zu \n",dim_vary); */
+    /* printf("fixed_ind = "); iprint_sz(d,fixed_ind); */
+    
+    
     /* int * absorbed = calloc_int(N); */
     size_t * neighbors_vary = calloc_size_t(2*N);
     size_t * neighbors_fixed = calloc_size_t(2*(d-1));
@@ -402,6 +411,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
                                   ngrid,bound);
     assert (res == 0);
 
+    /* printf("processed neighbors\n"); */
     // evaluate cost associated with all neighbors
     res = valuef_eval_fiber_ind_nn(vf, fixed_ind, dim_vary,
                                    neighbors_fixed, neighbors_vary,

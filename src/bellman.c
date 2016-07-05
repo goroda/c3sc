@@ -115,6 +115,16 @@ struct MCAparam{
     double * workspace; //(du,1);
 };
 
+/**********************************************************//**
+    Create/allocate memory for the MCA structure that stores 
+    all the information
+    needed for Kushner's solution method
+
+    \param[in]     dx         - dimension of state space
+    \param[in]     du         - dimension of control space
+
+    \return allocated structure
+**************************************************************/
 struct MCAparam * mca_param_create(size_t dx, size_t du)
 {
     struct MCAparam * mca = malloc(sizeof(struct MCAparam));
@@ -134,6 +144,16 @@ struct MCAparam * mca_param_create(size_t dx, size_t du)
     return mca;
 }
 
+
+/**********************************************************//**
+    Add references to the grid information to the MCA
+
+    \param[in,out] mca   - MCA structure to modify    
+    \param[in]     ngrid - size of discretization in each dimensiona (mca->dx,) array
+    \param[in]     xgrid - nodes of discretization in each dimension
+    \param[in]     hmin  - minimimum discretization level
+    \param[in]     hvec  - distance between nodes in each dimension (mca->dx,)
+**************************************************************/
 void mca_add_grid_refs(struct MCAparam * mca, size_t * ngrid, double ** xgrid,
                        double hmin, double * hvec)
 {
@@ -144,6 +164,11 @@ void mca_add_grid_refs(struct MCAparam * mca, size_t * ngrid, double ** xgrid,
     mca->hvec = hvec;
 }
 
+/**********************************************************//**
+    Destroy memory allocated to MCA structure
+                                                           
+    \param[in,out] mca   - MCA structure to modify    
+**************************************************************/
 void mca_param_destroy(struct MCAparam * mca)
 {
     if (mca != NULL){
@@ -158,7 +183,6 @@ void mca_param_destroy(struct MCAparam * mca)
 ////////////////////////////////////////////////
 /// DP
 ///////////////////////////////////////////////
-
 struct DPparam{
 
     // dynamics and storage space
@@ -169,6 +193,8 @@ struct DPparam{
     double * diff;
     double * grad_diff;
 
+    struct Boundary * bound;
+    
     // cost functions
     double discount; // discount factor
     int (*stagecost)(double,const double*,const double*,double*,double*);
@@ -192,6 +218,8 @@ struct DPparam * dp_param_create(size_t dx, size_t du, size_t dw, double discoun
     /* dprint2d_col(dx,dw,dp->diff); */
     dp->grad_diff = calloc_double(dx*dw*du);
 
+    dp->bound = NULL;
+    
     dp->discount = discount;
     dp->grad_stage = calloc_double(du);
 
@@ -230,6 +258,12 @@ void dp_param_add_diff(struct DPparam * dp, int (*s)(double,const double*,const 
 {
     assert (dp != NULL);
     diff_add_func(dp->dyn_diff,s,sargs);
+}
+
+void dp_param_add_boundary(struct DPparam * dp, struct Boundary * bound)
+{
+    assert (dp != NULL);
+    dp->bound = bound;
 }
 
 void dp_param_add_stagecost(struct DPparam * dp, int (*stagecost)(double,const double*,
@@ -318,6 +352,16 @@ void control_params_destroy(struct ControlParams * cp)
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
+/**********************************************************//**
+    Evaluate Bellmans equation for a certain control.
+
+    \param[in] du     - number of control variables
+    \param[in] u      - control
+    \param[in] grad_u - control gradient
+    \param[in] args   - pointer to problem parameters (ControlParams)
+
+    \return value of bellmans equation
+**************************************************************/
 double bellman_control(size_t du, double * u, double * grad_u, void * args)
 {
     struct ControlParams * param = args;
@@ -412,6 +456,16 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
     return val;
 }
 
+/**********************************************************//**
+    Find the optimal control
+
+    \param[in]     du   - number of control variables
+    \param[in,out] u    - control
+    \param[in]     val  - value of bellman function at optimal control
+    \param[in]     args - pointer to problem parameters (ControlParams)
+
+    \return 0 if successful, otherwise not
+**************************************************************/
 int bellman_optimal(size_t du, double * u, double * val, void * arg)
 {
     assert (arg != NULL);
@@ -425,9 +479,10 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     double * umin = calloc_double(du);
     double * ucurr = calloc_double(du);
     double minval = 0.0;
-    size_t nrand = 20;
-    size_t npert = 5;
+    size_t nrand = 10; // note this is changed if du = 1 or du = 3;
+    size_t npert = 2;
     double valtemp;
+    int justrand = 1;
 
     c3opt_add_objective(opt,&bellman_control,param);
     // first do zero;
@@ -435,137 +490,115 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     minval = valtemp; 
     memmove(umin,ucurr,du*sizeof(double));
 
-    // then start at each corner
-    /* printf("corners\n"); */
-    if (du == 3){
-        double ut[3];
-        for (size_t ii = 0; ii < 2; ii++){
+
+    if (justrand == 1){
+        // now compare with random samples
+        nrand = 200;
+        for (size_t jj = 0; jj < nrand; jj++){
+            for (size_t kk = 0; kk < du; kk++){
+                ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
+            }
+            valtemp = bellman_control(du,ucurr,NULL,arg);
+            if (valtemp < minval){
+                minval = valtemp;
+                memmove(umin,ucurr,du*sizeof(double));
+            }
+        }
+    }
+    else{
+        // then start at each corner
+        /* printf("corners\n"); */
+        if (du == 1){
+            nrand = 0;
             double distx = (ubu[0]-lbu[0])/4.0;
-            for (size_t jj = 0; jj < 2; jj++){
-                double disty = (ubu[1]-lbu[1])/4.0;
-                for (size_t kk = 0; kk < 2; kk++){
-                    double distz = (ubu[2]-lbu[2])/4.0;
-                    if (ii == 0){
-                        ucurr[0] = lbu[0]+distx;
-                    }
-                    else{
-                        ucurr[0] = ubu[0]-distx;
-                    }
-                    if (jj == 0){
-                        ucurr[1] = lbu[1]+disty;
-                    }
-                    else{
-                        ucurr[1] = ubu[1]-disty;
-                    }
-                    if (kk == 0){
-                        ucurr[2] = lbu[2]+distz;
-                    }
-                    else{
-                        ucurr[2] = ubu[2]-distz;
-                    }
-                    c3opt_minimize(opt,ucurr,&valtemp);
-                    /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
-                    if (valtemp < minval){
-                        /* printf("\t updating current min!\n"); */
-                        minval = valtemp;
-                        memmove(umin,ucurr,du*sizeof(double));
-                    }
-                    for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
-                        ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
-                        ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
-                        ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
-                        for (size_t zz = 0; zz < du; zz++){
-                            if (ut[zz] > ubu[zz]){
-                                ut[zz] = ubu[zz];
-                            }
-                            else if (ut[zz] < lbu[zz]){
-                                ut[zz] = lbu[zz];
-                            }
+            ucurr[0] = lbu[0] + distx;
+            c3opt_minimize(opt,ucurr,&valtemp);
+            /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+            if (valtemp < minval){
+                /* printf("\t updating current min!\n"); */
+                minval = valtemp;
+                memmove(umin,ucurr,du*sizeof(double));
+            }
+            ucurr[0] = ubu[0] - distx;
+            c3opt_minimize(opt,ucurr,&valtemp);
+            /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+            if (valtemp < minval){
+                /* printf("\t updating current min!\n"); */
+                minval = valtemp;
+                memmove(umin,ucurr,du*sizeof(double));
+            }
+        }
+        else if (du == 3){
+            nrand = 0;
+            double ut[3];
+            for (size_t ii = 0; ii < 2; ii++){
+                double distx = (ubu[0]-lbu[0])/4.0;
+                for (size_t jj = 0; jj < 2; jj++){
+                    double disty = (ubu[1]-lbu[1])/4.0;
+                    for (size_t kk = 0; kk < 2; kk++){
+                        double distz = (ubu[2]-lbu[2])/4.0;
+                        if (ii == 0){
+                            ucurr[0] = lbu[0]+distx;
                         }
-                        c3opt_minimize(opt,ut,&valtemp);
+                        else{
+                            ucurr[0] = ubu[0]-distx;
+                        }
+                        if (jj == 0){
+                            ucurr[1] = lbu[1]+disty;
+                        }
+                        else{
+                            ucurr[1] = ubu[1]-disty;
+                        }
+                        if (kk == 0){
+                            ucurr[2] = lbu[2]+distz;
+                        }
+                        else{
+                            ucurr[2] = ubu[2]-distz;
+                        }
+                        c3opt_minimize(opt,ucurr,&valtemp);
+                        /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
                         if (valtemp < minval){
                             /* printf("\t updating current min!\n"); */
                             minval = valtemp;
-                            memmove(umin,ut,du*sizeof(double));
+                            memmove(umin,ucurr,du*sizeof(double));
+                        }
+                        for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                            ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                            ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                            ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
+                            for (size_t zz = 0; zz < du; zz++){
+                                if (ut[zz] > ubu[zz]){
+                                    ut[zz] = ubu[zz];
+                                }
+                                else if (ut[zz] < lbu[zz]){
+                                    ut[zz] = lbu[zz];
+                                }
+                            }
+                            c3opt_minimize(opt,ut,&valtemp);
+                            if (valtemp < minval){
+                                /* printf("\t updating current min!\n"); */
+                                minval = valtemp;
+                                memmove(umin,ut,du*sizeof(double));
+                            }
                         }
                     }
                 }
             }
         }
+    
+        for (size_t jj = 0; jj < nrand; jj++){
+            for (size_t kk = 0; kk < du; kk++){
+                ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
+            }
+            c3opt_minimize(opt,ucurr,&valtemp);
+            if (valtemp < minval){
+                /* printf("\t updating current min!\n"); */
+                minval = valtemp;
+                memmove(umin,ucurr,du*sizeof(double));
+            }
+        }
     }
     
-    /* printf("+=\n"); */
-    /* // then += 0 */
-    /* for (size_t ii = 0; ii < du; ii++){ */
-    /*     for (size_t kk = 0; kk < du; kk++){ */
-    /*         ucurr[kk] = 0.0; */
-    /*     } */
-    /*     ucurr[ii] = ubu[ii]-1e-3; */
-    /*     c3opt_minimize(opt,ucurr,&valtemp); */
-    /*     printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
-    /*     if (valtemp < minval){ */
-    /*         /\* printf("\t updating current min!\n"); *\/ */
-    /*         minval = valtemp; */
-    /*         memmove(umin,ucurr,du*sizeof(double)); */
-    /*     } */
-
-    /*     for (size_t kk = 0; kk < du; kk++){ */
-    /*         ucurr[kk] = 0.0; */
-    /*     } */
-    /*     ucurr[ii] = lbu[ii]+1e-3; */
-    /*     c3opt_minimize(opt,ucurr,&valtemp); */
-    /*     printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
-    /*     if (valtemp < minval){ */
-    /*         /\* printf("\t updating current min!\n"); *\/ */
-    /*         minval = valtemp; */
-    /*         memmove(umin,ucurr,du*sizeof(double)); */
-    /*     } */
-    /* } */
-
-    for (size_t jj = 0; jj < nrand; jj++){
-        for (size_t kk = 0; kk < du; kk++){
-            ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
-        }
-
-        c3opt_add_objective(opt,&bellman_control,param);
-        c3opt_minimize(opt,ucurr,&valtemp);
-        if (valtemp < minval){
-            /* printf("\t updating current min!\n"); */
-            minval = valtemp;
-            memmove(umin,ucurr,du*sizeof(double));
-        }
-        /* for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum */
-        /*     for (size_t zz = 0; zz < du; zz++){ */
-        /*         ucurr[zz] += randu()*(0.05+0.05) - 0.05; */
-        /*         if (ucurr[zz] > ubu[zz]){ */
-        /*             ucurr[zz] = ubu[zz]-0.1; */
-        /*         } */
-        /*         else if (ucurr[zz] < lbu[zz]){ */
-        /*             ucurr[zz] = lbu[zz]+0.1; */
-        /*         } */
-        /*     } */
-        /*     c3opt_minimize(opt,ucurr,&valtemp); */
-        /*     if (valtemp < minval){ */
-        /*         /\* printf("\t updating current min!\n"); *\/ */
-        /*         minval = valtemp; */
-        /*         memmove(umin,ucurr,du*sizeof(double)); */
-        /*     } */
-        /* } */
-    }
-    
-    // now compare with random samples
-    /* nrand = 200; */
-    /* for (size_t jj = 0; jj < nrand; jj++){ */
-    /*     for (size_t kk = 0; kk < du; kk++){ */
-    /*         ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk]; */
-    /*     } */
-
-    /*     valtemp = bellman_control(du,ucurr,NULL,arg); */
-    /*     if (valtemp < minval){ */
-    /*         minval = valtemp; */
-    /*         memmove(umin,ucurr,du*sizeof(double)); */
-    /*     } */
-    /* } */
 
     memmove(u,umin,du*sizeof(double));
     *val = minval;
@@ -574,8 +607,93 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     return 0;
 }
 
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+
+struct VIparam
+{
+    struct ControlParams * cp;
+    struct ValueF * vf;
+
+    double convergence;
+};
+
+struct VIparam * vi_param_create(double convergence)
+{
+    struct VIparam * vi = malloc(sizeof(struct VIparam));
+    assert (vi != NULL);
+    vi->convergence = convergence;
+
+    vi->cp = NULL;
+    vi->vf = NULL;
+
+    return vi;
+}
+
+void vi_param_destroy(struct VIparam * vi)
+{
+    if (vi != NULL){
+        free(vi); vi = NULL;
+    }
+}
+
+void vi_param_add_cp(struct VIparam * vi, struct ControlParams * cp)
+{
+    assert (vi != NULL);
+    vi->cp = cp;
+}
+
+void vi_param_add_value(struct VIparam * vi, struct ValueF * vf)
+{
+    assert (vi != NULL);
+    vi->vf = vf;
+}
+
 int bellman_vi(size_t N, const double * x, double * out, void * arg)
 {
+    struct VIparam * param = arg;
+    struct ControlParams * cp = param->cp;
+    struct MCAparam * mca = cp->mca;
+    struct DPparam * dp = cp->dp;
+    size_t dx = mca->dx;
+    size_t du = mca->du;
+    size_t * ngrid = mca->ngrid;
+    double ** xgrid = mca->xgrid;
+    
+    struct ValueF * vf = param->vf;
+    struct Boundary * bound = dp->bound;
+
+    int * absorbed = calloc_int(N);
+    double * costs = calloc_double(N*(2*dx+1));
+    double * u = calloc_double(du);
+
+    /* printf("lets go!\n"); */
+    /* for (size_t ii = 0; ii < N; ii++){ */
+    /*     dprint(dx,x+ii*dx); */
+    /* } */
+    /* printf("get neighbor cost\n"); */
+    int res = mca_get_neighbor_costs(dx,N,x,
+                                     bound,vf,ngrid,xgrid,
+                                     absorbed,costs);
+    /* printf("got it\n"); */
+    assert (res == 0);
+
+    double time = 0.0;
+
+    for (size_t ii = 0; ii < N; ii++){
+        control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],costs+ii*(2*dx+1));
+        int res2 = bellman_optimal(du,u,out+ii,cp);
+        assert (res2 == 0);
+    }
+
+    free(absorbed); absorbed = NULL;
+    free(costs); costs = NULL;
+    free(u); u = NULL;
+
+    return 0;
     
 }
 

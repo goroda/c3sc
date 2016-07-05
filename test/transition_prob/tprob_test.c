@@ -35,6 +35,21 @@ int f1(double t, const double * x, const double * u, double * out,
     return 0;
 }
 
+int f1b(double t, const double * x, const double * u, double * out,
+       double * jac, void * args)
+{
+    (void)(t);
+    (void)(args);
+    out[0] = x[1];
+    out[1] = u[0];
+    if (jac != NULL){
+        //df1/du
+        jac[0] = 0.0;
+        jac[1] = 1.0;
+    }
+    return 0;
+}
+
 int s1(double t,const double * x,const double * u,double * out, double * grad,
        void * args)
 {
@@ -101,6 +116,35 @@ int s2(double t,const double * x,const double * u,double * out, double * grad,
         for (size_t ii = 0; ii < 27; ii++){
             grad[ii] = 0.0;
         }
+    }
+    return 0;
+}
+
+// 3 u
+// 3 x
+int f3(double t, const double * x, const double * u, double * out,
+       double * jac, void * args)
+{
+    (void)(t);
+    (void)(args);
+    out[0] = x[0]*pow(x[2],2)*u[0];
+    out[1] = -x[1]  * u[2] + u[1];
+    out[2] = x[0]*x[1]*u[0] + 2 * u[1];
+    if (jac != NULL){
+
+        //df/du0
+        jac[0] = x[0]*pow(x[2],2); 
+        jac[1] = 0.0;                           
+        jac[2] =  x[0]*x[1];                    
+
+        //df/du1
+        jac[3] = 0.0;
+        jac[4] = 1.0;
+        jac[5] = 2.0;
+
+        jac[6] = 0.0;
+        jac[7] = -x[1];
+        jac[8] = 0.0;
     }
     return 0;
 }
@@ -378,11 +422,13 @@ CuSuite * TProbGetSuite()
 }
 
 
-double quad(const double * x, void * arg)
+int quad(size_t N, const double * x, double * out, void * arg)
 {
     (void) (arg);
-    double out = x[0]*x[0] + x[0]*x[1] + x[2]*x[2];
-    return out;
+    for (size_t ii = 0; ii < N; ii++){
+        out[ii] = x[3*ii+0]*x[3*ii+0] + x[3*ii+0]*x[3*ii+1] + x[3*ii+2]*x[3*ii+2];
+    }
+    return 0;
 }
 
 void Test_valuef_neighbor_eval(CuTest * tc)
@@ -1240,10 +1286,13 @@ void Test_bellman_grad3d(CuTest * tc)
     }
 }
 
-double quad2d(const double * x, void * arg)
+int quad2d(size_t N, const double * x,double * out, void * arg)
 {
     (void)(arg);
-    return x[0]*x[0] + x[1]*x[1];
+    for (size_t ii = 0; ii < N; ii++){
+        out[ii] = x[2*ii+0]*x[2*ii+0] + x[2*ii+1]*x[2*ii+1];
+    }
+    return 0;
 }
 
 void Test_bellman_control1d(CuTest * tc)
@@ -1385,26 +1434,6 @@ void Test_bellman_control1d(CuTest * tc)
                         /* printf("locmin bf = %3.10G\n",minim); */
                         CuAssertIntEquals(tc,1,valopt < umin+1e-10);
                     }
-                    /*     struct c3Opt * opt = c3opt_alloc(BFGS,du); */
-                    /*     c3opt_add_lb(opt,&lbu); */
-                    /*     c3opt_add_ub(opt,&ubu); */
-                    /*     c3opt_set_absxtol(opt,1e-14); */
-                    /*     c3opt_set_relftol(opt,1e-14); */
-                    /*     c3opt_set_gtol(opt,1e-14); */
-                    /*     c3opt_set_verbose(opt,0); */
-                    /*     c3opt_add_objective(opt,&bellman_control,cp); */
-                    /*     double ustart[1] = {-1.0}; */
-                    /*     double valopt; */
-                    /*     c3opt_minimize(opt,ustart,&valopt); */
-                    /*     if (valopt > umin+1e-13){ */
-                    /*         printf("x = "); dprint(dx,x+ii*dx); */
-                    /*         printf("umin=%3.10G, valopt=%3.10G\n",umin,valopt); */
-                    /*         printf("minimizer=%3.10G, optmin=%3.10G\n",minim,ustart[0]); */
-                    /*         printf("not minimuzed\n"); */
-                    /*         exit(1); */
-                    /*     } */
-                    /*     c3opt_free(opt); opt = NULL; */
-                    /* } */
                 }
 
                 free(uopts); uopts = NULL;
@@ -1433,10 +1462,13 @@ void Test_bellman_control1d(CuTest * tc)
     c3opt_free(opt); opt = NULL;
 }
 
-double quad3d(const double * x, void * arg)
+int quad3d(size_t N, const double * x, double * out, void * arg)
 {
     (void)(arg);
-    return x[0]*x[0] + x[1]*x[1] + x[2]*x[2];
+    for (size_t ii = 0; ii < N; ii++){
+        out[ii] = x[3*ii+0]*x[3*ii+0] + x[3*ii+1]*x[3*ii+1] + x[3*ii+2]*x[3*ii+2];
+    }
+    return 0;
 }
 
 void Test_bellman_control3d(CuTest * tc)
@@ -1455,7 +1487,7 @@ void Test_bellman_control3d(CuTest * tc)
     boundary_add_obstacle(bound,center,lengths);
     
 
-    size_t ngrid[3] = {13, 24, 41};
+    size_t ngrid[3] = {50, 24, 41};
     double * xgrid[3];
     xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
     xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
@@ -1471,7 +1503,7 @@ void Test_bellman_control3d(CuTest * tc)
     
     double discount = 0.1;
     struct DPparam * dp = dp_param_create(dx,du,dw,discount);
-    dp_param_add_drift(dp,f2,NULL);
+    dp_param_add_drift(dp,f3,NULL);
     dp_param_add_diff(dp,s2,NULL);
     dp_param_add_stagecost(dp,stagecost3d);
     dp_param_add_boundcost(dp,boundcost);
@@ -1479,7 +1511,7 @@ void Test_bellman_control3d(CuTest * tc)
 
 
     // cross approximation tolerances
-    size_t start_rank = 10;
+    size_t start_rank = 5;
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
@@ -1613,7 +1645,7 @@ void Test_bellman_control3d(CuTest * tc)
                                 }
                             }
                         }
-                        /* if (absorbed[ii] == 0){ // this breaks!!! ofcourse... */
+                        /* if (absorbed[ii] == 0){  */
                         /*     double uopt[3]; */
                         /*     double valopt; */
                         /*     /\* printf("\n\n\n optimize\n"); *\/ */
@@ -1673,8 +1705,251 @@ CuSuite * BellmanGetSuite()
     /* SUITE_ADD_TEST(suite, Test_bound_nodes); */
     /* SUITE_ADD_TEST(suite, Test_bellman_grad1); */
     /* SUITE_ADD_TEST(suite, Test_bellman_grad3d); */
+    // uncomment the buttom two but they take a long time
     /* SUITE_ADD_TEST(suite, Test_bellman_control1d); */
-    SUITE_ADD_TEST(suite, Test_bellman_control3d);
+    /* SUITE_ADD_TEST(suite, Test_bellman_control3d); */
+
+    return suite;
+}
+
+void Test_bellman_vi(CuTest * tc)
+{
+    printf("Testing Function: bellman_vi (1d control) \n");
+    size_t dx = 2;
+    size_t du = 1;
+    size_t dw = 2;
+
+    double lb[2] = {-1.0, -2.0};
+    double ub[2] = {2.0, 3.0 };
+    double center[2] = {0.0,0.0};
+    double lengths[2] = {0.8,0.8};
+    struct Boundary * bound = boundary_alloc(dx,lb,ub);
+    boundary_add_obstacle(bound,center,lengths);
+    
+
+    size_t ngrid[2] = {60, 90};
+    double * xgrid[2];
+    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
+    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
+    double h[2] = {xgrid[0][1]-xgrid[0][0], xgrid[1][1]-xgrid[1][0]};
+    double hmin = fmin(h[0],h[1]);
+    struct MCAparam * mca = mca_param_create(dx,du);
+    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
+    
+
+    double discount = 0.1;
+    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
+    dp_param_add_drift(dp,f1b,NULL);
+    dp_param_add_diff(dp,s1,NULL);
+    dp_param_add_boundary(dp,bound);
+    dp_param_add_stagecost(dp,stagecost2d);
+    dp_param_add_boundcost(dp,boundcost);
+    dp_param_add_obscost(dp,ocost);
+
+
+    // cross approximation tolerances
+    size_t start_rank = 5;
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_adapt(aargs,0);
+    approx_args_set_startrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,start_rank);
+
+    double * start[2];
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii],start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+    struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
+
+
+    double lbu = -5.0;
+    double ubu = 5.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,&lbu);
+    c3opt_add_ub(opt,&ubu);
+    c3opt_set_absxtol(opt,1e-12);
+    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_set_verbose(opt,0);
+
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+
+    double convergence = 1e-5;
+    struct VIparam * vi = vi_param_create(convergence);
+    vi_param_add_cp(vi,cp);
+    vi_param_add_value(vi,vf);
+    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
+    struct ValueF * next = NULL;
+    double norm2;
+    for (size_t ii = 0; ii < 100; ii++){
+        if (next == NULL){
+            /* printf("go\n"); */
+            vi_param_add_value(vi,vf);
+            next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
+            norm2 = valuef_norm(next);
+            valuef_destroy(vf); vf = NULL;
+        }
+        else{
+            /* printf("there\n"); */
+            vi_param_add_value(vi,next);
+            vf = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
+            norm2 = valuef_norm(vf);
+            valuef_destroy(next); next = NULL;
+
+            
+        }
+        printf("Norm[%zu] = %G\n",ii+2,norm2);
+
+    }
+
+    
+    control_params_destroy(cp); cp = NULL;
+    boundary_free(bound); bound = NULL;
+    mca_param_destroy(mca); mca = NULL;
+    free(xgrid[0]); xgrid[0] = NULL;
+    free(xgrid[1]); xgrid[1] = NULL;
+    free(start[0]); start[0] = NULL;
+    free(start[1]); start[1] = NULL;
+    dp_param_destroy(dp); dp = NULL;
+    valuef_destroy(vf); vf = NULL;
+    valuef_destroy(next); next = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
+    vi_param_destroy(vi);
+}
+
+void Test_bellman_vi3d(CuTest * tc)
+{
+    printf("Testing Function: bellman_vi (3d control) \n");
+
+    size_t dx = 3;
+    size_t du = 3;
+    size_t dw = 3;
+
+    double lb[3] = {-1.0, -2.0,-3.0};
+    double ub[3] = {2.0, 3.0,1.0 };
+    double center[3] = {0.0,0.0,0.0};
+    double lengths[3] = {0.8,0.8,0.8};
+    struct Boundary * bound = boundary_alloc(dx,lb,ub);
+    boundary_add_obstacle(bound,center,lengths);
+    
+
+    size_t ngrid[3] = {20, 20, 20};
+    double * xgrid[3];
+    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
+    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
+    xgrid[2] = linspace(lb[2],ub[2],ngrid[2]);
+    double h[3] = {xgrid[0][1]-xgrid[0][0],
+                   xgrid[1][1]-xgrid[1][0],
+                   xgrid[2][1]-xgrid[2][0]};
+    double hmin = fmin(h[0],h[1]);
+    hmin = fmin(hmin,h[2]);
+    
+    struct MCAparam * mca = mca_param_create(dx,du);
+    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
+    
+    double discount = 0.1;
+    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
+    dp_param_add_drift(dp,f3,NULL);
+    dp_param_add_diff(dp,s2,NULL);
+    dp_param_add_boundary(dp,bound);
+    dp_param_add_stagecost(dp,stagecost3d);
+    dp_param_add_boundcost(dp,boundcost);
+    dp_param_add_obscost(dp,ocost);
+
+
+    // cross approximation tolerances
+    size_t start_rank = 10;
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_adapt(aargs,0);
+    approx_args_set_startrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,start_rank);
+
+    double * start[3];
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii],start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
+
+    double lbu = -5.0;
+    double ubu = 5.0;
+    double lbarr[3] = {lbu,lbu,lbu};
+    double ubarr[3] = {ubu,ubu,ubu};
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbarr);
+    c3opt_add_ub(opt,ubarr);
+    c3opt_set_absxtol(opt,1e-15);
+    c3opt_set_relftol(opt,1e-15);
+    c3opt_set_gtol(opt,0.0);
+    c3opt_set_verbose(opt,0);
+    c3opt_ls_set_beta(opt,0.8);
+
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+
+    double convergence = 1e-5;
+    struct VIparam * vi = vi_param_create(convergence);
+    vi_param_add_cp(vi,cp);
+    vi_param_add_value(vi,vf);
+    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
+    struct ValueF * next = NULL;
+    double norm2;
+    for (size_t ii = 0; ii < 100; ii++){
+        if (next == NULL){
+            /* printf("go\n"); */
+            vi_param_add_value(vi,vf);
+            next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
+            norm2 = valuef_norm(next);
+            valuef_destroy(vf); vf = NULL;
+        }
+        else{
+            /* printf("there\n"); */
+            vi_param_add_value(vi,next);
+            vf = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
+            norm2 = valuef_norm(vf);
+            valuef_destroy(next); next = NULL;
+
+            
+        }
+        printf("Norm[%zu] = %G\n",ii+2,norm2);
+
+    }
+    
+    control_params_destroy(cp); cp = NULL;
+    boundary_free(bound); bound = NULL;
+    mca_param_destroy(mca); mca = NULL;
+    free(xgrid[0]); xgrid[0] = NULL;
+    free(xgrid[1]); xgrid[1] = NULL;
+    free(xgrid[2]); xgrid[2] = NULL;
+    free(start[0]); start[0] = NULL;
+    free(start[1]); start[1] = NULL;
+    free(start[2]); start[2] = NULL;
+    dp_param_destroy(dp); dp = NULL;
+    valuef_destroy(vf); vf = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
+    vi_param_destroy(vi);
+}
+
+CuSuite * DPAlgsGetSuite()
+{
+    //printf("----------------------------\n");
+
+    CuSuite * suite = CuSuiteNew();
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
+    SUITE_ADD_TEST(suite, Test_bellman_vi3d);
 
     return suite;
 }

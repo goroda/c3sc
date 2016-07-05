@@ -24,6 +24,7 @@ void dp_param_add_diff(struct DPparam *,
                        int (*)(double,const double*,const double*,
                                 double*,double*,void*),
                        void *);
+void dp_param_add_boundary(struct DPparam *, struct Boundary *);
 void dp_param_add_stagecost(struct DPparam *,
                             int (*)(double,const double*,
                                     const double*,double*,double*));
@@ -44,4 +45,13 @@ void control_params_destroy(struct ControlParams *);
 ///////////////////////////////////////////////////////////////
 double bellman_control(size_t, double *, double *, void *);
 int bellman_optimal(size_t, double *, double *, void *);
+
+
+///////////////////////////////////////////////////////////////
+struct VIparam;
+struct VIparam * vi_param_create(double);
+void vi_param_destroy(struct VIparam *);
+void vi_param_add_cp(struct VIparam *, struct ControlParams *);
+void vi_param_add_value(struct VIparam * vi, struct ValueF *);
+int bellman_vi(size_t, const double *, double *, void *);
 #endif

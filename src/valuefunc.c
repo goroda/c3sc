@@ -77,6 +77,19 @@ void valuef_destroy(struct ValueF * vf)
 }
 
 /**********************************************************//**
+    Get the norm of the value function
+
+    \param[in] vf - value function
+    
+    \return L2 Norm
+**************************************************************/
+double valuef_norm(struct ValueF * vf)
+{
+    assert (vf != NULL);
+    return function_train_norm2(vf->cost);
+}
+
+/**********************************************************//**
     Evaluate the value function
 
     \param[in] vf - value function to evaluate 
@@ -364,7 +377,7 @@ int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
 
    \return Value function
 **************************************************************/
-struct ValueF * valuef_interp(size_t d, double (*f)(const double *,void*),void * args,
+struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,void*),void * args,
                               const size_t * N, double ** grid, double ** start,
                               struct ApproxArgs * aargs, int verbose)
 {
@@ -401,8 +414,8 @@ struct ValueF * valuef_interp(size_t d, double (*f)(const double *,void*),void *
         c3approx_set_adapt_maxrank_all(c3a,minN);
     }
 
-    struct Fwrap * fw = fwrap_create(d,"general");
-    fwrap_set_f(fw,f,args);
+    struct Fwrap * fw = fwrap_create(d,"general-vec");
+    fwrap_set_fvec(fw,f,args);
 
     int adapt = approx_args_get_adapt(aargs);;
     vf->cost = c3approx_do_cross(c3a,fw,adapt);
