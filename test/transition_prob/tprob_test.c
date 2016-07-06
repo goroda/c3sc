@@ -1762,10 +1762,10 @@ void Test_bellman_vi(CuTest * tc)
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
-    approx_args_set_kickrank(aargs,10);
-    approx_args_set_adapt(aargs,0);
+    approx_args_set_kickrank(aargs,5);
+    approx_args_set_adapt(aargs,1);
     approx_args_set_startrank(aargs,start_rank);
-    approx_args_set_maxrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,20);
 
     double * start[2];
     for (size_t ii = 0; ii < dx; ii++){
@@ -1776,7 +1776,6 @@ void Test_bellman_vi(CuTest * tc)
         }
     }
     struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
-
 
     double lbu = -5.0;
     double ubu = 5.0;
@@ -1797,7 +1796,8 @@ void Test_bellman_vi(CuTest * tc)
     printf("Norm[%d] = %G\n",1,valuef_norm(vf));
     struct ValueF * next = NULL;
     double norm2;
-    for (size_t ii = 0; ii < 100; ii++){
+    size_t nvi = 1;
+    for (size_t ii = 0; ii < nvi; ii++){
         if (next == NULL){
             /* printf("go\n"); */
             vi_param_add_value(vi,vf);
@@ -1811,8 +1811,6 @@ void Test_bellman_vi(CuTest * tc)
             vf = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
             norm2 = valuef_norm(vf);
             valuef_destroy(next); next = NULL;
-
-            
         }
         printf("Norm[%zu] = %G\n",ii+2,norm2);
 
@@ -2030,8 +2028,8 @@ void Test_bellman_pi(CuTest * tc)
 
     // create the value function that will yield the policy
     
-    size_t nvi = 20;
-    size_t npi = 20;
+    size_t nvi = 1;
+    size_t npi = 2;
     
     printf("Norm[%d] = %G\n",1,valuef_norm(vf));
     struct ValueF * next = NULL;
@@ -2068,6 +2066,7 @@ void Test_bellman_pi(CuTest * tc)
             printf("Norm[%zu] = %G\n",ii+2,norm2);
         }
         pi_param_destroy(poli); poli = NULL;
+        valuef_destroy(vf_pol); vf_pol = NULL;
         if (next == NULL){
             vi_param_add_value(vi,vf);
         }
@@ -2172,11 +2171,10 @@ void Test_bellman_pi3d(CuTest * tc)
     vi_param_add_cp(vi,cp);
     vi_param_add_value(vi,vf);
 
-
     // create the value function that will yield the policy
     
-    size_t nvi = 20;
-    size_t npi = 20;
+    size_t nvi = 10;
+    size_t npi = 100;
     
     printf("Norm[%d] = %G\n",1,valuef_norm(vf));
     struct ValueF * next = NULL;

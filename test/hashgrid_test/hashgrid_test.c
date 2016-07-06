@@ -190,7 +190,7 @@ void Test_htable2(CuTest * tc)
         /* printf("key=%s\n",blah); */
         int res = htable_add_element(hg,blah,x[ii],sval*sizeof(double));
         CuAssertIntEquals(tc,0,res);
-        /* free(blah); blah = NULL; */
+        free(blah); blah = NULL;
     }
 
     /* printf("\n\n\n\n"); */
@@ -227,7 +227,7 @@ CuSuite * HTableGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    /* SUITE_ADD_TEST(suite, Test_htable); */
+    SUITE_ADD_TEST(suite, Test_htable);
     SUITE_ADD_TEST(suite, Test_htable2);
 
     return suite;
