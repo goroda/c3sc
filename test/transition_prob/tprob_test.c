@@ -1379,10 +1379,16 @@ void Test_bellman_control1d(CuTest * tc)
                 }
 
                 /* printf("Hi\n"); */
+                size_t fi[2];
+                size_t dv;
                 int res = mca_get_neighbor_costs(dx,ngrid[vary_ind],x,
                                                  bound,vf,ngrid,xgrid,
+                                                 fi,&dv,
                                                  absorbed,costs);
                 CuAssertIntEquals(tc,0,res);
+                CuAssertIntEquals(tc,vary_ind,dv);
+                CuAssertIntEquals(tc,ngrid[vary_ind],fi[vary_ind]);
+                
 
 
                 double time = 0.0;
@@ -1564,9 +1570,13 @@ void Test_bellman_control3d(CuTest * tc)
                     }
 
                     /* printf("Hi\n"); */
+                    size_t fi[3];
+                    size_t dv;
                     int res = mca_get_neighbor_costs(dx,ngrid[vary_ind],x,
                                                      bound,vf,ngrid,xgrid,
+                                                     fi,&dv,
                                                      absorbed,costs);
+                    CuAssertIntEquals(tc,vary_ind,dv);
                     CuAssertIntEquals(tc,0,res);
 
 
@@ -1943,13 +1953,299 @@ void Test_bellman_vi3d(CuTest * tc)
     vi_param_destroy(vi);
 }
 
+void Test_bellman_pi(CuTest * tc)
+{
+    printf("Testing Function: bellman_pi (1d control) \n");
+    size_t dx = 2;
+    size_t du = 1;
+    size_t dw = 2;
+
+    double lb[2] = {-1.0, -2.0};
+    double ub[2] = {2.0, 3.0 };
+    double center[2] = {0.0,0.0};
+    double lengths[2] = {0.8,0.8};
+    struct Boundary * bound = boundary_alloc(dx,lb,ub);
+    boundary_add_obstacle(bound,center,lengths);
+    
+
+    size_t ngrid[2] = {60, 90};
+    double * xgrid[2];
+    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
+    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
+    double h[2] = {xgrid[0][1]-xgrid[0][0], xgrid[1][1]-xgrid[1][0]};
+    double hmin = fmin(h[0],h[1]);
+    struct MCAparam * mca = mca_param_create(dx,du);
+    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
+    
+
+    double discount = 0.1;
+    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
+    dp_param_add_drift(dp,f1b,NULL);
+    dp_param_add_diff(dp,s1,NULL);
+    dp_param_add_boundary(dp,bound);
+    dp_param_add_stagecost(dp,stagecost2d);
+    dp_param_add_boundcost(dp,boundcost);
+    dp_param_add_obscost(dp,ocost);
+
+
+    // cross approximation tolerances
+    size_t start_rank = 10;
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-7);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_adapt(aargs,0);
+    approx_args_set_startrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,20);
+
+    double * start[2];
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii],start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+    struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
+
+
+
+    double lbu = -5.0;
+    double ubu = 5.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,&lbu);
+    c3opt_add_ub(opt,&ubu);
+    c3opt_set_absxtol(opt,1e-12);
+    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_set_verbose(opt,0);
+
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+
+    double convergence = 1e-5;
+    struct VIparam * vi = vi_param_create(convergence);
+    vi_param_add_cp(vi,cp);
+    vi_param_add_value(vi,vf);
+
+
+    // create the value function that will yield the policy
+    
+    size_t nvi = 20;
+    size_t npi = 20;
+    
+    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
+    struct ValueF * next = NULL;
+    /* next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); */
+    /* printf("Norm[%d] = %G\n",2,valuef_norm(next)); */
+    for (size_t jj = 0; jj < nvi; jj++){
+        printf("VI iteration = %zu\n",jj);
+        struct ValueF * vf_pol = NULL;
+        vf_pol = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
+
+        struct PIparam * poli = NULL;
+        poli = pi_param_create(convergence,vf_pol);
+        pi_param_add_cp(poli,cp);
+        /* pi_param_add_value(poli,vf); */
+
+        double norm2;
+        for (size_t ii = 0; ii < npi; ii++){
+            if (next == NULL){
+                /* printf("go\n"); */
+                pi_param_add_value(poli,vf);
+                vi_param_add_value(vi,vf);
+                next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
+                norm2 = valuef_norm(next);
+                valuef_destroy(vf); vf = NULL;
+            }
+            else{
+                /* printf("there\n"); */
+                pi_param_add_value(poli,next);
+                vi_param_add_value(vi,next);
+                vf = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
+                norm2 = valuef_norm(vf);
+                valuef_destroy(next); next = NULL;
+            }
+            printf("Norm[%zu] = %G\n",ii+2,norm2);
+        }
+        pi_param_destroy(poli); poli = NULL;
+        if (next == NULL){
+            vi_param_add_value(vi,vf);
+        }
+        else{
+            vi_param_add_value(vi,next);
+        }
+    }
+    
+    control_params_destroy(cp); cp = NULL;
+    boundary_free(bound); bound = NULL;
+    mca_param_destroy(mca); mca = NULL;
+    free(xgrid[0]); xgrid[0] = NULL;
+    free(xgrid[1]); xgrid[1] = NULL;
+    free(start[0]); start[0] = NULL;
+    free(start[1]); start[1] = NULL;
+    dp_param_destroy(dp); dp = NULL;
+    valuef_destroy(vf); vf = NULL;
+    valuef_destroy(next); next = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
+    vi_param_destroy(vi);
+
+}
+
+void Test_bellman_pi3d(CuTest * tc)
+{
+    printf("Testing Function: bellman_pi (3d control) \n");
+
+    size_t dx = 3;
+    size_t du = 3;
+    size_t dw = 3;
+
+    double lb[3] = {-1.0, -2.0,-3.0};
+    double ub[3] = {2.0, 3.0,1.0 };
+    double center[3] = {0.0,0.0,0.0};
+    double lengths[3] = {0.8,0.8,0.8};
+    struct Boundary * bound = boundary_alloc(dx,lb,ub);
+    boundary_add_obstacle(bound,center,lengths);
+    
+
+    size_t ngrid[3] = {20, 20, 20};
+    double * xgrid[3];
+    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
+    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
+    xgrid[2] = linspace(lb[2],ub[2],ngrid[2]);
+    double h[3] = {xgrid[0][1]-xgrid[0][0],
+                   xgrid[1][1]-xgrid[1][0],
+                   xgrid[2][1]-xgrid[2][0]};
+    double hmin = fmin(h[0],h[1]);
+    hmin = fmin(hmin,h[2]);
+    
+    struct MCAparam * mca = mca_param_create(dx,du);
+    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
+    
+    double discount = 0.1;
+    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
+    dp_param_add_drift(dp,f3,NULL);
+    dp_param_add_diff(dp,s2,NULL);
+    dp_param_add_boundary(dp,bound);
+    dp_param_add_stagecost(dp,stagecost3d);
+    dp_param_add_boundcost(dp,boundcost);
+    dp_param_add_obscost(dp,ocost);
+
+
+    // cross approximation tolerances
+    size_t start_rank = 10;
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_adapt(aargs,0);
+    approx_args_set_startrank(aargs,start_rank);
+    approx_args_set_maxrank(aargs,start_rank);
+
+    double * start[3];
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii],start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
+
+    double lbu = -5.0;
+    double ubu = 5.0;
+    double lbarr[3] = {lbu,lbu,lbu};
+    double ubarr[3] = {ubu,ubu,ubu};
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbarr);
+    c3opt_add_ub(opt,ubarr);
+    c3opt_set_absxtol(opt,1e-15);
+    c3opt_set_relftol(opt,1e-15);
+    c3opt_set_gtol(opt,0.0);
+    c3opt_set_verbose(opt,0);
+    c3opt_ls_set_beta(opt,0.8);
+
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+
+    double convergence = 1e-5;
+    struct VIparam * vi = vi_param_create(convergence);
+    vi_param_add_cp(vi,cp);
+    vi_param_add_value(vi,vf);
+
+
+    // create the value function that will yield the policy
+    
+    size_t nvi = 20;
+    size_t npi = 20;
+    
+    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
+    struct ValueF * next = NULL;
+    /* next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); */
+    /* printf("Norm[%d] = %G\n",2,valuef_norm(next)); */
+    for (size_t jj = 0; jj < nvi; jj++){
+        printf("VI iteration = %zu\n",jj);
+        struct ValueF * vf_pol = NULL;
+        vf_pol = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
+
+        struct PIparam * poli = NULL;
+        poli = pi_param_create(convergence,vf_pol);
+        pi_param_add_cp(poli,cp);
+        /* pi_param_add_value(poli,vf); */
+
+        double norm2;
+        for (size_t ii = 0; ii < npi; ii++){
+            if (next == NULL){
+                /* printf("go\n"); */
+                pi_param_add_value(poli,vf);
+                vi_param_add_value(vi,vf);
+                next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
+                norm2 = valuef_norm(next);
+                valuef_destroy(vf); vf = NULL;
+            }
+            else{
+                /* printf("there\n"); */
+                pi_param_add_value(poli,next);
+                vi_param_add_value(vi,next);
+                vf = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
+                norm2 = valuef_norm(vf);
+                valuef_destroy(next); next = NULL;
+            }
+            printf("Norm[%zu] = %G\n",ii+2,norm2);
+        }
+        pi_param_destroy(poli); poli = NULL;
+        if (next == NULL){
+            vi_param_add_value(vi,vf);
+        }
+        else{
+            vi_param_add_value(vi,next);
+        }
+    }
+    
+    control_params_destroy(cp); cp = NULL;
+    boundary_free(bound); bound = NULL;
+    mca_param_destroy(mca); mca = NULL;
+    free(xgrid[0]); xgrid[0] = NULL;
+    free(xgrid[1]); xgrid[1] = NULL;
+    free(xgrid[2]); xgrid[2] = NULL;
+    free(start[0]); start[0] = NULL;
+    free(start[1]); start[1] = NULL;
+    free(start[2]); start[2] = NULL;
+    dp_param_destroy(dp); dp = NULL;
+    valuef_destroy(vf); vf = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
+    vi_param_destroy(vi);
+}
+
 CuSuite * DPAlgsGetSuite()
 {
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
     /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
-    SUITE_ADD_TEST(suite, Test_bellman_vi3d);
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi3d); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi); */
+    SUITE_ADD_TEST(suite, Test_bellman_pi3d);
 
     return suite;
 }

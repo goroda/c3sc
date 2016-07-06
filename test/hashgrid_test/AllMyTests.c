@@ -10,17 +10,20 @@
 #include "CuTest.h"
 
 CuSuite * HashGridGetSuite();
+CuSuite * HTableGetSuite();
 
 
 void RunAllTests(void) {
     
-    printf("Running test suite for: lib_linalg\n");
+    printf("Running test suite for: hashing\n");
     CuString * output = CuStringNew();
     CuSuite * suite = CuSuiteNew();
     
     CuSuite * mca = HashGridGetSuite();
+    CuSuite * tab = HTableGetSuite();
 
     CuSuiteAddSuite(suite, mca);
+    CuSuiteAddSuite(suite, tab);
 
     CuSuiteRun(suite);
     CuSuiteSummary(suite, output);
@@ -28,6 +31,7 @@ void RunAllTests(void) {
     printf("%s \n", output->buffer);
     
     CuSuiteDelete(mca);
+    CuSuiteDelete(tab);
     
     CuStringDelete(output);
     free(suite);

@@ -54,4 +54,14 @@ void vi_param_destroy(struct VIparam *);
 void vi_param_add_cp(struct VIparam *, struct ControlParams *);
 void vi_param_add_value(struct VIparam * vi, struct ValueF *);
 int bellman_vi(size_t, const double *, double *, void *);
+
+
+///////////////////////////////////////////////////////////////
+struct PIparam;
+struct PIparam * pi_param_create(double, struct ValueF *);
+void pi_param_destroy(struct PIparam *);
+void pi_param_add_cp(struct PIparam * pi, struct ControlParams *);
+void pi_param_add_value(struct PIparam *, struct ValueF *);
+int bellman_pi(size_t, const double *, double *, void *);
+
 #endif

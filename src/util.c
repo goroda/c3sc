@@ -546,7 +546,8 @@ size_t hash_grid_get_ind(struct HashGrid * ht,double val,int *exists)
     /* key[nvals-1] = '\0'; */
     
     // check if key already exists
-    *exists = 1;
+    int one = 1;
+    *exists = one;
     size_t ind = lookup_keyd(ht,key,exists);
     if (*exists == 0) {
         /* fprintf(stderr,"Value doesn't exists %3.15G\n",val); */

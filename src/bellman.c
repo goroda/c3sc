@@ -8,6 +8,7 @@
 #include "util.h"
 #include "nodeutil.h"
 #include "dynamics.h"
+#include "hashgrid.h"
 
 /* struct DPparam */
 /* { */
@@ -424,7 +425,7 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
         else{
             /* printf("here\n"); */
             res = dp->stagecost(time,x,u,&stage_cost,NULL);
-            /* printf("stagecost = %G\n",stage_cost); */
+            /* Printf("Stagecost = %G\n",stage_cost); */
             /* printf("drift = "); dprint(dx,dp->drift); */
             /* printf("diff =  "); dprint2d_col(dx,dw,dp->diff); */
             assert (res == 0);
@@ -459,10 +460,10 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
 /**********************************************************//**
     Find the optimal control
 
-    \param[in]     du   - number of control variables
-    \param[in,out] u    - control
-    \param[in]     val  - value of bellman function at optimal control
-    \param[in]     args - pointer to problem parameters (ControlParams)
+    \param[in]     du  - number of control variables
+    \param[in,out] u   - control
+    \param[in]     val - value of bellman function at optimal control
+    \param[in]     arg - pointer to problem parameters (ControlParams)
 
     \return 0 if successful, otherwise not
 **************************************************************/
@@ -656,6 +657,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
 {
     struct VIparam * param = arg;
     struct ControlParams * cp = param->cp;
+    assert (cp != NULL);
     struct MCAparam * mca = cp->mca;
     struct DPparam * dp = cp->dp;
     size_t dx = mca->dx;
@@ -664,6 +666,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     double ** xgrid = mca->xgrid;
     
     struct ValueF * vf = param->vf;
+    assert (vf != NULL);
     struct Boundary * bound = dp->bound;
 
     int * absorbed = calloc_int(N);
@@ -675,9 +678,14 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     /*     dprint(dx,x+ii*dx); */
     /* } */
     /* printf("get neighbor cost\n"); */
+    size_t * fi = calloc_size_t(dx);
+    size_t dim_vary;
     int res = mca_get_neighbor_costs(dx,N,x,
                                      bound,vf,ngrid,xgrid,
+                                     fi,&dim_vary,
                                      absorbed,costs);
+    free(fi); fi = NULL;
+    
     /* printf("got it\n"); */
     assert (res == 0);
 
@@ -697,25 +705,173 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     
 }
 
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+struct PIparam
+{
+    struct ControlParams * cp;
+    struct ValueF * vf_iteration;
 
-/* double bellman_wrapper(size_t dx, size_t du, size_t dw, size_t N, const double * x, */
-/*                        const double * u, double * grad_u, */
-/*                        struct DPparam * dp, struct Boundary * bound, */
-/*                        struct ValueF * vf, struct MCAparam * mca) */
-/* { */
-/*     double time = 0.0; */
-/*     double * costs = calloc_double(N * (2*dx+1)); */
-/*     int * absorbed = calloc_int(N); */
-/*     int res = mca_get_neighbor_costs(dx,N,x,bound,vf,mca->ngrid,mca->xgrid,absorbed,costs); */
+    struct ValueF * vf_policy;
+    struct HTable * htable;
     
-/*     assert (res == 0); */
-/*     for (size_t ii = 0; ii < N; ii++){ */
+    double convergence;
+
+    
+};
+
+struct PIparam * pi_param_create(double convergence, struct ValueF * policy)
+{
+    struct PIparam * poli = malloc(sizeof(struct PIparam));
+    assert (poli != NULL);
+    poli->convergence = convergence;
+    poli->vf_policy = policy;
+    poli->htable = htable_create(100000);
         
-/*         double bellman_control(size_t du, const double * u, double * grad_u, */
-/*                        double time, const double * x, int absorbed, double * costs, */
-/*                        struct DPparam * dp, struct MCAparam * mca) */
+    poli->cp = NULL;
+    poli->vf_iteration = NULL;
 
-/*     } */
+    return poli;
+}
 
-/*     return 0.0; */
-/* } */
+void pi_param_destroy(struct PIparam * poli)
+{
+    if (poli != NULL){
+        htable_destroy(poli->htable);
+        free(poli); poli = NULL;
+    }
+}
+
+void pi_param_add_cp(struct PIparam * poli, struct ControlParams * cp)
+{
+    assert (poli != NULL);
+    poli->cp = cp;
+}
+
+void pi_param_add_value(struct PIparam * poli, struct ValueF * vf)
+{
+    assert (poli != NULL);
+    poli->vf_iteration = vf;
+}
+
+int bellman_pi(size_t N, const double * x, double * out, void * arg)
+{
+    struct PIparam * param = arg;
+    assert (param->cp != NULL);
+    struct ControlParams * cp = param->cp;
+    struct MCAparam * mca = cp->mca;
+    struct DPparam * dp = cp->dp;
+    size_t dx = mca->dx;
+    size_t du = mca->du;
+    size_t * ngrid = mca->ngrid;
+    double ** xgrid = mca->xgrid;
+    
+    struct ValueF * vf_policy    = param->vf_policy;
+    struct ValueF * vf_iteration = param->vf_iteration;
+    struct Boundary * bound = dp->bound;
+
+    struct HTable * htable = param->htable;
+    
+    // handle the policy
+    double time = 0.0;
+    double * u = calloc_double(du);
+
+    int * absorbed_pol = calloc_int(N);
+    double * costs_pol = calloc_double(N*(2*dx+1));
+
+    size_t * fi = calloc_size_t(dx);
+    size_t dim_vary;
+    int res = mca_get_neighbor_costs(dx,N,x,
+                                     bound,vf_policy,ngrid,xgrid,
+                                     fi,&dim_vary,
+                                     absorbed_pol,costs_pol);
+
+    size_t * ind_to_serialize = calloc_size_t(dx+1);
+    for (size_t ii = 0; ii < dx; ii++){
+        if (ii != dim_vary){
+            ind_to_serialize[ii] = fi[ii];
+        }
+    }
+    ind_to_serialize[dx] = dim_vary;
+    free(fi); fi = NULL;
+    char * key = size_t_a_to_char(ind_to_serialize,dx+1);
+
+    size_t nbytes = 0;
+    double * probs = htable_get_element(htable,key,&nbytes);
+    int probs_alloc = 0;
+    /* probs = NULL; */
+    if (probs == NULL){
+        size_t nprobs = N*(2*dx+1) + 2*N; // last N are stage costs and N before that are dts
+        probs = calloc_double(nprobs); // last N are dts
+        probs_alloc = 1;
+            
+        for (size_t ii = 0; ii < N; ii++){
+            control_params_add_state_info(cp,time,x+ii*dx,absorbed_pol[ii],costs_pol+ii*(2*dx+1));
+            double val;
+            int res2 = bellman_optimal(du,u,&val,cp);
+
+            // build transition probabilities
+            assert (res2 == 0);
+            res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,dp->drift,NULL);
+            assert (res2 == 0);
+            res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,dp->diff,NULL);
+            res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec,
+                                      dp->drift,NULL,dp->diff,NULL,probs + ii*(2*dx+1),
+                                      NULL,probs + N*(2*dx+1)+ii,NULL,NULL);
+
+            res2 = dp->stagecost(time,x+ii*dx,u, probs+ N*(2*dx+1)+ N + ii,NULL);
+            assert (res2 == 0);
+        }
+        htable_add_element(htable,key,probs,nprobs * sizeof(double));
+    }
+
+    
+    // need to compute the control somewhere
+    int * absorbed = calloc_int(N);
+    double * costs = calloc_double(N*(2*dx+1));
+    fi = calloc_size_t(dx);
+    res = mca_get_neighbor_costs(dx,N,x,
+                                 bound,vf_iteration,ngrid,xgrid,
+                                 fi,&dim_vary,
+                                 absorbed,costs);
+
+    assert (res == 0);
+    free(fi); fi = NULL;
+
+    for (size_t ii = 0; ii < N; ii++){
+        // get the optimal control
+        // iterate with the optimal control
+        if (absorbed[ii] == 0){
+            out[ii] = bellmanrhs(dx,du,*(probs + N*(2*dx+1)+N+ii),NULL,dp->discount,
+                                 probs+ii*(2*dx+1),NULL,*(probs+N*(2*dx+1)+ii),NULL,
+                                 costs+ii*(2*dx+1),NULL);
+        }
+        else if (absorbed[ii] == 1){ // absorbed cost
+            res = dp->boundcost(time,x+ii*dx,out+ii);
+            assert (res == 0);
+        }
+        else if (absorbed[ii] == -1){
+            res = dp->obscost(x+ii*dx,out+ii);
+        }
+        else{
+            fprintf(stderr, "Unrecognized aborbed condition %d\n",absorbed[ii]);
+            exit(1);
+        }
+    }
+
+    if (probs_alloc == 1){
+        free(probs); probs = NULL;
+    }
+    free(absorbed); absorbed = NULL;
+    free(costs); costs = NULL;
+    free(absorbed_pol); absorbed_pol = NULL;
+    free(costs_pol); costs_pol = NULL;
+    free(u); u = NULL;
+
+    return 0;
+    
+}
+

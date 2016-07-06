@@ -382,6 +382,8 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
     \param[in]     vf              - value function
     \param[in]     ngrid           - size of grid in each dimension
     \param[in]     xgrid           - size of grid in each dimension
+    \param[in,out] fixed_ind       - (d,) fixed indices with some fill for varying one
+    \param[in,out] dim_vary        - dimension that is varying
     \param[in,out] absorbed        - (0,no), (1,yes), (-1,obstacle)
     \param[in,out] out             - (N*(2d+1),) array of values at neighbors of each element including fibers
 
@@ -389,14 +391,15 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
 **************************************************************/
 int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
                            struct ValueF * vf, const size_t * ngrid, double ** xgrid,
+                           size_t * fixed_ind , size_t * dim_vary,
                            int * absorbed, double * out)
 {
     // BellmanParam must have
 
     // convert fibers to indices
-    size_t * fixed_ind = calloc_size_t(d);
-    size_t dim_vary;
-    int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,&dim_vary);
+    /* size_t * fixed_ind = calloc_size_t(d); */
+    /* size_t dim_vary; */
+    int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
     assert (res == 0);
 
     /* printf("converted fiber, dim_vary = %zu \n",dim_vary); */
@@ -406,19 +409,19 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     /* int * absorbed = calloc_int(N); */
     size_t * neighbors_vary = calloc_size_t(2*N);
     size_t * neighbors_fixed = calloc_size_t(2*(d-1));
-    res = process_fibers_neighbor(d,fixed_ind,dim_vary,x,absorbed,
+    res = process_fibers_neighbor(d,fixed_ind,*dim_vary,x,absorbed,
                                   neighbors_vary,neighbors_fixed,
                                   ngrid,bound);
     assert (res == 0);
 
     /* printf("processed neighbors\n"); */
     // evaluate cost associated with all neighbors
-    res = valuef_eval_fiber_ind_nn(vf, fixed_ind, dim_vary,
+    res = valuef_eval_fiber_ind_nn(vf, fixed_ind, *dim_vary,
                                    neighbors_fixed, neighbors_vary,
                                    out);
 
     assert (res == 0);
-    free(fixed_ind); fixed_ind = NULL;
+    /* free(fixed_ind); fixed_ind = NULL; */
     /* free(absorbed); absorbed = NULL; */
     free(neighbors_vary); neighbors_vary = NULL;
     free(neighbors_fixed); neighbors_fixed = NULL;

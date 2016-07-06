@@ -25,5 +25,6 @@ int convert_fiber_to_ind(size_t d, size_t N, const double * x,
 
 int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
                            struct ValueF * vf, const size_t * ngrid, double ** xgrid,
+                           size_t *, size_t *,
                            int * absorbed, double * out);
 #endif
