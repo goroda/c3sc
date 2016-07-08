@@ -2132,7 +2132,7 @@ void Test_bellman_pi3d(CuTest * tc)
 
 
     // cross approximation tolerances
-    size_t start_rank = 10;
+    size_t start_rank = 20;
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
@@ -2174,7 +2174,7 @@ void Test_bellman_pi3d(CuTest * tc)
     // create the value function that will yield the policy
     
     size_t nvi = 10;
-    size_t npi = 100;
+    size_t npi = 20;
     
     printf("Norm[%d] = %G\n",1,valuef_norm(vf));
     struct ValueF * next = NULL;
