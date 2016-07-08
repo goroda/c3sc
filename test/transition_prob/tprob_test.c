@@ -920,7 +920,6 @@ void Test_bound_nodes(CuTest * tc)
         }
     }
     
-
     int * neighbors = calloc_int(2*d*nvals);
     int * boundaries = calloc_int(nvals);
     int res = process_fibers(d,nvals,x,boundaries,neighbors,bound);
@@ -2173,8 +2172,8 @@ void Test_bellman_pi3d(CuTest * tc)
 
     // create the value function that will yield the policy
     
-    size_t nvi = 10;
-    size_t npi = 20;
+    size_t nvi = 100;
+    size_t npi = 100;
     
     printf("Norm[%d] = %G\n",1,valuef_norm(vf));
     struct ValueF * next = NULL;

@@ -400,6 +400,13 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     /* size_t * fixed_ind = calloc_size_t(d); */
     /* size_t dim_vary; */
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
+    if (res != 0){
+        printf("first point = "); dprint(d,x);
+        printf("grid is \n");
+        for (size_t ii = 0; ii < d; ii++){
+            dprint(ngrid[ii],xgrid[ii]);
+        }
+    }
     assert (res == 0);
 
     /* printf("converted fiber, dim_vary = %zu \n",dim_vary); */
