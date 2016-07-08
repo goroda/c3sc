@@ -401,10 +401,13 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     /* size_t dim_vary; */
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
     if (res != 0){
-        printf("first point = "); dprint(d,x);
         printf("grid is \n");
         for (size_t ii = 0; ii < d; ii++){
             dprint(ngrid[ii],xgrid[ii]);
+        }
+        printf("\n evaluate at %zu points\n",N);
+        for (size_t ii = 0; ii < N; ii++){
+            printf("first point = "); dprint(d,x+ii*d);
         }
     }
     assert (res == 0);

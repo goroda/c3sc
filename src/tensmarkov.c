@@ -548,11 +548,11 @@ mca_get_node2(struct MCA * mca, double time, struct Node * node,
     struct MCNode * mcn = mcnode_alloc(node,du);
     /* printf("allocated\n"); */
 
-    int res;
+    int res = 0;
     double * dQ = NULL;
-    size_t ngrad = 0;
+    /* size_t ngrad = 0; */
     if (grad != NULL){
-        ngrad = du;
+        /* ngrad = du; */
         //gprob = malloc_dd(2*mca->d);
         res = dyn_eval(mca->dyn,time,node->x,u,mca->drift,
                        mca->gdrift,mca->diff,mca->gdiff);
@@ -562,7 +562,7 @@ mca_get_node2(struct MCA * mca, double time, struct Node * node,
         res = dyn_eval(mca->dyn,time,node->x,u,mca->drift,
                        NULL,mca->diff,NULL);
     }
-
+    assert (res == 0);
 
     /* printf("drift = "); dprint(mca->d,mca->drift); */
     

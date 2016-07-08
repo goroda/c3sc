@@ -562,7 +562,7 @@ dpih_iter_pol_solve(struct DPih * dp,
     double normprev = 0.0;
 
     struct Cost * tcost = NULL;
-    double prevrat = 0;
+    /* double prevrat = 0; */
     for (size_t jj = 0; jj < max_solve_iter; jj++){
 
         tcost = dpih_iter_pol(dp,pol,verbose-1,aargs);
@@ -588,7 +588,7 @@ dpih_iter_pol_solve(struct DPih * dp,
             /*     break; */
             /* } */
         }
-        prevrat = rat;
+        /* prevrat = rat; */
         normprev = normval;
         dpih_attach_cost_ow(dp,tcost);
         cost_free(tcost); tcost = NULL;

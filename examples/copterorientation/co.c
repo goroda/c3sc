@@ -339,9 +339,9 @@ int main(int argc, char * argv[])
         /* double * xt = linspace(lb[4],ub[4],N); */
         /* dprint(N,xt); */
     }
-    double center[6] = {0.0,0.0,0.0,0.0,0.0};
+    /* double center[6] = {0.0,0.0,0.0,0.0,0.0}; */
     /* double width[6] = {ub[0]-lb[0],ub[1]-lb[1],ub[2]-lb[2],0.4,0.4,0.2}; */
-    double width[6] = {0.2, 0.2, 0.2, 0.25, 0.25, 0.2};
+    /* double width[6] = {0.2, 0.2, 0.2, 0.25, 0.25, 0.2}; */
     /* dprint(6,width); */
     /* c3sc_add_obstacle(sc,center,width); */
     c3sc_add_dynamics(sc,f1,NULL,s1,NULL);

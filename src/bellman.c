@@ -308,8 +308,10 @@ struct ControlParams
     
 };
 
-struct ControlParams * control_params_create(size_t dx, size_t dw, struct DPparam * dp,
-                                             struct MCAparam * mca, struct c3Opt * opt)
+struct ControlParams * control_params_create(size_t dx, size_t dw,
+                                             struct DPparam * dp,
+                                             struct MCAparam * mca, 
+                                             struct c3Opt * opt)
 {
     struct ControlParams * c = malloc(sizeof(struct ControlParams));
     assert (c != NULL);
@@ -483,7 +485,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     size_t nrand = 10; // note this is changed if du = 1 or du = 3;
     size_t npert = 2;
     double valtemp;
-    int justrand = 1;
+    int justrand = 0;
 
     c3opt_add_objective(opt,&bellman_control,param);
     // first do zero;
@@ -532,7 +534,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             }
         }
         else if (du == 3){
-            nrand = 0;
+            nrand = 10;
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;
@@ -713,7 +715,8 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         /* printf("got it\n"); */
         double time = 0.0;
         for (size_t ii = 0; ii < N; ii++){
-            control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],costs+ii*(2*dx+1));
+            control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],
+                                          costs+ii*(2*dx+1));
             int res2 = bellman_optimal(du,u,out+ii,cp);
             assert (res2 == 0);
         }
@@ -857,7 +860,9 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
             double * u = calloc_double(du);
             for (size_t ii = 0; ii < N; ii++){
-                control_params_add_state_info(cp,time,x+ii*dx,absorbed_pol[ii],costs_pol+ii*(2*dx+1));
+                control_params_add_state_info(cp,time,x+ii*dx,
+                                              absorbed_pol[ii],
+                                              costs_pol+ii*(2*dx+1));
                 double val;
                 int res2 = bellman_optimal(du,u,&val,cp);
 
@@ -867,10 +872,12 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 assert (res2 == 0);
                 res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,dp->diff,NULL);
                 res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec,
-                                          dp->drift,NULL,dp->diff,NULL,probs + ii*(2*dx+1),
-                                          NULL,probs + N*(2*dx+1)+ii,NULL,NULL);
+                                          dp->drift,NULL,dp->diff,NULL,
+                                          probs + ii*(2*dx+1),
+                                          NULL,probs + N*(2*dx+1)+ii, // dt
+                                          NULL,NULL);
 
-                res2 = dp->stagecost(time,x+ii*dx,u, probs+ N*(2*dx+1)+ N + ii,NULL);
+                res2 = dp->stagecost(time,x+ii*dx,u,probs + N*(2*dx+1)+N+ii,NULL);
                 assert (res2 == 0);
             }
             htable_add_element(htable,key2,probs,nprobs * sizeof(double));
@@ -896,8 +903,12 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
             // get the optimal control
             // iterate with the optimal control
             if (absorbed[ii] == 0){
-                out[ii] = bellmanrhs(dx,du,*(probs + N*(2*dx+1)+N+ii),NULL,dp->discount,
-                                     probs+ii*(2*dx+1),NULL,*(probs+N*(2*dx+1)+ii),NULL,
+                out[ii] = bellmanrhs(dx,du,
+                                     *(probs + N*(2*dx+1)+N+ii), // stagecost
+                                     NULL,
+                                     dp->discount, 
+                                     probs+ii*(2*dx+1),NULL,
+                                     *(probs+N*(2*dx+1)+ii),NULL, // dt
                                      costs+ii*(2*dx+1),NULL);
             }
             else if (absorbed[ii] == 1){ // absorbed cost
@@ -939,3 +950,163 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     
 }
 
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////
+
+
+struct C3Control
+{
+    size_t dx;
+    size_t du;
+    size_t dw;
+    
+    size_t * ngrid;
+    double ** xgrid;
+    double * h;
+    double hmin;
+    
+    struct Boundary * bound;
+    struct MCAparam * mca;
+    struct DPparam * dp;
+};
+
+struct C3Control *
+c3control_create(size_t dx, size_t du, size_t dw,
+                 double * lb, double * ub,
+                 size_t * ngrid, double discount)
+{
+    struct C3Control * c3c = malloc(sizeof(struct C3Control));
+    c3c->dx = dx;
+    c3c->du = du;
+    c3c->dw = dw;
+
+    c3c->ngrid = ngrid;
+    c3c->xgrid = malloc(dx * sizeof(double *));
+    c3c->h     = calloc_double(dx);
+    c3c->hmin  = ub[0] - lb[0];
+    for (size_t ii = 0; ii < dx; ii++){
+        c3c->xgrid[ii] = linspace(lb[ii],ub[ii],ngrid[ii]);
+        c3c->h[ii] = c3c->xgrid[ii][1] - c3c->xgrid[ii][0];
+        if (c3c->h[ii] < c3c->hmin){
+            c3c->hmin = c3c->h[ii];
+        }
+    }
+    c3c->bound = boundary_alloc(dx,lb,ub);
+    c3c->mca   = mca_param_create(dx,du);
+    mca_add_grid_refs(c3c->mca,c3c->ngrid,c3c->xgrid,c3c->hmin,c3c->h);
+    c3c->dp    = dp_param_create(dx,du,dw,discount);
+    dp_param_add_boundary(c3c->dp, c3c->bound);
+
+    return c3c;
+}
+
+void c3control_destroy(struct C3Control * c3c)
+{
+    if (c3c != NULL){
+        boundary_free(c3c->bound);   c3c->bound = NULL;
+        mca_param_destroy(c3c->mca); c3c->mca   = NULL;
+        dp_param_destroy(c3c->dp);   c3c->dp    = NULL;
+        for (size_t ii = 0; ii < c3c->dx; ii++){
+            free(c3c->xgrid[ii]); c3c->xgrid[ii] = NULL;
+        }
+        free(c3c->xgrid); c3c->xgrid = NULL;
+        free(c3c->h);     c3c->h     = NULL;
+        free(c3c); c3c = NULL;
+    }
+}
+
+void c3control_add_obstacle(struct C3Control * c3c, double * center, double * widths)
+{
+    assert (c3c != NULL);
+    assert (c3c->bound == NULL);
+    boundary_add_obstacle(c3c->bound, center, widths);
+}
+
+void c3control_add_drift(struct C3Control * c3c, int (*b)(double,const double*,const double*,
+                                                          double*,double*,void*),
+                         void * args)
+{
+    assert (c3c != NULL);
+    assert (c3c->dp != NULL);
+    dp_param_add_drift(c3c->dp,b,args);
+}
+
+void c3control_add_diff(struct C3Control * c3c, int (*s)(double,const double*,const double*,
+                                                         double*,double*,void*),
+                        void * sargs)
+{
+    assert (c3c != NULL);
+    assert (c3c->dp != NULL);
+    dp_param_add_diff(c3c->dp,s,sargs);
+}
+
+void c3control_add_stagecost(struct C3Control * c3c,
+                             int (*stagecost)(double,const double*,
+                                              const double*,double*,double*))
+{
+    assert (c3c != NULL);
+    assert (c3c->dp != NULL);
+    dp_param_add_stagecost(c3c->dp,stagecost);
+}
+
+void c3control_add_boundcost(struct C3Control * c3c,
+                             int (*boundcost)(double,const double*,double*))
+{
+    assert (c3c != NULL);
+    assert (c3c->dp != NULL);
+    dp_param_add_boundcost(c3c->dp,boundcost);
+}
+
+void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,double*))
+{
+    assert (c3c != NULL);
+    assert (c3c->dp != NULL);
+    dp_param_add_obscost(c3c->dp,obscost);
+}

@@ -64,4 +64,38 @@ void pi_param_add_cp(struct PIparam * pi, struct ControlParams *);
 void pi_param_add_value(struct PIparam *, struct ValueF *);
 int bellman_pi(size_t, const double *, double *, void *);
 
+
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////
+
+
+struct C3Control *
+c3control_create(size_t, size_t, size_t,
+                     double *, double *,
+                     size_t *, double);
+
+void c3control_destroy(struct C3Control *);
+void c3control_add_obstacle(struct C3Control *, double *, double *);
+
+void c3control_add_drift(struct C3Control * c3c, 
+                             int (*b)(double,const double*,const double*,
+                                          double*,double*,void*),
+                             void * args);
+void c3control_add_diff(struct C3Control * c3c, 
+                            int (*s)(double,const double*,const double*,
+                                         double*,double*,void*),
+                            void * sargs);
+void c3control_add_stagecost(struct C3Control * c3c,
+                             int (*stagecost)(double,const double*,
+                                                  const double*,double*,double*));
+void c3control_add_boundcost(struct C3Control * c3c,
+                                 int (*boundcost)(double,const double*,double*));
+
+void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,double*));
 #endif
