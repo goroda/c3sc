@@ -2267,9 +2267,9 @@ void Test_bellman_c3control3d(CuTest * tc)
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
     CuAssertIntEquals(tc,0,c3c==NULL);
     // obstacle
-    double center[3] = {0.0,0.0,0.0};
-    double lengths[3] = {0.8,0.8,0.8};
-    c3control_add_obstacle(c3c,center,lengths);
+    /* double center[3] = {0.0,0.0,0.0}; */
+    /* double lengths[3] = {0.8,0.8,0.8}; */
+    /* c3control_add_obstacle(c3c,center,lengths); */
 
     // dynamics
     c3control_add_drift(c3c,f3,NULL);
@@ -2287,20 +2287,13 @@ void Test_bellman_c3control3d(CuTest * tc)
     size_t start_rank = 5;
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_round_tol(aargs,1e-13);
+    /* approx_args_set_maxiter(aargs,10); */
     approx_args_set_kickrank(aargs,10);
-    approx_args_set_adapt(aargs,0);
+    approx_args_set_adapt(aargs,1);
     approx_args_set_startrank(aargs,start_rank);
     approx_args_set_maxrank(aargs,start_rank);
 
-    double * start[3];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
 
     double lbu = -5.0;
     double ubu = 5.0;
@@ -2309,93 +2302,38 @@ void Test_bellman_c3control3d(CuTest * tc)
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbarr);
     c3opt_add_ub(opt,ubarr);
-    c3opt_set_absxtol(opt,1e-10);
-    c3opt_set_relftol(opt,1e-10);
+    c3opt_set_absxtol(opt,1e-7);
+    c3opt_set_relftol(opt,1e-7);
     c3opt_set_gtol(opt,0.0);
     c3opt_set_verbose(opt,0);
-    c3opt_ls_set_beta(opt,0.8);
+    /* c3opt_ls_set_beta(opt,0.8); */
 
     
-    //////////////////////////////////////////////////
-    // Initial approximation
-    //////////////////////////////////////////////////
-    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
-
     //////////////////////////////////////////////////
     // Solver properties
     //////////////////////////////////////////////////
-    size_t maxiter_vi = 10;
-    double  abs_conv_vi = 1e-3;
+    /* size_t maxiter_vi = 10; */
+    /* double  abs_conv_vi = 1e-3; */
 
-    size_t maxiter_pi = 10;
-    double  abs_conv_pi = 1e-3;
-    
-    /* struct Solution * solution_create() */
-    
-    /* struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt); */
+    size_t maxiter_pi = 100;
+    double abs_conv_pi = 1e-6;
+    struct ValueF * pol = c3control_init_value(c3c,quad3d,NULL,aargs,0);
+    struct ValueF * pol_copy = valuef_copy(pol);
 
-    /* double convergence = 1e-5; */
-    /* struct VIparam * vi = vi_param_create(convergence); */
-    /* vi_param_add_cp(vi,cp); */
-    /* vi_param_add_value(vi,vf); */
+    double diff = valuef_norm2diff(pol,pol_copy);
+    CuAssertDblEquals(tc,0,diff,1e-14);
 
-    /* // create the value function that will yield the policy */
+    /* struct ValueF * pol_cost = c3control_step_vi(c3c,pol_copy,aargs,opt); */
+    /* struct ValueF * pol_cost = c3control_step_pi(c3c,pol_copy,pol,aargs,opt); */
     
-    /* size_t nvi = 100; */
-    /* size_t npi = 100; */
-    
-    /* printf("Norm[%d] = %G\n",1,valuef_norm(vf)); */
-    /* struct ValueF * next = NULL; */
-    /* /\* next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); *\/ */
-    /* /\* printf("Norm[%d] = %G\n",2,valuef_norm(next)); *\/ */
-    /* for (size_t jj = 0; jj < nvi; jj++){ */
-    /*     printf("VI iteration = %zu\n",jj); */
-    /*     struct ValueF * vf_pol = NULL; */
-    /*     vf_pol = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0); */
+    struct ValueF * pol_cost = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
+                                                  pol,aargs,opt,1);
 
-    /*     struct PIparam * poli = NULL; */
-    /*     poli = pi_param_create(convergence,vf_pol); */
-    /*     pi_param_add_cp(poli,cp); */
-    /*     /\* pi_param_add_value(poli,vf); *\/ */
-
-    /*     double norm2; */
-    /*     for (size_t ii = 0; ii < npi; ii++){ */
-    /*         if (next == NULL){ */
-    /*             /\* printf("go\n"); *\/ */
-    /*             pi_param_add_value(poli,vf); */
-    /*             vi_param_add_value(vi,vf); */
-    /*             next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); */
-    /*             norm2 = valuef_norm(next); */
-    /*             valuef_destroy(vf); vf = NULL; */
-    /*         } */
-    /*         else{ */
-    /*             /\* printf("there\n"); *\/ */
-    /*             pi_param_add_value(poli,next); */
-    /*             vi_param_add_value(vi,next); */
-    /*             vf = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); */
-    /*             norm2 = valuef_norm(vf); */
-    /*             valuef_destroy(next); next = NULL; */
-    /*         } */
-    /*         printf("Norm[%zu] = %G\n",ii+2,norm2); */
-    /*     } */
-    /*     pi_param_destroy(poli); poli = NULL; */
-    /*     if (next == NULL){ */
-    /*         vi_param_add_value(vi,vf); */
-    /*     } */
-    /*     else{ */
-    /*         vi_param_add_value(vi,next); */
-    /*     } */
-    /* } */
-    
-    /* control_params_destroy(cp); cp = NULL; */
-    /* free(start[0]); start[0] = NULL; */
-    /* free(start[1]); start[1] = NULL; */
-    /* free(start[2]); start[2] = NULL; */
-    /* valuef_destroy(vf); vf = NULL; */
     /* approx_args_free(aargs); aargs = NULL; */
     /* c3opt_free(opt); opt = NULL; */
-
-    c3control_destroy(c3c); c3c = NULL;
+    /* valuef_destroy(pol); pol = NULL; */
+    /* valuef_destroy(pol_cost); pol_cost = NULL; */
+    /* c3control_destroy(c3c); c3c = NULL; */
 }
 
 CuSuite * DPAlgsGetSuite()
@@ -2406,7 +2344,8 @@ CuSuite * DPAlgsGetSuite()
     /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi); */
-    SUITE_ADD_TEST(suite, Test_bellman_pi3d);
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */
+    SUITE_ADD_TEST(suite, Test_bellman_c3control3d);
 
     return suite;
 }

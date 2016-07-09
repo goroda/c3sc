@@ -77,37 +77,45 @@ struct HList{
 void hlist_push(struct HList ** head, char * string, void * data, size_t nbytes)//double xIn, size_t ind)
 {
     struct HList * newNode = malloc(sizeof(struct HList));
+    newNode->key = NULL;
+    newNode->data = NULL;
     
     newNode->next = *head;
-    size_t N1 = strlen(string);
+    /* size_t N1 = strlen(string); */
     // create key
-    newNode->key = malloc((N1+1)*sizeof(char));
-    memmove(newNode->key,string,(N1+1)*sizeof(char));
+    newNode->key = malloc(256 * sizeof(char));
+    sprintf(newNode->key,"%s",string);
+    /* memmove(newNode->key,string,(N1+1)*sizeof(char)); */
     /* strncpy(newNode->key,string,N1); */
     /* newNode->key[N1] = '\0'; */
 
     // create data
     newNode->nbytes = nbytes;
     newNode->data = malloc(nbytes);
-    memmove((char *)newNode->data, (char *) data, nbytes);
+    memmove((char *)(newNode->data), (char *) data, nbytes);
     
     *head = newNode;
 }
 
 void hlist_free(struct HList ** head){
 
-    // This is a bit inefficient and doesnt free the last node
-    struct HList * current = *head;
-    struct HList * next;
-    while (current != NULL){
-        next = current->next; current->next = NULL;
-        free(current->key); current->key = NULL;
-        free(current->data); current->data = NULL;
-        /* free(current->x); */
-        free(current); current = NULL;
-        current = next;
+    if (*head != NULL){
+        // This is a bit inefficient and doesnt free the last node
+        struct HList * current = *head;
+        struct HList * next;
+        while (current != NULL){
+            next = current->next; current->next = NULL;
+            /* printf("free key\n"); */
+            free(current->key); current->key = NULL;
+            /* printf("freed data\n"); */
+            free(current->data); current->data = NULL;
+            /* printf("freed keys and data\n"); */
+            /* free(current->x); */
+            free(current); current = NULL;
+            current = next;
+        }
+        *head = NULL;
     }
-    *head = NULL;
 }
 
 struct HTable
@@ -149,10 +157,13 @@ void htable_destroy(struct HTable * ht)
 {
     if (ht != NULL){
         size_t ii;
+        /* printf("destroy the little lists\n"); */
         for (ii = 0; ii < ht->size; ii++){
             hlist_free(&(ht->table[ii])); ht->table[ii] = NULL;
         }
+        /* printf("destroyed all little lists\n"); */
         free(ht->table); ht->table = NULL;
+        /* printf("destroyed table\n"); */
         free(ht); ht = NULL;
     }
 }

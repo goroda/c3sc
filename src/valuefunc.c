@@ -76,34 +76,6 @@ void valuef_destroy(struct ValueF * vf)
     }
 }
 
-/**********************************************************//**
-    Get the norm of the value function
-
-    \param[in] vf - value function
-    
-    \return L2 Norm
-**************************************************************/
-double valuef_norm(struct ValueF * vf)
-{
-    assert (vf != NULL);
-    return function_train_norm2(vf->cost);
-}
-
-/**********************************************************//**
-    Evaluate the value function
-
-    \param[in] vf - value function to evaluate 
-    \param[in] x  - location at which to Evaluate
-    
-    \return evaluation
-**************************************************************/
-double valuef_eval(struct ValueF * vf, const double * x)
-{
-    assert (vf != NULL);
-    assert (vf->cost != NULL);
-    return function_train_eval(vf->cost,x);
-}
-
 void valuef_precompute_cores(struct ValueF * cost)
 {
     assert (cost != NULL);
@@ -129,6 +101,66 @@ void valuef_precompute_cores(struct ValueF * cost)
         }
     }
 }
+
+/**********************************************************//**
+    Copy a value function                                                           
+**************************************************************/
+struct ValueF * valuef_copy(struct ValueF * vf)
+{
+    assert (vf != NULL);
+
+    struct ValueF * vf2 = valuef_create(vf->d);
+    vf2->cost = function_train_copy(vf->cost);
+    memmove(vf2->N,vf->N,vf->d * sizeof(size_t));
+    valuef_precompute_cores(vf2);
+    return vf2;
+}
+
+
+/**********************************************************//**
+    Get the norm of the value function
+
+    \param[in] vf - value function
+    
+    \return L2 Norm
+**************************************************************/
+double valuef_norm(struct ValueF * vf)
+{
+    assert (vf != NULL);
+    assert (vf->cost != NULL);
+    return function_train_norm2(vf->cost);
+}
+
+/**********************************************************//**
+    Get the norm between value functions
+
+    \param[in] vf  - value function
+    \param[in] vf2 - second value function
+    
+    \return L2 difference 
+**************************************************************/
+double valuef_norm2diff(struct ValueF * vf, struct ValueF * vf2)
+{
+    assert (vf != NULL);
+    assert (vf2 != NULL);
+    return function_train_norm2diff(vf->cost,vf2->cost);
+}
+
+/**********************************************************//**
+    Evaluate the value function
+
+    \param[in] vf - value function to evaluate 
+    \param[in] x  - location at which to Evaluate
+    
+    \return evaluation
+**************************************************************/
+double valuef_eval(struct ValueF * vf, const double * x)
+{
+    assert (vf != NULL);
+    assert (vf->cost != NULL);
+    return function_train_eval(vf->cost,x);
+}
+
 
 
 /**********************************************************//**
@@ -400,7 +432,7 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
     }
     c3approx_init_cross(c3a,startrank,verbose,start);
     c3approx_set_cross_tol(c3a,cross_tol);
-    c3approx_set_cross_maxiter(c3a,30);
+    c3approx_set_cross_maxiter(c3a,10);
     c3approx_set_round_tol(c3a,round_tol);
     c3approx_set_adapt_kickrank(c3a,kickrank);
     size_t minN = N[0];

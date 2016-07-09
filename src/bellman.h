@@ -98,4 +98,23 @@ void c3control_add_boundcost(struct C3Control * c3c,
                                  int (*boundcost)(double,const double*,double*));
 
 void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,double*));
+
+
+struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
+                                  struct ApproxArgs * apargs,
+                                  struct c3Opt * opt);
+
+struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
+                                  struct ValueF * policy,
+                                  struct ApproxArgs * apargs,
+                                  struct c3Opt * opt);
+struct ValueF *
+c3control_init_value(struct C3Control * c3c,int (*f)(size_t,const double *,double*,void*),void * args,
+                        struct ApproxArgs * aargs, int verbose);
+struct ValueF * c3control_pi_solve(struct C3Control * c3c,
+                                   size_t maxiter, double abs_conv_tol,
+                                   struct ValueF * policy,
+                                   struct ApproxArgs * apargs,
+                                   struct c3Opt * opt,
+                                   int verbose);
 #endif

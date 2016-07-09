@@ -62,6 +62,8 @@ double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_
                   double discount, const double * prob, const double * prob_grad, 
                   double dt, const double * dtgrad, const double * cost, double * grad)
 {
+    assert (prob != NULL);
+
     double ebt = exp(-discount * dt);
     double cost_to_go = cblas_ddot(2*dx+1,prob,1,cost,1);
 
@@ -378,7 +380,12 @@ double bellman_control(size_t du, double * u, double * grad_u, void * args)
     size_t dx = param->dx;
     size_t dw = param->dw;
     int absorbed = param->absorbed;
-        
+
+    assert (dp != NULL);
+    assert (mca != NULL);
+    assert (costs != NULL);
+    assert (x != NULL);
+    
     //get drift and diffusion
     int res;
     if (grad_u != NULL){
@@ -535,6 +542,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
         }
         else if (du == 3){
             nrand = 10;
+            npert = 4;
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;
@@ -772,8 +780,11 @@ struct PIparam * pi_param_create(double convergence, struct ValueF * policy)
 void pi_param_destroy(struct PIparam * poli)
 {
     if (poli != NULL){
+        /* printf("destroy table\n"); */
         htable_destroy(poli->htable); poli->htable = NULL;
+        /* printf("got it tbale=NULL = %d\n",poli->htable_iter == NULL); */
         htable_destroy(poli->htable_iter); poli->htable_iter = NULL;
+        /* printf("destroy self\n"); */
         free(poli); poli = NULL;
     }
 }
@@ -796,11 +807,15 @@ void pi_param_add_value(struct PIparam * poli, struct ValueF * vf)
 
 int bellman_pi(size_t N, const double * x, double * out, void * arg)
 {
+
+    /* printf("started pi\n"); */
     struct PIparam * param = arg;
     assert (param->cp != NULL);
     struct ControlParams * cp = param->cp;
     struct MCAparam * mca = cp->mca;
+    assert (mca != NULL);
     struct DPparam * dp = cp->dp;
+    assert (dp != NULL);
     size_t dx = mca->dx;
     size_t du = mca->du;
     size_t * ngrid = mca->ngrid;
@@ -808,24 +823,33 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     
     struct ValueF * vf_policy    = param->vf_policy;
     struct ValueF * vf_iteration = param->vf_iteration;
+    assert (vf_policy != NULL);
+    assert (vf_iteration != NULL);
     struct Boundary * bound = dp->bound;
+    assert (bound != NULL);
 
     struct HTable * htable = param->htable;
     struct HTable * htable_iter = param->htable_iter;
-    
+
+    assert (htable != NULL);
+    assert (htable_iter != NULL);
     // handle the policy
     double time = 0.0;
 
 
+    /* printf("prep\n"); */
     int * absorbed_pol = calloc_int(N);
     double * costs_pol = calloc_double(N*(2*dx+1));
 
     size_t * fi = calloc_size_t(dx);
     size_t dim_vary;
+    /* printf("get neighbor costs\n"); */
     int res = mca_get_neighbor_costs(dx,N,x,
                                      bound,vf_policy,ngrid,xgrid,
                                      fi,&dim_vary,
                                      absorbed_pol,costs_pol);
+    /* printf("got them\n"); */
+    assert (res == 0);
 
     size_t * ind_to_serialize = calloc_size_t(dx+1);
     for (size_t ii = 0; ii < dx; ii++){
@@ -839,14 +863,15 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     char * key2 = size_t_a_to_char(ind_to_serialize,dx+1);
     char * key3 = size_t_a_to_char(ind_to_serialize,dx+1);
     free(ind_to_serialize); ind_to_serialize = NULL;
-    
-
 
     // see if already computed the output for this function
     size_t nbytes1 = 0;
+    /* printf("get the element\n"); */
     double * out_stored = htable_get_element(htable_iter,key1,&nbytes1);
+    /* printf("done prepping\n"); */
     /* double * out_stored = NULL; */
     if (out_stored == NULL){
+        /* printf("not stored\n"); */
         size_t nbytes = 0;
         // see if already computed transition probabilities for this fiber
         double * probs = htable_get_element(htable,key1,&nbytes);
@@ -923,7 +948,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 exit(1);
             }
         }
-
+        
         if (probs_alloc == 1){
             free(probs); probs = NULL;
         }
@@ -931,11 +956,14 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         free(costs); costs = NULL;
         
         htable_add_element(htable_iter,key3,out,N * sizeof(double));
+        /* printf("dealt with it\n"); */
     }
     else{
+        /* printf("got saved\n"); */
         for (size_t ii = 0; ii < N; ii++){
             out[ii] = out_stored[ii];
         }
+        /* dprint(N,out); */
         free(key3); key3 = NULL;
         free(key2); key2 = NULL;
     }
@@ -946,6 +974,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     free(absorbed_pol); absorbed_pol = NULL;
     free(costs_pol); costs_pol = NULL;
 
+    /* printf("finished pi\n"); */
     return 0;
     
 }
@@ -1065,7 +1094,7 @@ void c3control_destroy(struct C3Control * c3c)
 void c3control_add_obstacle(struct C3Control * c3c, double * center, double * widths)
 {
     assert (c3c != NULL);
-    assert (c3c->bound == NULL);
+    assert (c3c->bound != NULL);
     boundary_add_obstacle(c3c->bound, center, widths);
 }
 
@@ -1109,4 +1138,185 @@ void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,
     assert (c3c != NULL);
     assert (c3c->dp != NULL);
     dp_param_add_obscost(c3c->dp,obscost);
+}
+
+struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
+                                  struct ApproxArgs * apargs,
+                                  struct c3Opt * opt)
+{
+    assert (c3c != NULL);
+    assert (c3c->ngrid != NULL);
+    assert (c3c->xgrid != NULL);
+    
+    size_t dx = c3c->dx;
+    size_t * ngrid = c3c->ngrid;
+    double ** xgrid = c3c->xgrid;
+    size_t start_rank = approx_args_get_startrank(apargs);
+    double ** start = malloc(dx * sizeof(double *));
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii], start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+
+    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,opt);
+    struct VIparam * vi = vi_param_create(1e-10);
+    vi_param_add_cp(vi,cp);
+    vi_param_add_value(vi,vf);
+    
+    struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,0);
+
+
+    vi_param_destroy(vi); vi = NULL;
+    control_params_destroy(cp); cp = NULL;
+    for (size_t ii = 0; ii < dx; ii++){
+        free(start[ii]); start[ii] = NULL;
+    }
+    free(start); start = NULL;
+
+    return next;
+}
+
+struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
+                                  struct ValueF * policy,
+                                  struct ApproxArgs * apargs,
+                                  struct c3Opt * opt)
+{
+    assert (c3c != NULL);
+    assert (c3c->ngrid != NULL);
+    assert (c3c->xgrid != NULL);
+    assert (vf != NULL);
+    assert (policy != NULL);
+    assert (opt != NULL);
+    assert (apargs != NULL);
+    assert (c3c->mca != NULL);
+    assert (c3c->dp != NULL);
+    
+    size_t dx = c3c->dx;
+    size_t * ngrid = c3c->ngrid;
+    double ** xgrid = c3c->xgrid;
+    size_t start_rank = approx_args_get_startrank(apargs);
+    double ** start = malloc(dx * sizeof(double *));
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii], start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+    }
+
+    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,opt);
+    struct PIparam * poli = pi_param_create(1e-10,policy);
+    pi_param_add_cp(poli,cp);
+    pi_param_add_value(poli,vf);
+
+    /* printf("interp\n"); */
+    struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,apargs,0);
+    /* printf("done\n"); */
+
+    /* printf("destroy param\n"); */
+    pi_param_destroy(poli); poli = NULL;
+    /* printf("destroy cp\n"); */
+    control_params_destroy(cp); cp = NULL;
+    for (size_t ii = 0; ii < dx; ii++){
+        free(start[ii]); start[ii] = NULL;
+    }
+    free(start); start = NULL;
+    /* printf("all freed\n"); */
+    return next;
+}
+
+
+struct ValueF *
+c3control_init_value(struct C3Control * c3c,int (*f)(size_t,const double *,double*,void*),void * args,
+                     struct ApproxArgs * aargs, int verbose)
+{
+    assert (c3c != NULL);
+    assert (c3c->ngrid != NULL);
+    assert (c3c->xgrid != NULL);
+    
+    size_t dx = c3c->dx;
+    size_t * ngrid = c3c->ngrid;
+    double ** xgrid = c3c->xgrid;
+    size_t start_rank = approx_args_get_startrank(aargs);
+    double ** start = malloc(dx * sizeof(double *));
+    for (size_t ii = 0; ii < dx; ii++){
+        start[ii] = calloc_double(start_rank);
+        size_t stride = uniform_stride(ngrid[ii], start_rank);
+        for (size_t jj = 0; jj < start_rank; jj++){
+            start[ii][jj] = xgrid[ii][stride*jj];
+        }
+        /* printf("ii = 0; start= "); dprint(start_rank,start[ii]); */
+    }
+
+    struct ValueF * vf = valuef_interp(c3c->dx,f,args,c3c->ngrid,c3c->xgrid,
+                                       start, aargs,verbose);
+
+    for (size_t ii = 0; ii < dx; ii++){
+        free(start[ii]); start[ii] = NULL;
+    }
+    free(start); start = NULL;
+    return vf;
+        
+}
+
+struct ValueF * c3control_pi_solve(struct C3Control * c3c,
+                                   size_t maxiter, double abs_conv_tol,
+                                   struct ValueF * policy,
+                                   struct ApproxArgs * apargs,
+                                   struct c3Opt * opt,
+                                   int verbose)
+{
+
+    struct ValueF * start = valuef_copy(policy);
+    /* double dd = valuef_norm2diff(start,policy); */
+    /* printf("diff = %G\n",dd); */
+    for (size_t ii = 0; ii < maxiter; ii++){
+        /* printf("ii = %zu\n",ii); */
+        assert (start != NULL);
+        struct ValueF * next = c3control_step_pi(c3c,start,policy,apargs,opt);
+        /* printf("stepped\n"); */
+        double diff = valuef_norm2diff(start,next);
+        double norm = valuef_norm(next);
+        if (verbose > 0){
+            if ((ii+1) % 1 == 0){
+                printf("\t POLICY ITERATION (%zu\\%zu):\n",ii+1,maxiter);
+                printf("\t \t L2 Difference between iterates    = %3.5E\n ",diff);
+                printf("\t \t L2 Norm of current value function = %3.5E\n", norm);
+                printf("\t \t Relative L2 Cauchy difference     = %3.5E\n", diff/norm);
+                /* printf("\t \t Ratio: L2 Norm Prev / L2 Norm Cur = %G\n",rat); */
+            }
+
+            double pt[3];
+            double * lb = c3opt_get_lb(opt);
+            double * ub = c3opt_get_ub(opt);
+            double sumdiff = 0.0;
+            double sumnorm = 0.0;
+            for (size_t kk = 0; kk < 1000; kk++){
+                pt[0] = randu()*(ub[0]-lb[0])+lb[0];
+                pt[1] = randu()*(ub[1]-lb[1])+lb[1];
+                pt[2] = randu()*(ub[2]-lb[2])+lb[2];
+                double v1 = valuef_eval(next,pt);
+                double v2 = valuef_eval(start,pt);
+                sumdiff += pow(v2-v1,2);
+                sumnorm += pow(v1,2);
+            }
+            sumdiff /= sumnorm;
+            printf("relative norm diff sampled = %G\n",sqrt(sumdiff));
+        }
+        
+        valuef_destroy(start); start = NULL;
+        start = valuef_copy(next);
+        valuef_destroy(next); next = NULL;
+        norm = valuef_norm(start); 
+        /* printf("start norm = %G\n",norm); */
+
+        if (diff < abs_conv_tol){
+            break;
+        }
+    }
+
+    return start;
 }

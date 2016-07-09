@@ -399,6 +399,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     // convert fibers to indices
     /* size_t * fixed_ind = calloc_size_t(d); */
     /* size_t dim_vary; */
+    /* printf("convert fiber\n"); */
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
     if (res != 0){
         printf("grid is \n");
@@ -419,6 +420,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     /* int * absorbed = calloc_int(N); */
     size_t * neighbors_vary = calloc_size_t(2*N);
     size_t * neighbors_fixed = calloc_size_t(2*(d-1));
+    /* printf("process neighbors\n"); */
     res = process_fibers_neighbor(d,fixed_ind,*dim_vary,x,absorbed,
                                   neighbors_vary,neighbors_fixed,
                                   ngrid,bound);
@@ -426,6 +428,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
 
     /* printf("processed neighbors\n"); */
     // evaluate cost associated with all neighbors
+    /* printf("evaluated neighbors\n"); */
     res = valuef_eval_fiber_ind_nn(vf, fixed_ind, *dim_vary,
                                    neighbors_fixed, neighbors_vary,
                                    out);
