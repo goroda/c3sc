@@ -117,6 +117,43 @@ struct ValueF * valuef_copy(struct ValueF * vf)
 }
 
 /**********************************************************//**
+    Save a value function
+**************************************************************/
+int valuef_save(struct ValueF * vf, char * filename)
+{
+    assert (vf != NULL);
+    assert (vf->cost != NULL);
+    int res = function_train_save(vf->cost,filename);
+    if (res == 1){
+        // 0 should be good according to unix but haven't updated
+        // function train code!!
+        return 0; 
+    }
+    return 1;
+}
+
+/**********************************************************//**
+    Load a cost function
+**************************************************************/
+struct ValueF * valuef_load(char * filename, size_t * ngrid, double ** xgrid)
+{
+
+    struct FunctionTrain * cost = function_train_load(filename);
+    if (cost == NULL){
+        return NULL;
+    }
+    struct ValueF * vf = valuef_create(cost->dim);
+    memmove(vf->N, ngrid, cost->dim * sizeof(size_t));
+    
+    vf->cost = function_train_create_nodal(cost,ngrid,xgrid);
+    valuef_precompute_cores(vf);
+
+    function_train_free(cost); cost = NULL;
+    return vf;
+}
+
+
+/**********************************************************//**
     Get the value function ranks
 **************************************************************/
 size_t * valuef_get_ranks(struct ValueF * vf)

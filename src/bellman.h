@@ -84,6 +84,7 @@ void diag_append(struct Diag ** diag,
                  double abs_diff, size_t dim, size_t * ranks,
                  double frac);
 void diag_print(struct Diag * head, FILE * fp);
+int diag_save(struct Diag * head, char * filename);
 
 struct C3Control *
 c3control_create(size_t, size_t, size_t,
@@ -91,6 +92,10 @@ c3control_create(size_t, size_t, size_t,
                      size_t *, double);
 
 void c3control_destroy(struct C3Control *);
+size_t * c3control_get_ngrid(struct C3Control *);
+double ** c3control_get_xgrid(struct C3Control *);
+void c3control_set_external_boundary(struct C3Control *, size_t,
+                                     char *);
 void c3control_add_obstacle(struct C3Control *, double *, double *);
 
 void c3control_add_drift(struct C3Control * c3c, 
@@ -112,13 +117,15 @@ void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt, 
+                                  struct c3Opt * opt,
+                                  int verbose,
                                   size_t * nevals);
 
 struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
                                   struct PIparam * poli,
                                   struct ApproxArgs * apargs,
                                   struct c3Opt * opt,
+                                  int verbose,
                                   size_t * nevals_iter);
 struct ValueF *
 c3control_init_value(struct C3Control * c3c,

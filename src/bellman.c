@@ -632,8 +632,10 @@ struct VIparam
     struct ControlParams * cp;
     struct ValueF * vf;
     struct HTable * htable;
+    struct HTable * htable_node;
 
     size_t nstate_evals;
+    size_t nnode_evals;
     double convergence;
 };
 
@@ -643,7 +645,10 @@ struct VIparam * vi_param_create(double convergence)
     assert (vi != NULL);
     vi->convergence = convergence;
     vi->htable = htable_create(1000000);
-    vi->nstate_evals = 0;
+    vi->nstate_evals = 0; // counts in terms of fibers
+
+    vi->htable_node = htable_create(1000000); 
+    vi->nnode_evals = 0; // counts in terms of nodes (should be smaller)
     vi->cp = NULL;
     vi->vf = NULL;
     
@@ -655,6 +660,7 @@ void vi_param_destroy(struct VIparam * vi)
 {
     if (vi != NULL){
         htable_destroy(vi->htable); vi->htable = NULL;
+        htable_destroy(vi->htable_node); vi->htable_node = NULL;
         free(vi); vi = NULL;
     }
 }
@@ -674,6 +680,10 @@ void vi_param_add_value(struct VIparam * vi, struct ValueF * vf)
     htable_destroy(vi->htable); vi->htable = NULL;
     vi->htable = htable_create(1000000);
     vi->nstate_evals = 0;
+
+    htable_destroy(vi->htable_node); vi->htable_node = NULL;
+    vi->htable_node = htable_create(1000000);
+    vi->nnode_evals = 0;
 }
 
 int bellman_vi(size_t N, const double * x, double * out, void * arg)
@@ -689,8 +699,9 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     double ** xgrid = mca->xgrid;
     
     struct ValueF * vf = param->vf;
-    struct HTable * htable = param->htable;
     assert (vf != NULL);
+    struct HTable * htable = param->htable;
+    struct HTable * htable_node = param->htable_node;
     struct Boundary * bound = dp->bound;
 
     int * absorbed = calloc_int(N);
@@ -703,6 +714,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     /* } */
     /* printf("get neighbor cost\n"); */
     size_t * fi = calloc_size_t(dx);
+    size_t * fit = calloc_size_t(dx);
     size_t dim_vary;
     int res = mca_get_neighbor_costs(dx,N,x,
                                      bound,vf,ngrid,xgrid,
@@ -711,12 +723,13 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     assert (res == 0);
     size_t * ind_to_serialize = calloc_size_t(dx+1);
     for (size_t ii = 0; ii < dx; ii++){
+        fit[ii] = fi[ii];
         if (ii != dim_vary){
             ind_to_serialize[ii] = fi[ii];
         }
     }
     ind_to_serialize[dx] = dim_vary;
-    free(fi); fi = NULL;
+
     char * key = size_t_a_to_char(ind_to_serialize,dx+1);
     free(ind_to_serialize); ind_to_serialize = NULL;
     /* free(fi); fi = NULL; */
@@ -729,6 +742,23 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         double time = 0.0;
         param->nstate_evals = param->nstate_evals + N;
         for (size_t ii = 0; ii < N; ii++){
+
+            //hack for computing how many individual nodes accessed
+            // for some reason table doesnt work yet
+            fit[dim_vary] = ii;
+            char * key1 = size_t_a_to_char(fit,dx);
+            size_t nb = 0;
+            double * val =  htable_get_element(htable_node,key1,&nb);
+            if (val == NULL){
+                param->nnode_evals++;
+                double vv = 2.0;
+                htable_add_element(htable_node,key1,&vv,sizeof(double));
+            }
+            else{
+                free(key1); key1 = NULL;
+            }
+
+            // calculate
             control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],
                                           costs+ii*(2*dx+1));
             int res2 = bellman_optimal(du,u,out+ii,cp);
@@ -744,6 +774,8 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         free(key); key = NULL;
     }
 
+    free(fi); fi = NULL;
+    free(fit); fit = NULL;
     free(absorbed); absorbed = NULL;
     free(costs); costs = NULL;
     free(u); u = NULL;
@@ -761,13 +793,17 @@ struct PIparam
 {
     struct ControlParams * cp;
     struct ValueF * vf_iteration;
-    struct HTable * htable_iter; // store evaluations for fixed iteration
+    struct HTable * htable_iter; // store fiber evaluations for fixed iteration
+
+    struct ValueF * vf_iteration_node;
+    struct HTable * htable_iter_node; // store node evaluations for fixed iteration
 
     struct ValueF * vf_policy;
     struct HTable * htable; // store probability transitions, stage costs, etc associated with policy
 
     size_t npol_evals; // evaluation of policies
-    size_t niter_evals; // evaluation for one iteration
+    size_t niter_evals; // evaluation of fibers for one step of PI
+    size_t niter_node_evals; // evaluation of nodes for one step of VI
     double convergence;
 };
 
@@ -776,14 +812,18 @@ struct PIparam * pi_param_create(double convergence, struct ValueF * policy)
     struct PIparam * poli = malloc(sizeof(struct PIparam));
     assert (poli != NULL);
     poli->convergence = convergence;
+    poli->cp = NULL;
+    
     poli->vf_policy = policy;
     poli->htable = htable_create(100000);
     poli->npol_evals = 0;
         
-    poli->cp = NULL;
     poli->vf_iteration = NULL;
+    
     poli->htable_iter = NULL;
     poli->niter_evals = 0;
+    poli->htable_iter_node = NULL;
+    poli->niter_node_evals = 0;
 
     return poli;
 }
@@ -791,11 +831,10 @@ struct PIparam * pi_param_create(double convergence, struct ValueF * policy)
 void pi_param_destroy(struct PIparam * poli)
 {
     if (poli != NULL){
-        /* printf("destroy table\n"); */
+
         htable_destroy(poli->htable); poli->htable = NULL;
-        /* printf("got it tbale=NULL = %d\n",poli->htable_iter == NULL); */
         htable_destroy(poli->htable_iter); poli->htable_iter = NULL;
-        /* printf("destroy self\n"); */
+        htable_destroy(poli->htable_iter_node); poli->htable_iter_node = NULL;
         free(poli); poli = NULL;
     }
 }
@@ -815,6 +854,11 @@ void pi_param_add_value(struct PIparam * poli, struct ValueF * vf)
     poli->htable_iter = NULL;
     poli->htable_iter = htable_create(1000000);
     poli->niter_evals = 0;
+
+    htable_destroy(poli->htable_iter_node); 
+    poli->htable_iter_node = NULL;
+    poli->htable_iter_node = htable_create(1000000);
+    poli->niter_node_evals = 0;
 }
 
 int bellman_pi(size_t N, const double * x, double * out, void * arg)
@@ -842,6 +886,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
     struct HTable * htable = param->htable;
     struct HTable * htable_iter = param->htable_iter;
+    struct HTable * htable_iter_node = param->htable_iter_node;
 
     assert (htable != NULL);
     assert (htable_iter != NULL);
@@ -897,7 +942,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
             double * u = calloc_double(du);
             for (size_t ii = 0; ii < N; ii++){
-                param->npol_evals++;
+                param->npol_evals++;                                
                 control_params_add_state_info(cp,time,x+ii*dx,
                                               absorbed_pol[ii],
                                               costs_pol+ii*(2*dx+1));
@@ -935,10 +980,27 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                                      absorbed,costs);
 
         assert (res == 0);
-        free(fi); fi = NULL;
+
 
         param->niter_evals = param->niter_evals + 20;
         for (size_t ii = 0; ii < N; ii++){
+
+            //hack for computing how many individual nodes accessed
+            // for some reason table doesnt work yet
+            fi[dim_vary] = ii;
+            char * key1a = size_t_a_to_char(fi,dx);
+            size_t nb = 0;
+            double * val = htable_get_element(htable_iter_node,key1a,&nb);
+            if (val == NULL){
+                param->niter_node_evals++;
+                double vv = 2.0;
+                htable_add_element(htable_iter_node,key1a,&vv,sizeof(double));                
+            }
+            else{
+                free(key1a); key1a = NULL;
+            }
+
+            
             // get the optimal control
             // iterate with the optimal control
             if (absorbed[ii] == 0){
@@ -961,6 +1023,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 fprintf(stderr, "Unrecognized aborbed condition %d\n",absorbed[ii]);
                 exit(1);
             }
+
         }
         
         if (probs_alloc == 1){
@@ -968,6 +1031,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         }
         free(absorbed); absorbed = NULL;
         free(costs); costs = NULL;
+        free(fi); fi = NULL;
         
         htable_add_element(htable_iter,key3,out,N * sizeof(double));
         /* printf("dealt with it\n"); */
@@ -1105,6 +1169,33 @@ void c3control_destroy(struct C3Control * c3c)
     }
 }
 
+size_t * c3control_get_ngrid(struct C3Control * c3c)
+{
+    if (c3c == NULL){
+        return NULL;
+    }
+    return c3c->ngrid;
+}
+
+double ** c3control_get_xgrid(struct C3Control * c3c)
+{
+    if (c3c == NULL){
+        return NULL;
+    }
+    return c3c->xgrid;
+}
+
+/**********************************************************//**
+    Set the external boundary type of a particular dimension
+**************************************************************/
+void c3control_set_external_boundary(struct C3Control * c3c, size_t dim,
+                                     char * type)
+{
+    assert (c3c != NULL);
+    assert (c3c->bound != NULL);
+    boundary_external_set_type(c3c->bound,dim,type);
+}
+
 void c3control_add_obstacle(struct C3Control * c3c, double * center, double * widths)
 {
     assert (c3c != NULL);
@@ -1156,7 +1247,9 @@ void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt, size_t * nevals)
+                                  struct c3Opt * opt,
+                                  int verbose,
+                                  size_t * nevals)
 {
     assert (c3c != NULL);
     assert (c3c->ngrid != NULL);
@@ -1180,8 +1273,9 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     vi_param_add_cp(vi,cp);
     vi_param_add_value(vi,vf);
     vi->nstate_evals = 0;
-    struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,0);
-    *nevals = vi->nstate_evals;
+    vi->nnode_evals = 0;
+    struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,verbose);
+    *nevals = vi->nnode_evals;
 
     vi_param_destroy(vi); vi = NULL;
     control_params_destroy(cp); cp = NULL;
@@ -1196,7 +1290,9 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
 struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
                                   struct PIparam * poli,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt, size_t * niter_evals)
+                                  struct c3Opt * opt,
+                                  int verbose,
+                                  size_t * niter_evals)
 {
     assert (c3c != NULL);
     assert (c3c->ngrid != NULL);
@@ -1228,15 +1324,11 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
 
     /* printf("interp\n"); */
     poli->niter_evals = 0;
+    poli->niter_node_evals = 0;
     struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,
-                                         start,apargs,0);
-    /* printf("n iters = %zu\n",poli->niter_evals); */
-    /* printf("done\n"); */
+                                         start,apargs,verbose);
+    *niter_evals = poli->niter_node_evals;
 
-    *niter_evals = poli->niter_evals;
-    /* printf("destroy param\n"); */
-    /* pi_param_destroy(poli); poli = NULL; */
-    /* printf("destroy cp\n"); */
     control_params_destroy(cp); cp = NULL;
     for (size_t ii = 0; ii < dx; ii++){
         free(start[ii]); start[ii] = NULL;
@@ -1296,6 +1388,7 @@ struct ValueF * c3control_vi_solve(struct C3Control * c3c,
         assert (start != NULL);
         size_t niter_evals = 0;
         struct ValueF * next = c3control_step_vi(c3c,start,apargs,opt,
+                                                 verbose-1,
                                                  &niter_evals);
         /* printf("stepped\n"); */
         double diff = valuef_norm2diff(start,next);
@@ -1316,6 +1409,7 @@ struct ValueF * c3control_vi_solve(struct C3Control * c3c,
                 stot *= c3c->ngrid[jj];
             }
             double frac = (double) niter_evals / (double) stot;
+            assert (frac < 1.0);
             size_t * ranks = valuef_get_ranks(next);
             diag_append(diag,ii,1,norm,diff,c3c->dx,ranks,frac);
         }
@@ -1350,6 +1444,7 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
         assert (start != NULL);
         size_t niter_evals = 0;
         struct ValueF * next = c3control_step_pi(c3c,start,poli,apargs,opt,
+                                                 verbose-1,
                                                  &niter_evals);
         /* printf("stepped\n"); */
         double diff = valuef_norm2diff(start,next);
@@ -1388,7 +1483,7 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
             }
             /* printf("nevals = %zu\n",niter_evals); */
             /* printf("ntot = %zu\n",stot); */
-            /* assert (niter_evals < stot); */
+            assert (niter_evals < stot);
             double frac = (double) niter_evals / (double) stot;
             /* printf("frac = %G\n",frac); */
             size_t * ranks = valuef_get_ranks(next);
@@ -1409,9 +1504,6 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
     pi_param_destroy(poli); poli = NULL;
     return start;
 }
-
-
-
 
 struct Diag
 {
@@ -1506,4 +1598,16 @@ void diag_print(struct Diag * head, FILE * fp)
     }
 }
 
-/* void diag_print(struct Diag * ) */
+int diag_save(struct Diag * head, char * filename)
+{
+    FILE * fp =  fopen(filename, "w");
+    if (fp == NULL){
+        fprintf(stderr, "cat: can't open %s\n", filename);
+        return 1;
+    }
+
+    diag_print(head,fp);
+    
+    fclose(fp);
+    return 0;
+}
