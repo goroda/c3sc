@@ -2284,10 +2284,10 @@ void Test_bellman_c3control3d(CuTest * tc)
     // Approximation and Optimization Options
     //////////////////////////////////////////////////
     // cross approximation tolerances
-    size_t start_rank = 5;
+    size_t start_rank = 10;
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-13);
+    approx_args_set_round_tol(aargs,1e-3);
     /* approx_args_set_maxiter(aargs,10); */
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
@@ -2312,10 +2312,10 @@ void Test_bellman_c3control3d(CuTest * tc)
     //////////////////////////////////////////////////
     // Solver properties
     //////////////////////////////////////////////////
-    /* size_t maxiter_vi = 10; */
-    /* double  abs_conv_vi = 1e-3; */
+    size_t maxiter_vi = 3;
+    double  abs_conv_vi = 1e-3;
 
-    size_t maxiter_pi = 100;
+    size_t maxiter_pi = 20;
     double abs_conv_pi = 1e-6;
     struct ValueF * pol = c3control_init_value(c3c,quad3d,NULL,aargs,0);
     struct ValueF * pol_copy = valuef_copy(pol);
@@ -2325,15 +2325,27 @@ void Test_bellman_c3control3d(CuTest * tc)
 
     /* struct ValueF * pol_cost = c3control_step_vi(c3c,pol_copy,aargs,opt); */
     /* struct ValueF * pol_cost = c3control_step_pi(c3c,pol_copy,pol,aargs,opt); */
-    
-    struct ValueF * pol_cost = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
-                                                  pol,aargs,opt,1);
 
-    /* approx_args_free(aargs); aargs = NULL; */
-    /* c3opt_free(opt); opt = NULL; */
-    /* valuef_destroy(pol); pol = NULL; */
-    /* valuef_destroy(pol_cost); pol_cost = NULL; */
-    /* c3control_destroy(c3c); c3c = NULL; */
+    struct Diag * diag = NULL;
+    struct ValueF * pol_cost = NULL;
+    struct ValueF * vf = NULL;
+    /* pol_cost = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi, */
+    /*                                               pol,aargs,opt,1,&diag); */
+
+    vf = c3control_vi_solve(c3c,maxiter_vi,abs_conv_vi,pol,
+                            aargs,opt,1,&diag);
+
+    diag_print(diag,stdout);
+
+
+    diag_destroy(&diag); diag = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    c3opt_free(opt); opt = NULL;
+    valuef_destroy(pol); pol = NULL;
+    valuef_destroy(pol_copy); pol_copy = NULL;
+    valuef_destroy(pol_cost); pol_cost = NULL;
+    valuef_destroy(vf); vf = NULL;
+    c3control_destroy(c3c); c3c = NULL;
 }
 
 CuSuite * DPAlgsGetSuite()

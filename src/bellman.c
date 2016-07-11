@@ -9,6 +9,7 @@
 #include "nodeutil.h"
 #include "dynamics.h"
 #include "hashgrid.h"
+#include "bellman.h"
 
 /* struct DPparam */
 /* { */
@@ -542,7 +543,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
         }
         else if (du == 3){
             nrand = 10;
-            npert = 4;
+            npert = 5;
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;
@@ -632,6 +633,7 @@ struct VIparam
     struct ValueF * vf;
     struct HTable * htable;
 
+    size_t nstate_evals;
     double convergence;
 };
 
@@ -641,8 +643,10 @@ struct VIparam * vi_param_create(double convergence)
     assert (vi != NULL);
     vi->convergence = convergence;
     vi->htable = htable_create(1000000);
+    vi->nstate_evals = 0;
     vi->cp = NULL;
     vi->vf = NULL;
+    
 
     return vi;
 }
@@ -669,6 +673,7 @@ void vi_param_add_value(struct VIparam * vi, struct ValueF * vf)
     // create a new htable for the new value function
     htable_destroy(vi->htable); vi->htable = NULL;
     vi->htable = htable_create(1000000);
+    vi->nstate_evals = 0;
 }
 
 int bellman_vi(size_t N, const double * x, double * out, void * arg)
@@ -722,11 +727,13 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     if (out_stored == NULL){
         /* printf("got it\n"); */
         double time = 0.0;
+        param->nstate_evals = param->nstate_evals + N;
         for (size_t ii = 0; ii < N; ii++){
             control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],
                                           costs+ii*(2*dx+1));
             int res2 = bellman_optimal(du,u,out+ii,cp);
             assert (res2 == 0);
+           
         }
         htable_add_element(htable,key,out,N * sizeof(double));
     }
@@ -758,7 +765,9 @@ struct PIparam
 
     struct ValueF * vf_policy;
     struct HTable * htable; // store probability transitions, stage costs, etc associated with policy
-    
+
+    size_t npol_evals; // evaluation of policies
+    size_t niter_evals; // evaluation for one iteration
     double convergence;
 };
 
@@ -769,10 +778,12 @@ struct PIparam * pi_param_create(double convergence, struct ValueF * policy)
     poli->convergence = convergence;
     poli->vf_policy = policy;
     poli->htable = htable_create(100000);
+    poli->npol_evals = 0;
         
     poli->cp = NULL;
     poli->vf_iteration = NULL;
     poli->htable_iter = NULL;
+    poli->niter_evals = 0;
 
     return poli;
 }
@@ -803,6 +814,7 @@ void pi_param_add_value(struct PIparam * poli, struct ValueF * vf)
     htable_destroy(poli->htable_iter); 
     poli->htable_iter = NULL;
     poli->htable_iter = htable_create(1000000);
+    poli->niter_evals = 0;
 }
 
 int bellman_pi(size_t N, const double * x, double * out, void * arg)
@@ -885,6 +897,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
             double * u = calloc_double(du);
             for (size_t ii = 0; ii < N; ii++){
+                param->npol_evals++;
                 control_params_add_state_info(cp,time,x+ii*dx,
                                               absorbed_pol[ii],
                                               costs_pol+ii*(2*dx+1));
@@ -924,6 +937,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         assert (res == 0);
         free(fi); fi = NULL;
 
+        param->niter_evals = param->niter_evals + 20;
         for (size_t ii = 0; ii < N; ii++){
             // get the optimal control
             // iterate with the optimal control
@@ -1142,7 +1156,7 @@ void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt)
+                                  struct c3Opt * opt, size_t * nevals)
 {
     assert (c3c != NULL);
     assert (c3c->ngrid != NULL);
@@ -1165,9 +1179,9 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     struct VIparam * vi = vi_param_create(1e-10);
     vi_param_add_cp(vi,cp);
     vi_param_add_value(vi,vf);
-    
+    vi->nstate_evals = 0;
     struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,0);
-
+    *nevals = vi->nstate_evals;
 
     vi_param_destroy(vi); vi = NULL;
     control_params_destroy(cp); cp = NULL;
@@ -1180,15 +1194,15 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
 }
 
 struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
-                                  struct ValueF * policy,
+                                  struct PIparam * poli,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt)
+                                  struct c3Opt * opt, size_t * niter_evals)
 {
     assert (c3c != NULL);
     assert (c3c->ngrid != NULL);
     assert (c3c->xgrid != NULL);
     assert (vf != NULL);
-    assert (policy != NULL);
+    assert (poli != NULL);
     assert (opt != NULL);
     assert (apargs != NULL);
     assert (c3c->mca != NULL);
@@ -1208,16 +1222,20 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
     }
 
     struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,opt);
-    struct PIparam * poli = pi_param_create(1e-10,policy);
+    /* struct PIparam * poli = pi_param_create(1e-10,policy); */
     pi_param_add_cp(poli,cp);
     pi_param_add_value(poli,vf);
 
     /* printf("interp\n"); */
-    struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,apargs,0);
+    poli->niter_evals = 0;
+    struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,
+                                         start,apargs,0);
+    /* printf("n iters = %zu\n",poli->niter_evals); */
     /* printf("done\n"); */
 
+    *niter_evals = poli->niter_evals;
     /* printf("destroy param\n"); */
-    pi_param_destroy(poli); poli = NULL;
+    /* pi_param_destroy(poli); poli = NULL; */
     /* printf("destroy cp\n"); */
     control_params_destroy(cp); cp = NULL;
     for (size_t ii = 0; ii < dx; ii++){
@@ -1230,7 +1248,8 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
 
 
 struct ValueF *
-c3control_init_value(struct C3Control * c3c,int (*f)(size_t,const double *,double*,void*),void * args,
+c3control_init_value(struct C3Control * c3c,
+                     int (*f)(size_t,const double *,double*,void*),void * args,
                      struct ApproxArgs * aargs, int verbose)
 {
     assert (c3c != NULL);
@@ -1262,21 +1281,76 @@ c3control_init_value(struct C3Control * c3c,int (*f)(size_t,const double *,doubl
         
 }
 
+struct ValueF * c3control_vi_solve(struct C3Control * c3c,
+                                   size_t maxiter, double abs_conv_tol,
+                                   struct ValueF * vo,
+                                   struct ApproxArgs * apargs,
+                                   struct c3Opt * opt,
+                                   int verbose, 
+                                   struct Diag ** diag)
+{
+
+    struct ValueF * start = valuef_copy(vo);
+    for (size_t ii = 0; ii < maxiter; ii++){
+        /* printf("ii = %zu\n",ii); */
+        assert (start != NULL);
+        size_t niter_evals = 0;
+        struct ValueF * next = c3control_step_vi(c3c,start,apargs,opt,
+                                                 &niter_evals);
+        /* printf("stepped\n"); */
+        double diff = valuef_norm2diff(start,next);
+        double norm = valuef_norm(next);
+        if (verbose > 0){
+            if ((ii+1) % 1 == 0){
+                printf("\t Value Iteration (%zu\\%zu):\n",ii+1,maxiter);
+                printf("\t \t L2 Difference between iterates    = %3.5E\n ",diff);
+                printf("\t \t L2 Norm of current value function = %3.5E\n", norm);
+                printf("\t \t Relative L2 Cauchy difference     = %3.5E\n", diff/norm);
+                /* printf("\t \t Ratio: L2 Norm Prev / L2 Norm Cur = %G\n",rat); */
+            }
+        }
+        
+        if (diag != NULL){
+            size_t stot = 1;
+            for (size_t jj = 0; jj < c3c->dx; jj++){
+                stot *= c3c->ngrid[jj];
+            }
+            double frac = (double) niter_evals / (double) stot;
+            size_t * ranks = valuef_get_ranks(next);
+            diag_append(diag,ii,1,norm,diff,c3c->dx,ranks,frac);
+        }
+
+        
+        valuef_destroy(start); start = NULL;
+        start = valuef_copy(next);
+        valuef_destroy(next); next = NULL;
+        norm = valuef_norm(start); 
+        if (diff < abs_conv_tol){
+            break;
+        }
+    }
+    return start;
+}
+
+
 struct ValueF * c3control_pi_solve(struct C3Control * c3c,
                                    size_t maxiter, double abs_conv_tol,
                                    struct ValueF * policy,
                                    struct ApproxArgs * apargs,
                                    struct c3Opt * opt,
-                                   int verbose)
+                                   int verbose, struct Diag ** diag)
 {
 
     struct ValueF * start = valuef_copy(policy);
+    struct PIparam * poli = pi_param_create(1e-10,policy);
     /* double dd = valuef_norm2diff(start,policy); */
     /* printf("diff = %G\n",dd); */
     for (size_t ii = 0; ii < maxiter; ii++){
         /* printf("ii = %zu\n",ii); */
         assert (start != NULL);
-        struct ValueF * next = c3control_step_pi(c3c,start,policy,apargs,opt);
+        size_t niter_evals = 0;
+        struct ValueF * next = c3control_step_pi(c3c,start,poli,apargs,opt,
+                                                 &niter_evals);
         /* printf("stepped\n"); */
         double diff = valuef_norm2diff(start,next);
         double norm = valuef_norm(next);
@@ -1289,22 +1363,37 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
                 /* printf("\t \t Ratio: L2 Norm Prev / L2 Norm Cur = %G\n",rat); */
             }
 
-            double pt[3];
-            double * lb = c3opt_get_lb(opt);
-            double * ub = c3opt_get_ub(opt);
-            double sumdiff = 0.0;
-            double sumnorm = 0.0;
-            for (size_t kk = 0; kk < 1000; kk++){
-                pt[0] = randu()*(ub[0]-lb[0])+lb[0];
-                pt[1] = randu()*(ub[1]-lb[1])+lb[1];
-                pt[2] = randu()*(ub[2]-lb[2])+lb[2];
-                double v1 = valuef_eval(next,pt);
-                double v2 = valuef_eval(start,pt);
-                sumdiff += pow(v2-v1,2);
-                sumnorm += pow(v1,2);
+            /* double pt[3]; */
+            /* double * lb = c3opt_get_lb(opt); */
+            /* double * ub = c3opt_get_ub(opt); */
+            /* double sumdiff = 0.0; */
+            /* double sumnorm = 0.0; */
+            /* for (size_t kk = 0; kk < 1000; kk++){ */
+            /*     pt[0] = randu()*(ub[0]-lb[0])+lb[0]; */
+            /*     pt[1] = randu()*(ub[1]-lb[1])+lb[1]; */
+            /*     pt[2] = randu()*(ub[2]-lb[2])+lb[2]; */
+            /*     double v1 = valuef_eval(next,pt); */
+            /*     double v2 = valuef_eval(start,pt); */
+            /*     sumdiff += pow(v2-v1,2); */
+            /*     sumnorm += pow(v1,2); */
+            /* } */
+            /* sumdiff /= sumnorm; */
+            /* printf("relative norm diff sampled = %G\n",sqrt(sumdiff)); */
+        }
+        
+        if (diag != NULL){
+            size_t stot = 1;
+            for (size_t jj = 0; jj < c3c->dx; jj++){
+                stot *= c3c->ngrid[jj];
             }
-            sumdiff /= sumnorm;
-            printf("relative norm diff sampled = %G\n",sqrt(sumdiff));
+            /* printf("nevals = %zu\n",niter_evals); */
+            /* printf("ntot = %zu\n",stot); */
+            /* assert (niter_evals < stot); */
+            double frac = (double) niter_evals / (double) stot;
+            /* printf("frac = %G\n",frac); */
+            size_t * ranks = valuef_get_ranks(next);
+            diag_append(diag,ii,0,norm,diff,c3c->dx,ranks,frac);
+            /* printf("appended\n"); */
         }
         
         valuef_destroy(start); start = NULL;
@@ -1317,6 +1406,104 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
             break;
         }
     }
-
+    pi_param_destroy(poli); poli = NULL;
     return start;
 }
+
+
+
+
+struct Diag
+{
+    size_t iter;
+    int type; // 0 for pi, 1 for vi;
+    double norm;
+    double abs_diff;
+    size_t dim;
+    size_t * ranks;
+    double frac;
+
+    struct Diag * next;
+};
+
+void diag_destroy(struct Diag ** head)
+{
+    if (*head != NULL){
+        struct Diag * current = *head;
+        struct Diag * next;
+        while (current != NULL){
+            next = current->next; current->next = NULL;
+            free(current->ranks); current->ranks = NULL;
+            free(current); current = NULL;
+            current = next;
+        }
+        *head = NULL;
+    }
+}
+
+struct Diag * diag_create(size_t iter, int type, double norm,
+                          double abs_diff, size_t dim, size_t * ranks,
+                          double frac)
+{
+    struct Diag * diag = malloc(sizeof(struct Diag));
+    diag->iter = iter;
+    diag->type = type;
+    diag->norm = norm;
+    diag->abs_diff = abs_diff;
+    diag->dim = dim;
+    diag->ranks = calloc_size_t(dim+1);
+    for (size_t ii = 0; ii < dim; ii++){
+        diag->ranks[ii] = ranks[ii];
+    }
+    diag->ranks[dim] = ranks[dim];
+    diag->frac= frac;
+    diag->next = NULL;
+    return diag;
+}
+
+void diag_append(struct Diag ** diag,
+                 size_t iter, int type, double norm,
+                 double abs_diff, size_t dim, size_t * ranks,
+                 double frac)
+{
+    struct Diag * current = *diag;
+    if (current == NULL){
+        /* printf("create\n"); */
+        *diag = diag_create(iter,type,norm,abs_diff,dim,ranks,frac);
+        /* printf("created\n"); */
+    }
+    else{
+        while (current->next != NULL){
+            current = current->next;
+        }
+        current->next = diag_create(iter,type,norm,abs_diff,dim,ranks,frac);
+    }
+}
+
+void diag_print(struct Diag * head, FILE * fp)
+{
+    struct Diag * current = head;
+    while ( current != NULL){
+        double avg_rank = 0.0;
+        size_t maxrank = 0;
+        for (size_t ii = 1; ii < current->dim; ii++){
+            if (current->ranks[ii] > maxrank){
+                maxrank = current->ranks[ii];
+            }
+            avg_rank += (double)(current->ranks[ii]);
+        }
+        /* printf("ranks = "); iprint_sz(current->dim+1,current->ranks); */
+        avg_rank /= (double)(current->dim-1);
+        fprintf(fp,"%zu %d %3.15G %3.15G %3.15G %zu %3.15G \n",
+                current->iter, 
+                current->type, 
+                current->norm,
+                current->abs_diff,
+                avg_rank,
+                maxrank,
+                current->frac);
+        current = current->next;
+    }
+}
+
+/* void diag_print(struct Diag * ) */

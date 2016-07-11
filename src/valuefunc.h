@@ -8,6 +8,7 @@
 struct ValueF;
 void valuef_destroy(struct ValueF *);
 struct ValueF * valuef_copy(struct ValueF *);
+size_t * valuef_get_ranks(struct ValueF *);
 double valuef_norm(struct ValueF *);
 double valuef_norm2diff(struct ValueF *, struct ValueF *);
 double valuef_eval(struct ValueF *, const double *);

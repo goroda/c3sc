@@ -74,6 +74,16 @@ int bellman_pi(size_t, const double *, double *, void *);
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
+struct Diag;
+void diag_destroy(struct Diag **);
+struct Diag * diag_create(size_t iter, int type, double norm,
+                          double abs_diff, size_t dim, size_t * ranks,
+                          double frac);
+void diag_append(struct Diag ** diag,
+                 size_t iter, int type, double norm,
+                 double abs_diff, size_t dim, size_t * ranks,
+                 double frac);
+void diag_print(struct Diag * head, FILE * fp);
 
 struct C3Control *
 c3control_create(size_t, size_t, size_t,
@@ -102,19 +112,32 @@ void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt);
+                                  struct c3Opt * opt, 
+                                  size_t * nevals);
 
 struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
-                                  struct ValueF * policy,
+                                  struct PIparam * poli,
                                   struct ApproxArgs * apargs,
-                                  struct c3Opt * opt);
+                                  struct c3Opt * opt,
+                                  size_t * nevals_iter);
 struct ValueF *
-c3control_init_value(struct C3Control * c3c,int (*f)(size_t,const double *,double*,void*),void * args,
-                        struct ApproxArgs * aargs, int verbose);
+c3control_init_value(struct C3Control * c3c,
+                     int (*f)(size_t,const double *,double*,void*),void * args,
+                     struct ApproxArgs * aargs, int verbose);
+
+struct ValueF * c3control_vi_solve(struct C3Control * c3c,
+                                   size_t maxiter, double abs_conv_tol,
+                                   struct ValueF * vo,
+                                   struct ApproxArgs * apargs,
+                                   struct c3Opt * opt,
+                                   int verbose, 
+                                   struct Diag ** diag);
+
 struct ValueF * c3control_pi_solve(struct C3Control * c3c,
                                    size_t maxiter, double abs_conv_tol,
                                    struct ValueF * policy,
                                    struct ApproxArgs * apargs,
                                    struct c3Opt * opt,
-                                   int verbose);
+                                   int verbose, 
+                                   struct Diag **);
 #endif

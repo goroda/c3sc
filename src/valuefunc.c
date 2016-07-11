@@ -116,6 +116,15 @@ struct ValueF * valuef_copy(struct ValueF * vf)
     return vf2;
 }
 
+/**********************************************************//**
+    Get the value function ranks
+**************************************************************/
+size_t * valuef_get_ranks(struct ValueF * vf)
+{
+    assert (vf != NULL);
+    assert (vf->cost != NULL);
+    return function_train_get_ranks(vf->cost);
+}
 
 /**********************************************************//**
     Get the norm of the value function
