@@ -94,6 +94,10 @@ c3control_create(size_t, size_t, size_t,
 void c3control_destroy(struct C3Control *);
 size_t * c3control_get_ngrid(struct C3Control *);
 double ** c3control_get_xgrid(struct C3Control *);
+void c3control_add_policy_sim(struct C3Control *, struct ValueF *, 
+                              struct c3Opt * opt_sim,
+                              void (*transform)(size_t, const double *, double*));
+
 void c3control_set_external_boundary(struct C3Control *, size_t,
                                      char *);
 void c3control_add_obstacle(struct C3Control *, double *, double *);
@@ -114,6 +118,7 @@ void c3control_add_boundcost(struct C3Control * c3c,
 
 void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,double*));
 
+int c3control_controller(double,const double *, double *, void *);
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
                                   struct ApproxArgs * apargs,

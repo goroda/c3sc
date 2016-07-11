@@ -27,4 +27,12 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
                            struct ValueF * vf, const size_t * ngrid, double ** xgrid,
                            size_t *, size_t *,
                            int * absorbed, double * out);
+
+int mca_get_neighbor_node_costs(size_t d, const double * x,
+                                struct Boundary * bound,
+                                struct ValueF * vf, 
+                                const size_t * ngrid, 
+                                double ** xgrid,
+                                int * absorbed, double * out);
+
 #endif

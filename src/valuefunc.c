@@ -207,8 +207,6 @@ double valuef_eval(struct ValueF * vf, const double * x)
     return function_train_eval(vf->cost,x);
 }
 
-
-
 /**********************************************************//**
    Evaluate the cost of a fiber and associated neighbors
 

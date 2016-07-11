@@ -493,30 +493,36 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     size_t nrand = 10; // note this is changed if du = 1 or du = 3;
     size_t npert = 2;
     double valtemp;
-    int justrand = 0;
+    int justrand = 1;
 
     c3opt_add_objective(opt,&bellman_control,param);
     // first do zero;
     valtemp = bellman_control(du,ucurr,NULL,arg);
-    minval = valtemp; 
+    minval = valtemp;
     memmove(umin,ucurr,du*sizeof(double));
-
+    
 
     if (justrand == 1){
         // now compare with random samples
-        nrand = 200;
+        double valtemp = 123456;
+        nrand = 100;
         for (size_t jj = 0; jj < nrand; jj++){
             for (size_t kk = 0; kk < du; kk++){
                 ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
             }
             valtemp = bellman_control(du,ucurr,NULL,arg);
-            if (valtemp < minval){
+            
+            if ((jj == 0) ||(valtemp < minval)){
                 minval = valtemp;
+                /* printf("valtemp = %G\n",valtemp); */
+                /* printf("\t new u = "); dprint(du,ucurr); */
                 memmove(umin,ucurr,du*sizeof(double));
             }
         }
+
         c3opt_minimize(opt,umin,val);
-        
+        /* printf("val = %G finished newu = \n",*val); dprint(du,umin); */
+        /* printf("umin = "); dprint(du,umin); */
     }
     else{
         // then start at each corner
@@ -542,8 +548,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             }
         }
         else if (du == 3){
-            nrand = 10;
-            npert = 5;
+            nrand = 2;
+            npert = 2;
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;
@@ -1122,6 +1128,10 @@ struct C3Control
     struct Boundary * bound;
     struct MCAparam * mca;
     struct DPparam * dp;
+
+    struct ValueF * policy_sim;
+    struct c3Opt * opt_sim;
+    void (*transform_sim)(size_t,const double*,double*);
 };
 
 struct C3Control *
@@ -1151,6 +1161,9 @@ c3control_create(size_t dx, size_t du, size_t dw,
     c3c->dp    = dp_param_create(dx,du,dw,discount);
     dp_param_add_boundary(c3c->dp, c3c->bound);
 
+    c3c->policy_sim = NULL;
+    c3c->opt_sim = NULL;
+    c3c->transform_sim = NULL;
     return c3c;
 }
 
@@ -1183,6 +1196,16 @@ double ** c3control_get_xgrid(struct C3Control * c3c)
         return NULL;
     }
     return c3c->xgrid;
+}
+
+void c3control_add_policy_sim(struct C3Control * c3c, struct ValueF * pol,
+                              struct c3Opt * opt_sim,
+                              void (*transform)(size_t, const double *, double*))
+{
+    assert (c3c != NULL);
+    c3c->policy_sim = pol;
+    c3c->opt_sim = opt_sim;
+    c3c->transform_sim = transform;
 }
 
 /**********************************************************//**
@@ -1243,6 +1266,71 @@ void c3control_add_obscost(struct C3Control * c3c, int (*obscost)(const double*,
     assert (c3c != NULL);
     assert (c3c->dp != NULL);
     dp_param_add_obscost(c3c->dp,obscost);
+}
+
+
+int c3control_policy_eval(struct C3Control * c3c, double t,
+                          const double * x, double * u)
+{
+    assert (c3c != NULL);
+    assert (c3c->policy_sim != NULL);
+
+    size_t dx = c3c->dx;
+    size_t * ngrid = c3c->ngrid;
+    double ** xgrid = c3c->xgrid;
+    double * costs = calloc_double(2*dx+1);
+    int absorbed;
+
+    struct Boundary * bound = c3c->bound;
+    struct ValueF * policy_sim = c3c->policy_sim;
+    struct c3Opt * opt = c3c->opt_sim;
+    assert (policy_sim != NULL);
+    assert (opt != NULL);
+
+    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,
+                                                      c3c->dp,c3c->mca,opt);
+
+    double val;
+    int res = mca_get_neighbor_node_costs(dx, x, bound, policy_sim,
+                                          ngrid, xgrid, &absorbed, costs);
+
+    /* if (absorbed != 0){ */
+    /*     printf("x = "); dprint(dx,x); */
+    /*     printf("absorbed = %d\n ",absorbed); */
+    /* } */
+
+    assert (res == 0);
+    for (size_t ii = 0; ii < c3c->du; ii++){
+        u[ii] = 0.0;
+    }
+    control_params_add_state_info(cp,t,x,absorbed,costs);
+    int res2 = bellman_optimal(c3c->du,u,&val,cp);
+    /* printf("val = %G u choose = ",val); dprint(c3c->du,u); */
+    assert (res2 == 0);
+    /* exit(1); */
+
+
+    free(costs); costs = NULL;
+    control_params_destroy(cp); cp = NULL;
+
+    return 0;
+}
+
+int c3control_controller(double t,const double * x, double * u, void * args)
+{
+
+    struct C3Control * c3c = args;
+    if (c3c->transform_sim == NULL){
+        return c3control_policy_eval(args,t,x,u);
+    }
+    else{
+        double * xin = calloc_double(c3c->dx);
+        c3c->transform_sim(c3c->dx,x,xin);
+        int out = c3control_policy_eval(args,t,xin,u);
+        free(xin); xin = NULL;
+        return out;
+    }
+    return 0;
 }
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
@@ -1504,6 +1592,9 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
     pi_param_destroy(poli); poli = NULL;
     return start;
 }
+
+
+
 
 struct Diag
 {

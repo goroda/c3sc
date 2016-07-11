@@ -14,7 +14,6 @@
 #include "bellman.h"
 #include "c3sc.h"
 
-
 static char * program_name;
 
 void print_code_usage (FILE *, int) __attribute__ ((noreturn));
@@ -329,9 +328,9 @@ int main(int argc, char * argv[])
     
     c3control_set_external_boundary(c3c,0,"reflect");
     c3control_set_external_boundary(c3c,1,"reflect");
-    double center[2] = {0.0,0.0};
-    double width[2] = {0.15,0.15};
-    c3control_add_obstacle(c3c,center,width);
+    /* double center[2] = {0.0,0.0}; */
+    /* double width[2] = {0.15,0.15}; */
+    /* c3control_add_obstacle(c3c,center,width); */
 
     char filename[256];
     sprintf(filename,"%s/%s.c3",dirout,"cost");
@@ -347,7 +346,7 @@ int main(int argc, char * argv[])
     
     size_t maxiter_vi = niter+1;
     double abs_conv_vi = 1e-3;
-    size_t maxiter_pi = 500;
+    size_t maxiter_pi = 10;
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256] = "diagnostic.dat";
@@ -370,58 +369,56 @@ int main(int argc, char * argv[])
         assert (saved == 0);
     }
 
-    c3control_destroy(c3c); c3c = NULL;
-    diag_destroy(&diag); diag = NULL;
-    valuef_destroy(cost); cost = NULL;
 
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
             dirout,lbu[0],ubu[0],ss[0],ss[1],"cost");
     print_cost(filename,cost,30,30,lb,ub);
 
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
     
-    /* struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc); */
-    /* printf("created policy\n"); */
+    printf("created policy\n");
     /* char odename[256] = "rk4"; */
-    /* struct Integrator * ode_sys = NULL; */
-    /* ode_sys = integrator_create_controlled(2,1,f1,NULL, */
-    /*                                        implicit_policy_controller,pol); */
-    /* integrator_set_type(ode_sys,odename); */
-    /* integrator_set_dt(ode_sys,1e-2); */
-    /* integrator_set_verbose(ode_sys,0); */
+    char odename[256] = "forward-euler";
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(2,1,f1,NULL,
+                                           c3control_controller,c3c);
+    integrator_set_type(ode_sys,odename);
+    integrator_set_dt(ode_sys,1e-2);
+    integrator_set_verbose(ode_sys,0);
+
+    // Initialize trajectories for state
+    double time = 0.0;
+    double state[2] = {0.5, 0.5};
+    double con[1] = {0.0};
+    // Integrate
+    struct Trajectory * traj = NULL;
+    trajectory_add(&traj,2,1,time,state,con);
+    double final_time = 1e1;
+    double dt = 1e-2;
+    int res;
+    printf("Integrating Trajectory\n");
+    while (time < final_time){
+        res = trajectory_step(traj,ode_sys,dt);
+        assert(res == 0);
+        time = time + dt;
+    }
+    printf("Saving Trajectory\n");
+    sprintf(filename,"%s/%s.dat",dirout,"traj");
+    FILE * fp = fopen(filename,"w");
+    assert (fp != NULL);
+    trajectory_print(traj,fp,4);
+    fclose(fp);
+
+    // cleanup integrator stuff
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
 
 
-    /* // Initialize trajectories for state */
-    /* double time = 0.0; */
-    /* double state[2] = {0.5, 0.5}; */
-    /* double con[1] = {0.0}; */
-    /* // Integrate */
-    /* struct Trajectory * traj = NULL; */
-    /* trajectory_add(&traj,2,1,time,state,con); */
-    /* double final_time = 5e0; */
-    /* double dt = 1e-1; */
-    /* int res; */
-    /* printf("Integrating Trajectory\n"); */
-    /* while (time < final_time){ */
-    /*     res = trajectory_step(traj,ode_sys,dt); */
-    /*     assert(res == 0); */
-    /*     time = time + dt; */
-    /* } */
-    /* printf("Saving Trajectory\n"); */
-    /* sprintf(filename,"%s/%s.dat",dirout,"traj"); */
-    /* fp = fopen(filename,"w"); */
-    /* assert (fp != NULL); */
-    /* trajectory_print(traj,fp,4); */
-    /* fclose(fp); */
-
-    /* // cleanup integrator stuff */
-    /* integrator_destroy(ode_sys); ode_sys = NULL; */
-    /* trajectory_free(traj); traj = NULL; */
-    /* implicit_policy_free(pol); pol = NULL; */
-
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
+    diag_destroy(&diag); diag = NULL;
+    c3opt_free(opt); opt = NULL;
+    approx_args_free(aargs); aargs = NULL;
     
-    /* //cleanup solver stuff */
-    /* c3sc_diagnostic_init(diag); diag = NULL; */
-    /* approx_args_free(aargs); aargs = NULL; */
-    /* c3sc_destroy(sc); sc= NULL; */
     return 0;
 }

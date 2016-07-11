@@ -389,8 +389,10 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
 
     \return 0 if everything is ok, 
 **************************************************************/
-int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * bound,
-                           struct ValueF * vf, const size_t * ngrid, double ** xgrid,
+int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
+                           struct Boundary * bound,
+                           struct ValueF * vf, 
+                           const size_t * ngrid, double ** xgrid,
                            size_t * fixed_ind , size_t * dim_vary,
                            int * absorbed, double * out)
 {
@@ -443,9 +445,126 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     return 0;
 }
 
+/**********************************************************//**
+    Process node for use within an implicit policy
+**************************************************************/
+int mca_get_neighbor_node_costs(size_t d, const double * x,
+                                struct Boundary * bound,
+                                struct ValueF * vf, 
+                                const size_t * ngrid, double ** xgrid,
+                                int * absorbed, double * out)
+{
+
+    int inobs = boundary_in_obstacle(bound,x);
+    if (inobs == 1){
+        *absorbed = -1;
+        double val = valuef_eval(vf,x);
+        for (size_t ii = 0; ii < 2*d+1; ii++){
+            out[ii] = val;
+        }
+        return 0;
+    }
+
+    *absorbed = 0;
+    double * xtemp = calloc_double(d);
+    for (size_t ii = 0; ii < d; ii++){
+        xtemp[ii] = x[ii];
+    }
+
+    for (size_t ii = 0; ii < d; ii++){
+        double lb = xgrid[ii][0];
+        double ub = xgrid[ii][ngrid[ii]-1];
+        double h = xgrid[ii][1] - xgrid[ii][0];
+        if ( ((x[ii] + h) < ub) && (x[ii]-h > lb)){ // standard case
+            xtemp[ii] = x[ii]-h;
+            out[2*ii] = valuef_eval(vf,xtemp);
+            xtemp[ii] = x[ii]+h;
+            out[2*ii+1] = valuef_eval(vf,xtemp);
+            xtemp[ii] = x[ii];
+        }
+        else if ((x[ii]-h) <= lb){ // left boundary is hit
+            xtemp[ii] = x[ii]+h;
+            out[2*ii+1] = valuef_eval(vf,xtemp);
+
+            enum EBTYPE b = boundary_type_dim(bound,ii,0);
+            if ( (b == ABSORB) || (b == REFLECT) ){
+                xtemp[ii] = lb;
+                out[2*ii] = valuef_eval(vf,xtemp);
+            }
+            else if (b == PERIODIC){
+                if (x[ii] > lb){
+                    double diff = x[ii] - lb;
+                    double left = h - diff; // assumes x[ii] > lb
+                    xtemp[ii] = ub-left;
+                    out[2*ii] = valuef_eval(vf,xtemp);
+                }
+                else{ // lb > x[ii]
+                    double diff = lb-x[ii];
+                    double te = ub - diff;
+                    xtemp[ii] = te-h;
+                    out[2*ii] = valuef_eval(vf,xtemp);
+                }
+            }
+            else{
+                fprintf(stderr,"No boundary specified!\n");
+                assert(1 == 0);
+            }            
+            xtemp[ii] = x[ii];
+        }
+        else{ // right boundary is hit
+            xtemp[ii] = x[ii]-h;
+            out[2*ii] = valuef_eval(vf,xtemp);
+
+            enum EBTYPE b = boundary_type_dim(bound,ii,1);
+            if ( (b == ABSORB) || (b == REFLECT) ){
+                xtemp[ii] = ub;
+                out[2*ii+1] = valuef_eval(vf,xtemp);
+            }
+            else if (b == PERIODIC){
+                if (x[ii] < ub){
+                    double diff = ub - x[ii];
+                    double left = h - diff; // assumes x[ii] > lb
+                    xtemp[ii] = lb+left;
+                    out[2*ii+1] = valuef_eval(vf,xtemp);
+                }
+                else{ // lb > x[ii]
+                    double diff = x[ii] - ub;
+                    double te = lb + diff;
+                    xtemp[ii] = te+h;
+                    out[2*ii+1] = valuef_eval(vf,xtemp);
+                }
+            }
+            else{
+                fprintf(stderr,"No boundary specified!\n");
+                assert(1 == 0);
+            }            
+            xtemp[ii] = x[ii];
+        }
+    }
+
+    free(xtemp); xtemp = NULL;
+    return 0;
+}
+
+
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+// I don't think below is used
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////
+
 
 /**********************************************************//**
-    Process fibers to figure out boundary information                                                           
+    Process fibers to figure out boundary information
 
     \param[in]     d         - dimension of state space
     \param[in]     nvals     - number of evaluations
@@ -461,7 +580,11 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,struct Boundary * 
     boundv[ii] = 0  if not absorbed
     boundv[ii] = 1  if absored in a boundary
 **************************************************************/
-int process_fibers(size_t d, size_t nvals, const double * x, int * boundv, int * neighbors, 
+int process_fibers(size_t d, 
+                   size_t nvals,
+                   const double * x, 
+                   int * boundv, 
+                   int * neighbors, 
                    struct Boundary * bound)
 {
     double time = 0.0;
@@ -519,3 +642,4 @@ int process_fibers(size_t d, size_t nvals, const double * x, int * boundv, int *
     }
     return 0;
 }
+

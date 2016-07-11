@@ -414,7 +414,7 @@ int main(int argc, char * argv[])
     // Integrate
     struct Trajectory * traj = NULL;
     trajectory_add(&traj,2,1,time,state,con);
-    double final_time = 5e0;
+    double final_time = 1e1;
     double dt = 1e-1;
     int res;
     printf("Integrating Trajectory\n");
