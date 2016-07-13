@@ -497,34 +497,33 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
 
     c3opt_add_objective(opt,&bellman_control,param);
     // first do zero;
-    valtemp = bellman_control(du,ucurr,NULL,arg);
+    /* valtemp = bellman_control(du,ucurr,NULL,arg); */
+    c3opt_minimize(opt,ucurr,&valtemp);
     minval = valtemp;
     memmove(umin,ucurr,du*sizeof(double));
     
 
     if (justrand == 1){
         // now compare with random samples
-        double valtemp = 123456;
-        nrand = 100;
+        /* double valtemp = 123456; */
+        nrand = 3;
         for (size_t jj = 0; jj < nrand; jj++){
             for (size_t kk = 0; kk < du; kk++){
                 ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
             }
-            valtemp = bellman_control(du,ucurr,NULL,arg);
-            
-            if ((jj == 0) ||(valtemp < minval)){
+            /* valtemp = bellman_control(du,ucurr,NULL,arg); */
+            c3opt_minimize(opt,ucurr,&valtemp);            
+            if (valtemp < minval){
                 minval = valtemp;
-                /* printf("valtemp = %G\n",valtemp); */
-                /* printf("\t new u = "); dprint(du,ucurr); */
                 memmove(umin,ucurr,du*sizeof(double));
             }
         }
 
-        c3opt_minimize(opt,umin,val);
+
         /* printf("val = %G finished newu = \n",*val); dprint(du,umin); */
         /* printf("umin = "); dprint(du,umin); */
     }
-    else{
+    else if (justrand == -1){
         // then start at each corner
         /* printf("corners\n"); */
         if (du == 1){
