@@ -33,6 +33,10 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
+static int order[4] = { 0, 1, 2, 3}; // x y o v
+/* static int order[4] = { 0, 3, 2, 1}; */
+/* static int order[4] = { 3, 2, 0, 1};  */
+
 int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
 {
@@ -49,28 +53,35 @@ int f1(double t, const double * x, const double * u, double * out,
     // u[0] : steering angle (-15 pi / 180,  15 pi /180)
     // u[1] : acceleration (-1, 1)
 
-    double L = 0.2;
+
+    /* int order[4] = { 0, 1, 2, 3}; // x y o v */
+    /* double posx = x[order[0]]; */
+    /* double posy = x[order[1]]; */
+    double orient = x[order[2]];
+    double speed = x[order[3]];
+
+    
+    double L = 0.2; // length of the car
     double vc = 8.0;
     double alpha = 2.0;
 
-
-    double pre = (1.0 / (1.0 + (x[3]/vc))) * (x[3] / L);
-    out[0] = x[3] * cos(x[2]);
-    out[1] = x[3] * sin(x[2]);
-    out[2] = pre * tan (u[0]);
-    out[3] = alpha * u[1];
+    double pre = (1.0 / (1.0 + (speed/vc))) * (speed / L);
+    out[order[0]] = speed * cos(orient);
+    out[order[1]] = speed * sin(orient);
+    out[order[2]] = pre * tan (u[0]);
+    out[order[3]] = alpha * u[1];
 
     if (jac != NULL){
         //df1/du
-        jac[0] = 0.0;    
-        jac[1] = 0.0;    
-        jac[2] = pre * pow(cos(u[0]),-2);
-        jac[3] = 0;
+        jac[order[0]] = 0.0;    
+        jac[order[1]] = 0.0;    
+        jac[order[2]] = pre * pow(cos(u[0]),-2);
+        jac[order[3]] = 0;
 
-        jac[4] = 0.0;
-        jac[5] = 0.0;
-        jac[6] = 0.0;   
-        jac[7] = alpha;
+        jac[order[0]] = 0.0;
+        jac[order[1]] = 0.0;
+        jac[order[2]] = 0.0;   
+        jac[order[3]] = alpha;
     }
 
     /* printf("x = "); dprint(4,x); */
@@ -114,14 +125,12 @@ int stagecost(double t,const double * x,const double * u, double * out,
     (void)(t);
 
     *out = 0.0;
-    *out = 1.0;
-    (void)(x);
+    *out = 1.0 + pow(x[order[0]],2) + pow(x[order[1]],2);
     (void)(u);
     
     if (grad!= NULL){
         grad[0] = 0.0;
         grad[1] = 0.0;
-        grad[2] = 0.0;
     }
     return 0;
 }
@@ -148,9 +157,10 @@ int ocost(const double * x,double * out)
 int startcost(size_t N, const double * x, double * out, void * args)
 {
     (void)(args);
-    (void)(x);
     for (size_t ii = 0; ii < N; ii++){
-        out[ii] = 20.0;
+        /* out[ii] = pow(x[ii*4+(size_t)order[0]],2) + pow(x[ii*4+(size_t)order[1]],2); */
+                 /* + pow(x[ii*4+2],2) + pow(x[ii*4+3],2); */
+        out[ii] = 10.0;
     }
     return 0;
 }
@@ -159,30 +169,31 @@ void state_transform(size_t ndim, const double * x, double * y)
 {
     (void)(ndim);
 
+    
     y[0] = x[0];
     y[1] = x[1];
     y[2] = x[2];
     y[3] = x[3];
     /* int trans = 0; */
-    if ((x[2] < M_PI ) && (x[2] > -M_PI)){
-        y[2] = x[2];
+    if ((x[order[2]] < M_PI ) && (x[order[2]] > -M_PI)){
+        y[order[2]] = x[order[2]];
     }
-    else if (x[2] > M_PI){
+    else if (x[order[2]] > M_PI){
         /* trans = 1; */
-        while (y[2] > 2 * M_PI){
-            y[2] -= 2.0*M_PI;
+        while (y[order[2]] > 2 * M_PI){
+            y[order[2]] -= 2.0*M_PI;
         }
-        if (y[2] > M_PI){
-            y[2] = y[2] - 2.0*M_PI;
+        if (y[order[2]] > M_PI){
+            y[order[2]] = y[order[2]] - 2.0*M_PI;
         }
     }
-    else if (x[2] < -M_PI){
+    else if (x[order[2]] < -M_PI){
         /* trans = 1; */
-        while (y[2] < - 2.0* M_PI){
-            y[2] += 2.0 * M_PI;
+        while (y[order[2]] < - 2.0* M_PI){
+            y[order[2]] += 2.0 * M_PI;
         }
-        if (y[2] < -M_PI){
-            y[2] += 2.0 * M_PI;
+        if (y[order[2]] < -M_PI){
+            y[order[2]] += 2.0 * M_PI;
         }
     }
     /* if (trans == 1){ */
@@ -240,19 +251,24 @@ int main(int argc, char * argv[])
     size_t dx = 4;
     size_t dw = 4;
     size_t du = 2;
-    double lb[4] = {-4.0, -4.0, -M_PI, 2.0};
-    double ub[4] = {4.0, 4.0, M_PI,  5.0};
+
+    // lower and upper bounds of standard ordering
+    double lbs[4] = {-4.0, -4.0, -M_PI, 2.0};
+    double ubs[4] = {4.0, 4.0, M_PI,  5.0};
+    
+    double lb[4] = {lbs[order[0]],lbs[order[1]],lbs[order[2]],lbs[order[3]]};
+    double ub[4] = {ubs[order[0]],ubs[order[1]],ubs[order[2]],ubs[order[3]]};
     size_t Narr[4] = {N,N,N,N};
-    double beta = 0.0;
+    double beta = 10.0;
 
     double lbu[2] = {-15.0*M_PI/180.0, -1.0};
     double ubu[2] = {15.0*M_PI/180.0, 1.0};
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-10);
-    c3opt_set_relftol(opt,1e-10);
-    c3opt_set_gtol(opt,0.0);
+    c3opt_set_absxtol(opt,1e-8);
+    c3opt_set_relftol(opt,1e-8);
+    c3opt_set_gtol(opt,1e-13);
     c3opt_ls_set_maxiter(opt,10);
     c3opt_ls_set_alpha(opt,0.1);
     c3opt_ls_set_beta(opt,0.2);
@@ -262,10 +278,10 @@ int main(int argc, char * argv[])
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-5);
     approx_args_set_round_tol(aargs,1e-5);
-    approx_args_set_startrank(aargs,5);
+    approx_args_set_startrank(aargs,8);
     approx_args_set_adapt(aargs,1);
     approx_args_set_kickrank(aargs,5);
-    approx_args_set_maxrank(aargs,5);
+    approx_args_set_maxrank(aargs,8);
 
 
     // setup problem
@@ -276,13 +292,22 @@ int main(int argc, char * argv[])
     c3control_add_boundcost(c3c,boundcost);
     c3control_add_obscost(c3c,ocost);
 
-    c3control_set_external_boundary(c3c,2,"periodic");
-    c3control_set_external_boundary(c3c,3,"reflect");
+    /* c3control_set_external_boundary(c3c,(size_t)order[0],"reflect"); */
+    /* c3control_set_external_boundary(c3c,(size_t)order[1],"reflect"); */
+    c3control_set_external_boundary(c3c,(size_t)order[2],"periodic");
+    c3control_set_external_boundary(c3c,(size_t)order[3],"reflect");
 
     // possible obstacle
-    double w = 0.5;
-    double center[4] = {0.0,0.0,0.0,0.0};
-    double width[4] = {w,w,ub[2]-lb[2],ub[3]-lb[3]};
+    double w = 1.0;
+    double center[4] = {0.0, 0.0, 0.0, 0.0};
+    center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0;
+    
+    double width[4];
+    width[order[0]] = w;
+    width[order[1]] = w;
+    width[order[2]] = (ubs[order[2]] - lbs[order[2]]);
+    width[order[3]] = (ubs[order[3]] - lbs[order[3]]);
+    
     c3control_add_obstacle(c3c,center,width);
 
     char filename[256];
@@ -298,7 +323,7 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     size_t maxiter_vi = niter;
     double abs_conv_vi = 1e-3;
-    size_t maxiter_pi = 10;
+    size_t maxiter_pi = 5;
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256];
@@ -342,9 +367,16 @@ int main(int argc, char * argv[])
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-    double state[4] = {1.0, 1.0, -M_PI/2.0, 3.0};
+    /* double state[4] = {1.0, 1.0, -3.0 * M_PI / 4.0, 3.0}; */
+    /* double state_st[4] = {2.0, 2.0, - M_PI / 2.0, 3.0}; */
+    double state_st[4] = {-2.0, 3.0, -3.0 * M_PI / 4.0, 3.0};
+    /* double state_st[4] = {1.0, 1.0, - 3.0* M_PI / 4.0, 3.0}; */
+    /* double state[4] = {1.0, 1.0, 3.0 * M_PI / 4.0, 3.0}; */
     double con[2] = {0.0, 0.0};
 
+    double state[4] = {state_st[order[0]], state_st[order[1]], state_st[order[2]],
+                       state_st[order[3]]};
+    
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");
     trajectory_add(&traj,4,2,time,state,con);
@@ -352,7 +384,7 @@ int main(int argc, char * argv[])
 
 
     double dt = 1e-2;
-    double final_time = 1e0;
+    double final_time = 4e0;
     int res;
     while (time < final_time){
         /* printf("time = %G\n",time); */

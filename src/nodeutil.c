@@ -253,6 +253,8 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
             absorbed[ii] = 0;
         }
         else{
+            /* printf("x is in an obstacle!! = "); dprint(d,x+ii*d); */
+            /* assert(1 == 0); */
             absorbed[ii] = -1;
         }
     }
@@ -325,10 +327,12 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
     else if (b == REFLECT){
         neighbors_vary[0] = 0;
         neighbors_vary[1] = 1;
+        absorbed[0] = 0;
     }
     else if (b == PERIODIC){
         neighbors_vary[0] = ngrid[dim_vary]-2;
         neighbors_vary[1] = 1;
+        absorbed[0] = 0;
     }
     else{
         fprintf(stderr,"Should not be here!\n");
@@ -346,10 +350,12 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
     else if (b == REFLECT){
         neighbors_vary[2*(ngrid[dim_vary]-1)] =  ngrid[dim_vary]-2;
         neighbors_vary[2*(ngrid[dim_vary]-1)+1] =  ngrid[dim_vary]-1;
+        absorbed[ngrid[dim_vary]-1] = 1;
     }
     else if (b == PERIODIC){
         neighbors_vary[2*(ngrid[dim_vary]-1)] = ngrid[dim_vary]-2;
         neighbors_vary[2*(ngrid[dim_vary]-1)+1] = 1;
+        absorbed[ngrid[dim_vary]-1] = 1;
     }
     else{
         fprintf(stderr,"Should not be here!\n");
@@ -404,6 +410,8 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
     /* printf("convert fiber\n"); */
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
     if (res != 0){
+        printf("\n======================================\n");
+        printf("Error calling convert fiber to _ind!!\n\n");
         printf("grid is \n");
         for (size_t ii = 0; ii < d; ii++){
             dprint(ngrid[ii],xgrid[ii]);
@@ -412,10 +420,13 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
         for (size_t ii = 0; ii < N; ii++){
             printf("first point = "); dprint(d,x+ii*d);
         }
+        printf("\n======================================\n");
     }
     assert (res == 0);
+    assert (*dim_vary < d);
+    assert (N == ngrid[*dim_vary]);
 
-    /* printf("converted fiber, dim_vary = %zu \n",dim_vary); */
+    /* printf("converted fiber, dim_vary = %zu \n",*dim_vary); */
     /* printf("fixed_ind = "); iprint_sz(d,fixed_ind); */
     
     
@@ -427,7 +438,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
                                   neighbors_vary,neighbors_fixed,
                                   ngrid,bound);
     assert (res == 0);
-
+    /* printf("done processing \n"); iprint(N,absorbed); */
     /* printf("processed neighbors\n"); */
     // evaluate cost associated with all neighbors
     /* printf("evaluated neighbors\n"); */
@@ -440,7 +451,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
     /* free(absorbed); absorbed = NULL; */
     free(neighbors_vary); neighbors_vary = NULL;
     free(neighbors_fixed); neighbors_fixed = NULL;
-
+    /* printf("done with calls\n"); */
     
     return 0;
 }

@@ -291,7 +291,12 @@ void bound_rect_free_array(struct BoundRect ** br, size_t N)
 int bound_rect_inside(struct BoundRect * br,const double * x)
 {
     int inside_obstacle = 1;
+    /* printf("br dim = %zu\n",br->dim); */
+    /* printf("x in bound = "); dprint(br->dim,x); */
+    assert (br->dim > 0);
     for (size_t ii = 0; ii < br->dim; ii++){
+        /* printf("ii=%zu, lb=%G,ub=%G\n",ii,br->lb[ii],br->ub[ii]); */
+
         if ((x[ii] < br->lb[ii]) || (x[ii] > br->ub[ii])){
             inside_obstacle = 0;
             break;
@@ -430,7 +435,10 @@ void boundary_add_obstacle(struct Boundary * bound, double * center, double * le
         fprintf(stderr,"Not enough space allocated for obstacles in boundary\n");
         exit(1);
     }
+    /* printf("Adding boundary obstacle n = %zu!!\n",bound->n); */
+    assert (bound->d > 0);
     bound->br[bound->n] = bound_rect_init(bound->d,center,lengths);
+    /* printf("br dim = %zu\n",bound->br[bound->n]->dim); */
     bound->n = bound->n+1;
 }
 
@@ -621,9 +629,12 @@ struct BoundInfo * boundary_type(const struct Boundary * bound,double time,const
 **************************************************************/
 int boundary_in_obstacle(const struct Boundary * bound, const double * x)
 {
+    /* printf("n obs = %zu\n",bound->n); */
+    /* printf("x = "); dprint(bound->d,x); */
     for (size_t ii = 0; ii < bound->n; ii++){
         int inobs = bound_rect_inside(bound->br[ii],x);
         if (inobs == 1){
+            /* printf("IN OBSTACLE\n"); */
             return 1;
         }
     }

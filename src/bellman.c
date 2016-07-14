@@ -493,7 +493,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     size_t nrand = 10; // note this is changed if du = 1 or du = 3;
     size_t npert = 2;
     double valtemp;
-    int justrand = 1;
+    int justrand = -1;
 
     c3opt_add_objective(opt,&bellman_control,param);
     // first do zero;
@@ -506,7 +506,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     if (justrand == 1){
         // now compare with random samples
         /* double valtemp = 123456; */
-        nrand = 3;
+        nrand = 10;
         for (size_t jj = 0; jj < nrand; jj++){
             for (size_t kk = 0; kk < du; kk++){
                 ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
@@ -541,14 +541,34 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             c3opt_minimize(opt,ucurr,&valtemp);
             /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
             if (valtemp < minval){
-                /* printf("\t updating current min!\n"); */
                 minval = valtemp;
                 memmove(umin,ucurr,du*sizeof(double));
             }
         }
+        else if (du == 2){
+            nrand = 0;
+            size_t npts = 4;
+            double * pts1 = linspace(lbu[0],ubu[0],npts);
+            double * pts2  = linspace(lbu[1],ubu[1],npts);
+            double pt[2];
+            for (size_t ii = 0; ii < npts; ii++){
+                for (size_t jj = 0; jj < npts; jj++){
+                    pt[0] = pts1[ii];
+                    pt[1] = pts2[jj];
+                    c3opt_minimize(opt,pt,&valtemp);
+                    if (valtemp < minval){
+                        minval = valtemp;
+                        memmove(umin,pt,du*sizeof(double));
+                    }
+                }
+            }
+            
+            free(pts1); free(pts2);
+            pts1 = NULL; pts2 = NULL;
+        }
         else if (du == 3){
-            nrand = 2;
-            npert = 2;
+            nrand = 0;
+            npert = 0;
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;
@@ -737,7 +757,6 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
 
     char * key = size_t_a_to_char(ind_to_serialize,dx+1);
     free(ind_to_serialize); ind_to_serialize = NULL;
-    /* free(fi); fi = NULL; */
 
     size_t nbytes = 0;
     double * out_stored = htable_get_element(htable,key,&nbytes);
@@ -906,6 +925,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     size_t * fi = calloc_size_t(dx);
     size_t dim_vary;
     /* printf("get neighbor costs\n"); */
+    /* printf("\t %zu,%zu\n",dx,N); */
     int res = mca_get_neighbor_costs(dx,N,x,
                                      bound,vf_policy,ngrid,xgrid,
                                      fi,&dim_vary,
@@ -913,8 +933,10 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     /* printf("got them\n"); */
     assert (res == 0);
 
+    assert (dim_vary < dx);
     size_t * ind_to_serialize = calloc_size_t(dx+1);
     for (size_t ii = 0; ii < dx; ii++){
+        assert (fi[ii] < ngrid[ii]);
         if (ii != dim_vary){
             ind_to_serialize[ii] = fi[ii];
         }
@@ -928,25 +950,26 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
     // see if already computed the output for this function
     size_t nbytes1 = 0;
-    /* printf("get the element\n"); */
     double * out_stored = htable_get_element(htable_iter,key1,&nbytes1);
-    /* printf("done prepping\n"); */
-    /* double * out_stored = NULL; */
     if (out_stored == NULL){
         /* printf("not stored\n"); */
         size_t nbytes = 0;
         // see if already computed transition probabilities for this fiber
         double * probs = htable_get_element(htable,key1,&nbytes);
+        /* probs = NULL; */
+        /* printf("got probs\n"); */
         int probs_alloc = 0;
         /* probs = NULL; */
         if (probs == NULL){
-            /* printf("probs is null key=%s\n",key); */
+            /* printf("probs is null\n");; */
             size_t nprobs = N*(2*dx+1) + 2*N; // last N are stage costs and N before that are dts
             probs = calloc_double(nprobs); // last N are dts
             probs_alloc = 1;
 
             double * u = calloc_double(du);
+            /* printf("lets go\n"); */
             for (size_t ii = 0; ii < N; ii++){
+                /* printf("ii=%zu/%zu",ii+1,N); */
                 param->npol_evals++;                                
                 control_params_add_state_info(cp,time,x+ii*dx,
                                               absorbed_pol[ii],
@@ -968,10 +991,14 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 res2 = dp->stagecost(time,x+ii*dx,u,probs + N*(2*dx+1)+N+ii,NULL);
                 assert (res2 == 0);
             }
+            /* printf("done with going over all points\n"); */
             htable_add_element(htable,key2,probs,nprobs * sizeof(double));
+            /* printf("added element"); */
             free(u); u = NULL;
+            /* printf("freed control\n"); */
         }
         else{
+            /* printf("probs is null"); */
             free(key2); key2 = NULL;
         }
 
@@ -979,15 +1006,19 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         int * absorbed = calloc_int(N);
         double * costs = calloc_double(N*(2*dx+1));
         fi = calloc_size_t(dx);
+        /* printf("get other mca\n"); */
         res = mca_get_neighbor_costs(dx,N,x,
                                      bound,vf_iteration,ngrid,xgrid,
                                      fi,&dim_vary,
                                      absorbed,costs);
+        /* printf("got other \n"); iprint(N,absorbed); */
+        
 
         assert (res == 0);
 
 
-        param->niter_evals = param->niter_evals + 20;
+        param->niter_evals = param->niter_evals + N;
+        /* printf("N = %zu\n",N); */
         for (size_t ii = 0; ii < N; ii++){
 
             //hack for computing how many individual nodes accessed
@@ -999,7 +1030,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
             if (val == NULL){
                 param->niter_node_evals++;
                 double vv = 2.0;
-                htable_add_element(htable_iter_node,key1a,&vv,sizeof(double));                
+                htable_add_element(htable_iter_node,key1a,&vv,sizeof(double));
             }
             else{
                 free(key1a); key1a = NULL;
@@ -1016,28 +1047,40 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                                      probs+ii*(2*dx+1),NULL,
                                      *(probs+N*(2*dx+1)+ii),NULL, // dt
                                      costs+ii*(2*dx+1),NULL);
+                /* printf("out[%zu] = %G\n",ii,out[ii]); */
+             
             }
             else if (absorbed[ii] == 1){ // absorbed cost
+                /* printf("boundary[%zu]\n",ii); */
+                /* printf("\t"); dprint(dx,x+ii*dx); */
                 res = dp->boundcost(time,x+ii*dx,out+ii);
                 assert (res == 0);
             }
             else if (absorbed[ii] == -1){
+                /* printf("weird [%zu]\n",ii); */
+                /* printf("\t"); dprint(dx,x+ii*dx); */
+                /* assert (1 == 0); */
                 res = dp->obscost(x+ii*dx,out+ii);
             }
             else{
+                printf("ii = %zu, N = %zu, dx = %zu\n",ii,N,dx);
+                printf("x = "); dprint(dx,x+ii*dx);
+                printf("absorbed = "); iprint(N,absorbed);
                 fprintf(stderr, "Unrecognized aborbed condition %d\n",absorbed[ii]);
                 exit(1);
             }
 
         }
-        
+
+        /* printf("free stuff\n"); */
         if (probs_alloc == 1){
             free(probs); probs = NULL;
         }
         free(absorbed); absorbed = NULL;
         free(costs); costs = NULL;
         free(fi); fi = NULL;
-        
+
+        /* printf("add the element\n"); */
         htable_add_element(htable_iter,key3,out,N * sizeof(double));
         /* printf("dealt with it\n"); */
     }
@@ -1329,7 +1372,7 @@ int c3control_controller(double t,const double * x, double * u, void * args)
         free(xin); xin = NULL;
         return out;
     }
-    return 0;
+    /* return 0; */
 }
 
 struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
@@ -1400,20 +1443,26 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
         start[ii] = calloc_double(start_rank);
         size_t stride = uniform_stride(ngrid[ii], start_rank);
         for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
+            start[ii][jj] = xgrid[ii][1+stride*jj];
         }
+        /* printf("grid = "); dprint(ngrid[ii],xgrid[ii]); */
+        /* printf("\t start = "); dprint(start_rank,start[ii]); */
     }
 
     struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,opt);
-    /* struct PIparam * poli = pi_param_create(1e-10,policy); */
+
     pi_param_add_cp(poli,cp);
     pi_param_add_value(poli,vf);
 
     /* printf("interp\n"); */
     poli->niter_evals = 0;
     poli->niter_node_evals = 0;
+
+    /* printf("Begin interpolation for PI\n"); */
     struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,
                                          start,apargs,verbose);
+
+    /* printf("Completed interpolation for PI\n"); */
     *niter_evals = poli->niter_node_evals;
 
     control_params_destroy(cp); cp = NULL;
