@@ -31,6 +31,7 @@ void print_code_usage (FILE * stream, int exit_code)
             " -f --diff2     Size of diffusion for y (default 1.0)\n"
             " -s --steps     Number of iterations (default 100)\n"
             " -t --type      0 for absorb 1 for reflect (default 0)\n"
+            " -e --epsilon   rounding tol (default is 1e-7)\n"
             " -v --verbose   Output words (default 0)\n"
             "                1 - output main file stuff\n"
             "                >1 - also output approximation info\n"
@@ -229,7 +230,7 @@ int startcost(size_t N, const double * x, double * out, void * args)
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:n:a:b:r:f:s:t:v:";
+    const char * const short_options = "hd:n:a:b:r:f:s:t:e:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
@@ -239,6 +240,7 @@ int main(int argc, char * argv[])
         { "diff1"    , 1, NULL, 'r' },
         { "diff2"    , 1, NULL, 'f' },
         { "steps"    , 1, NULL, 's' },
+        { "epsilon"  , 1, NULL, 'e' },
         { "bctype"   , 1, NULL, 't' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
@@ -252,6 +254,7 @@ int main(int argc, char * argv[])
     double lbu[1] = {-1.0};
     double ubu[1] = {1.0};
     double ss[2] = {1.0,1.0};
+    double roundtol = 1e-7;
     int bctype = 0;
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
@@ -283,6 +286,9 @@ int main(int argc, char * argv[])
             case 't':
                 bctype = strtoul(optarg,NULL,10);
                 break;
+            case 'e':
+                roundtol = strtod(optarg,NULL);
+                break;
             case 'v':
                 verbose = strtol(optarg,NULL,10);
                 break;
@@ -309,13 +315,13 @@ int main(int argc, char * argv[])
     c3opt_add_ub(opt,ubu);
     c3opt_set_absxtol(opt,1e-8);
     c3opt_set_relftol(opt,1e-8);
-    c3opt_set_gtol(opt,1e-10);
+    c3opt_set_gtol(opt,1e-25);
     c3opt_set_verbose(opt,0);
     
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-10);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_round_tol(aargs,roundtol);
     approx_args_set_kickrank(aargs,5);
     approx_args_set_adapt(aargs,1);
     approx_args_set_startrank(aargs,5);
@@ -353,9 +359,10 @@ int main(int argc, char * argv[])
     size_t maxiter_vi = niter;
     double abs_conv_vi = 1e-3;
     size_t maxiter_pi = 10;
-    double abs_conv_pi = 1e-2;
+    double abs_conv_pi = 1e-8;
     struct Diag * diag = NULL;
-    char filename_diag[256] = "diagnostic.dat";
+    char filename_diag[256];
+    sprintf(filename_diag,"%s/%s",dirout,"diagnostic.dat");
     printf("\n\n\nmaxiter_vi = %zu\\n\n", maxiter_vi);
     for (size_t ii = 0; ii < maxiter_vi; ii++){
         printf("\n\n\n\n\n\n\n");
