@@ -30,6 +30,7 @@ void print_code_usage (FILE * stream, int exit_code)
             " -r --diff1     Size of diffusion for x (default 1.0)\n"
             " -f --diff2     Size of diffusion for y (default 1.0)\n"
             " -s --steps     Number of iterations (default 100)\n"
+            " -t --type      0 for absorb 1 for reflect (default 0)\n"
             " -v --verbose   Output words (default 0)\n"
             "                1 - output main file stuff\n"
             "                >1 - also output approximation info\n"
@@ -187,7 +188,7 @@ int stagecost(double t,const double * x,const double * u, double * out,
     /*     grad[1] = 4 * u[1]; */
     /* } */
 
-    *out += 10.0*pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
+    *out += pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
     if (grad!= NULL){
         grad[0] = 2 * u[0];
     }
@@ -218,20 +219,17 @@ int startcost(size_t N, const double * x, double * out, void * args)
     (void)(args);
 
     for (size_t ii = 0; ii < N; ii++){
-        if ((fabs(x[ii*N+0]) <= 2e-1) && (fabs(x[ii*N+ 1]) < 2e-1)){
-            out[ii] =  0.2;
-        }
-        else{
-            out[ii] = 0.2;
-        }
+        /* printf("ii = %zu, x = ",ii); dprint(2,x+ii); */
+        out[ii] = 0.2;
     }
+    /* printf("done\n"); */
     return 0;
 }
 
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:n:a:b:r:f:s:v:";
+    const char * const short_options = "hd:n:a:b:r:f:s:t:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
@@ -241,6 +239,7 @@ int main(int argc, char * argv[])
         { "diff1"    , 1, NULL, 'r' },
         { "diff2"    , 1, NULL, 'f' },
         { "steps"    , 1, NULL, 's' },
+        { "bctype"   , 1, NULL, 't' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
     };
@@ -253,6 +252,7 @@ int main(int argc, char * argv[])
     double lbu[1] = {-1.0};
     double ubu[1] = {1.0};
     double ss[2] = {1.0,1.0};
+    int bctype = 0;
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
         switch (next_option)
@@ -279,6 +279,9 @@ int main(int argc, char * argv[])
                 break;
             case 's':
                 niter = strtoul(optarg,NULL,10);
+                break;
+            case 't':
+                bctype = strtoul(optarg,NULL,10);
                 break;
             case 'v':
                 verbose = strtol(optarg,NULL,10);
@@ -326,8 +329,11 @@ int main(int argc, char * argv[])
     c3control_add_boundcost(c3c,boundcost);
     c3control_add_obscost(c3c,ocost);
     
-    c3control_set_external_boundary(c3c,0,"reflect");
-    c3control_set_external_boundary(c3c,1,"reflect");
+    if (bctype == 1){
+        c3control_set_external_boundary(c3c,0,"reflect");
+        c3control_set_external_boundary(c3c,1,"reflect");        
+    }
+
     /* double center[2] = {0.0,0.0}; */
     /* double width[2] = {0.15,0.15}; */
     /* c3control_add_obstacle(c3c,center,width); */
@@ -344,13 +350,15 @@ int main(int argc, char * argv[])
     int saved = valuef_save(cost,filename);
     assert (saved == 0);
     
-    size_t maxiter_vi = niter+1;
+    size_t maxiter_vi = niter;
     double abs_conv_vi = 1e-3;
     size_t maxiter_pi = 10;
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256] = "diagnostic.dat";
+    printf("\n\n\nmaxiter_vi = %zu\\n\n", maxiter_vi);
     for (size_t ii = 0; ii < maxiter_vi; ii++){
+        printf("\n\n\n\n\n\n\n");
         struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
                                                   cost,aargs,opt,verbose,&diag);
 
@@ -367,9 +375,15 @@ int main(int argc, char * argv[])
 
         saved = diag_save(diag,filename_diag);
         assert (saved == 0);
+
+        if (verbose != 0){
+            printf("ii=%zu ranks=",ii);
+            size_t * ranks = valuef_get_ranks(cost);
+            iprint_sz(dx+1,ranks);
+        }
     }
 
-
+    
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
             dirout,lbu[0],ubu[0],ss[0],ss[1],"cost");
     print_cost(filename,cost,30,30,lb,ub);
@@ -388,7 +402,7 @@ int main(int argc, char * argv[])
 
     // Initialize trajectories for state
     double time = 0.0;
-    double state[2] = {0.5, 0.5};
+    double state[2] = {-0.5, -0.5};
     double con[1] = {0.0};
     // Integrate
     struct Trajectory * traj = NULL;

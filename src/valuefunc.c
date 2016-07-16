@@ -476,7 +476,8 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
     }
     c3approx_init_cross(c3a,startrank,verbose,start);
     c3approx_set_cross_tol(c3a,cross_tol);
-    c3approx_set_cross_maxiter(c3a,10);
+    c3approx_set_cross_maxiter(c3a,5);
+    /* c3approx_set_cross_maxiter(c3a,100); */
     c3approx_set_round_tol(c3a,round_tol);
     c3approx_set_adapt_kickrank(c3a,kickrank);
     size_t minN = N[0];

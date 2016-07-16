@@ -33,9 +33,8 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
-static int order[4] = { 0, 1, 2, 3}; // x y o v
-/* static int order[4] = { 0, 3, 2, 1}; */
-/* static int order[4] = { 3, 2, 0, 1};  */
+static int order[5] = { 0, 1, 2, 3, 4}; // x y orientation omega v
+/* static int order[5] = { 0, 4, 3, 2, 1}; // x y orientation omega v */
 
 int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
@@ -57,31 +56,50 @@ int f1(double t, const double * x, const double * u, double * out,
     /* int order[4] = { 0, 1, 2, 3}; // x y o v */
     /* double posx = x[order[0]]; */
     /* double posy = x[order[1]]; */
+
     double orient = x[order[2]];
-    double speed = x[order[3]];
+    double angvel = x[order[3]];
+    double speed = x[order[4]];
 
+    double steering = u[0];
     
-    double L = 0.2; // length of the car
-    double vc = 8.0;
-    double alpha = 2.0;
+    double m = 1460.0;
+    double cf = 17000.0;
+    double ct = 20000.0;
+    double a = 1.2;
+    double b = 1.5;
+    double I = 2170.0;
+    double s = 27.0;
 
-    double pre = (1.0 / (1.0 + (speed/vc))) * (speed / L);
-    out[order[0]] = speed * cos(orient);
-    out[order[1]] = speed * sin(orient);
-    out[order[2]] = pre * tan (u[0]);
-    out[order[3]] = alpha * u[1];
+    double co = cos(orient);
+    double so = sin(orient);
+
+    // forces
+    double ff = cf * ( (speed + a * angvel)/s + steering);
+    double ft = ct * (speed - b * angvel)/s;
+
+    // derivative of ff
+    double dff = cf;
+
+    //double pre = (1.0 / (1.0 + (speed/vc))) * (speed / L);
+    out[order[0]] = s * co - speed * so;
+    out[order[1]] = s * so + speed * co;
+    out[order[2]] = angvel;
+    out[order[3]] = (a * ff - b * ft)/ I;
+    out[order[4]] = -s * angvel + (ff + ft)/m;
 
     if (jac != NULL){
         //df1/du
         jac[order[0]] = 0.0;    
         jac[order[1]] = 0.0;    
-        jac[order[2]] = pre * pow(cos(u[0]),-2);
-        jac[order[3]] = 0;
+        jac[order[2]] = 0.0;
+        jac[order[3]] = a * dff / I;
+        jac[order[4]] = dff / m;
 
-        jac[order[0]] = 0.0;
-        jac[order[1]] = 0.0;
-        jac[order[2]] = 0.0;   
-        jac[order[3]] = alpha;
+        /* jac[order[0]] = 0.0; */
+        /* jac[order[1]] = 0.0; */
+        /* jac[order[2]] = 0.0;    */
+        /* jac[order[3]] = alpha; */
     }
 
     /* printf("x = "); dprint(4,x); */
@@ -99,20 +117,22 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     (void)(u);
     (void)(args);
 
-    for (size_t ii = 0; ii < 16; ii++){
+    for (size_t ii = 0; ii < 5*5; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e-2;
-    double vorient = 1e-2;
-    double vspeed = 1e-2;
+    double vpos = 1e0;
+    double vorient = 1e-1;
+    double vspeed = 1e0;
 
     out[0] = vpos;
-    out[5] = vpos;
-    out[10] = vorient;
-    out[15] = vspeed;
+    out[6] = vpos;
+    out[12] = vorient;
+    out[28] = vspeed;
+    out[24] = vspeed;
 
+    // note 1 control!!
     if (grad != NULL){
-        for (size_t ii = 0; ii < 16*2; ii++){
+        for (size_t ii = 0; ii < 25*1; ii++){
             grad[ii] = 0.0;
         }
     }
@@ -125,12 +145,12 @@ int stagecost(double t,const double * x,const double * u, double * out,
     (void)(t);
 
     *out = 0.0;
-    *out = 1.0 + pow(x[order[0]],2) + pow(x[order[1]],2);
+    *out = 10.0 + pow(x[order[0]],2) + pow(x[order[1]],2);
     (void)(u);
     
     if (grad!= NULL){
         grad[0] = 0.0;
-        grad[1] = 0.0;
+        /* grad[1] = 0.0; */
     }
     return 0;
 }
@@ -141,27 +161,15 @@ int boundcost(double t, const double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 10.0;
+    *out = 1e1;
     return 0;
 }
 
 int ocost(const double * x,double * out)
 {
-    /* printf("absorbed \n"); */
-    /* dprint(6,x); */
-
-    /* double ocenterx = 2.0; */
-    /* double ocentery = 2.0; */
-    /* double width = 1.0; */
-
-    /* if ( fabs(x[order[0]] - ocenterx) < width/2.0 ){ */
-    /*     if (fabs(x[order[1]] -  ocentery) < width/2.0){ */
-    /*         *out = 1e3; */
-    /*         return 0; */
-    /*     } */
-    /* } */
-
-    /* printf("here!\n"); */
+    /* printf("absorbed "); */
+    /* dprint(5,x); */
+    (void)(x);
     *out = 0.0;
     return 0;
 }
@@ -186,6 +194,7 @@ void state_transform(size_t ndim, const double * x, double * y)
     y[1] = x[1];
     y[2] = x[2];
     y[3] = x[3];
+    y[4] = x[4];
     /* int trans = 0; */
     if ((x[order[2]] < M_PI ) && (x[order[2]] > -M_PI)){
         y[order[2]] = x[order[2]];
@@ -260,43 +269,45 @@ int main(int argc, char * argv[])
         }
     } while (next_option != -1);
 
-    size_t dx = 4;
-    size_t dw = 4;
-    size_t du = 2;
+    size_t dx = 5;
+    size_t dw = 5;
+    size_t du = 1;
 
     // lower and upper bounds of standard ordering
-    double lbs[4] = {-4.0, -4.0, -M_PI, 2.0};
-    double ubs[4] = {4.0, 4.0, M_PI,  5.0};
+    double lbs[5] = {-40.0, -40.0, -M_PI, -10.0*M_PI,  -100.0};
+    double ubs[5] = {40.0, 40.0, M_PI, 10.0*M_PI,  100.0};
     
-    double lb[4] = {lbs[order[0]],lbs[order[1]],lbs[order[2]],lbs[order[3]]};
-    double ub[4] = {ubs[order[0]],ubs[order[1]],ubs[order[2]],ubs[order[3]]};
-    size_t Narr[4] = {N,N,N,N};
+    double lb[5] = {lbs[order[0]],lbs[order[1]],lbs[order[2]],lbs[order[3]],lbs[order[4]]};
+    double ub[5] = {ubs[order[0]],ubs[order[1]],ubs[order[2]],ubs[order[3]],ubs[order[4]]};
+    size_t Narr[5] = {N,N,N,N,N};
     double beta = 10.0;
 
-    double lbu[2] = {-15.0*M_PI/180.0, -1.0};
-    double ubu[2] = {15.0*M_PI/180.0, 1.0};
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    double lbu[1] = {-45.0*M_PI/180.0};//, -1.0};
+    double ubu[1] = {45.0*M_PI/180.0};//, 1.0};
+
+    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-8);
-    c3opt_set_relftol(opt,1e-8);
-    c3opt_set_gtol(opt,1e-13);
-    c3opt_ls_set_maxiter(opt,10);
-    c3opt_ls_set_alpha(opt,0.1);
-    c3opt_ls_set_beta(opt,0.2);
-    c3opt_set_verbose(opt,0);
+    size_t dopts = 20;
+    double * uopts = linspace(lbu[0],ubu[0],dopts);
+    c3opt_set_brute_force_vals(opt,dopts,uopts);
+
+    /* c3opt_set_absxtol(opt,1e-8); */
+    /* c3opt_set_relftol(opt,1e-8); */
+    /* c3opt_set_gtol(opt,1e-13); */
+    /* c3opt_ls_set_maxiter(opt,10); */
+    /* c3opt_ls_set_alpha(opt,0.1); */
+    /* c3opt_ls_set_beta(opt,0.2); */
+    /* c3opt_set_verbose(opt,0); */
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-7);
+    approx_args_set_cross_tol(aargs,1e-4);
     approx_args_set_round_tol(aargs,1e-3);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_kickrank(aargs,5);
-    /* approx_args_set_startrank(aargs,10); */
-    /* approx_args_set_maxrank(aargs,40); */
-
-    approx_args_set_startrank(aargs,45);
-    approx_args_set_maxrank(aargs,45);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_startrank(aargs,30);
+    approx_args_set_maxrank(aargs,30);
 
 
     // setup problem
@@ -311,32 +322,22 @@ int main(int argc, char * argv[])
     /* c3control_set_external_boundary(c3c,(size_t)order[1],"reflect"); */
     c3control_set_external_boundary(c3c,(size_t)order[2],"periodic");
     c3control_set_external_boundary(c3c,(size_t)order[3],"reflect");
+    /* c3control_set_external_boundary(c3c,(size_t)order[4],"reflect"); */
 
-    // goal region
-    double w = 1.0;
-    double center[4] = {0.0, 0.0, 0.0, 0.0};
+    // possible obstacle
+    double w = 10.0;
+    double center[5] = {0.0, 0.0, 0.0, 0.0,0.0};
     center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0;
+    center[order[4]] = (ubs[order[4]]+lbs[order[4]])/2.0;
     
-    double width[4];
+    double width[5];
     width[order[0]] = w;
     width[order[1]] = w;
     width[order[2]] = (ubs[order[2]] - lbs[order[2]]);
     width[order[3]] = (ubs[order[3]] - lbs[order[3]]);
+    width[order[4]] = (ubs[order[4]] - lbs[order[4]]);
     
     c3control_add_obstacle(c3c,center,width);
-
-    
-    // obstacle
-    /* double v = 1.0; */
-    /* double center2[4] = {2.0, 2.0, 0.0, 0.0}; */
-    /* center2[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0; */
-    
-    /* double width2[4]; */
-    /* width2[order[0]] = v; */
-    /* width2[order[1]] = v; */
-    /* width2[order[2]] = (ubs[order[2]] - lbs[order[2]]); */
-    /* width2[order[3]] = (ubs[order[3]] - lbs[order[3]]); */
-    /* c3control_add_obstacle(c3c,center2,width2); */
 
     char filename[256];
     sprintf(filename,"%s/%s.c3",dirout,"cost");
@@ -376,7 +377,7 @@ int main(int argc, char * argv[])
         size_t * ranks = valuef_get_ranks(cost);
         if (verbose != 0){
             printf("ii=%zu ranks=",ii);
-            iprint_sz(5,ranks);
+            iprint_sz(dx+1,ranks);
         }
 
     }
@@ -384,35 +385,36 @@ int main(int argc, char * argv[])
     c3control_add_policy_sim(c3c,cost,opt,state_transform);
 
 /* //    printf("created policy\n"); */
-    /* char odename[256] = "rk4"; */
+    /* char odename[256] = "rkf45"; */
     char odename[256] = "forward-euler";
     struct Integrator * ode_sys =
-        integrator_create_controlled(4,2,f1,NULL,c3control_controller,c3c);
+        integrator_create_controlled(5,1,f1,NULL,c3control_controller,c3c);
     integrator_set_type(ode_sys,odename);
     /* integrator_set_adaptive_opts(ode_sys,1e-5,1e-2,1e-7); */
-    integrator_set_dt(ode_sys,1e-3);
+    integrator_set_dt(ode_sys,1e-4);
     integrator_set_verbose(ode_sys,0);
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-    /* double state_st[4] = {1.0, 1.0, -3.0 * M_PI / 4.0, 3.0}; */
-    /* double state_st[4] = {1.0, 1.0, 3.0*M_PI/4.0, 3.0};   */
-    /* double state_st[4] = {-2.0, 3.0, -3.0 * M_PI / 4.0, 3.0}; */
-    /* double state_st[4] = {-1.0, -1.0, M_PI+0.2 , 3.0}; */
-    double state_st[4] = {1.0, 0.0,  M_PI / 4.0, 3.0};
-    double con[2] = {0.0, 0.0};
+    /* double state_st[5] = {20.0, 0.0, -3.0* M_PI / 4.0, 0.0, 3.0}; */
+    /* double state_st[5] = {30.0, 3.0, -M_PI / 2.0, 0.0, 3.0}; */
+    /* double state_st[5] = {30.0, 30.0, - M_PI / 1.5, 0.0, 0.0}; */
 
-    double state[4] = {state_st[order[0]], state_st[order[1]], state_st[order[2]],
-                       state_st[order[3]]};
+    double state_st[5] = {30.0, 30.0, - 3*M_PI / 4.0, 0.0, 0.0};
+    /* double state_st[5] = {10.0, 20.0, 3.0*M_PI / 4.0, 0.0, 0.0}; */
+    double con[1] = {0.0};
+
+    double state[5] = {state_st[order[0]], state_st[order[1]], state_st[order[2]],
+                       state_st[order[3]], state_st[order[4]]};
     
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");
-    trajectory_add(&traj,4,2,time,state,con);
+    trajectory_add(&traj,5,1,time,state,con);
     printf("initialized trajectory\n");
 
 
-    double dt = 1e-2;
-    double final_time = 4e0;
+    double dt = 1e-3;
+    double final_time = 2e0;
     int res;
     while (time < final_time){
         /* printf("time = %G\n",time); */

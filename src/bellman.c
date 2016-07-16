@@ -482,9 +482,17 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     assert (arg != NULL);
     struct ControlParams * param = arg;
 
+
     // unpack
     struct c3Opt * opt = param->opt;
     assert (opt != NULL);
+    c3opt_add_objective(opt,&bellman_control,param);
+
+    if (c3opt_is_bruteforce(opt) == 1){
+        c3opt_minimize(opt,u,val);
+        return 0;
+    }
+
     double * lbu = c3opt_get_lb(opt);
     double * ubu = c3opt_get_ub(opt);
     double * umin = calloc_double(du);
@@ -495,7 +503,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     double valtemp;
     int justrand = -1;
 
-    c3opt_add_objective(opt,&bellman_control,param);
+
     // first do zero;
     /* valtemp = bellman_control(du,ucurr,NULL,arg); */
     c3opt_minimize(opt,ucurr,&valtemp);
@@ -547,7 +555,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
         }
         else if (du == 2){
             nrand = 0;
-            size_t npts = 4;
+            size_t npts = 10;
             double * pts1 = linspace(lbu[0],ubu[0],npts);
             double * pts2  = linspace(lbu[1],ubu[1],npts);
             double pt[2];
@@ -555,7 +563,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
                 for (size_t jj = 0; jj < npts; jj++){
                     pt[0] = pts1[ii];
                     pt[1] = pts2[jj];
-                    c3opt_minimize(opt,pt,&valtemp);
+                    valtemp = bellman_control(du,pt,NULL,param);
+                    /* c3opt_minimize(opt,pt,&valtemp); */
                     if (valtemp < minval){
                         minval = valtemp;
                         memmove(umin,pt,du*sizeof(double));
@@ -567,8 +576,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             pts1 = NULL; pts2 = NULL;
         }
         else if (du == 3){
-            nrand = 0;
-            npert = 0;
+            nrand = 2;
+            npert = 1;
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;

@@ -350,12 +350,12 @@ int process_fibers_neighbor(size_t d, const size_t * fixed_ind, size_t dim_vary,
     else if (b == REFLECT){
         neighbors_vary[2*(ngrid[dim_vary]-1)] =  ngrid[dim_vary]-2;
         neighbors_vary[2*(ngrid[dim_vary]-1)+1] =  ngrid[dim_vary]-1;
-        absorbed[ngrid[dim_vary]-1] = 1;
+        absorbed[ngrid[dim_vary]-1] = 0;
     }
     else if (b == PERIODIC){
         neighbors_vary[2*(ngrid[dim_vary]-1)] = ngrid[dim_vary]-2;
         neighbors_vary[2*(ngrid[dim_vary]-1)+1] = 1;
-        absorbed[ngrid[dim_vary]-1] = 1;
+        absorbed[ngrid[dim_vary]-1] = 0;
     }
     else{
         fprintf(stderr,"Should not be here!\n");
@@ -532,10 +532,12 @@ int mca_get_neighbor_node_costs(size_t d, const double * x,
                 out[2*ii+1] = valuef_eval(vf,xtemp);
             }
             else if (b == PERIODIC){
+                /* printf ("hit it %G\n",x[ii]); */
                 if (x[ii] < ub){
                     double diff = ub - x[ii];
                     double left = h - diff; // assumes x[ii] > lb
                     xtemp[ii] = lb+left;
+                    /* printf("xtemp is %G \n",xtemp[ii]); */
                     out[2*ii+1] = valuef_eval(vf,xtemp);
                 }
                 else{ // lb > x[ii]
