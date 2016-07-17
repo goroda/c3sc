@@ -102,7 +102,7 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 16; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e-2;
+    double vpos = 1.0;
     double vorient = 1e-2;
     double vspeed = 1e-2;
 
@@ -123,9 +123,10 @@ int stagecost(double t,const double * x,const double * u, double * out,
               double * grad)
 {
     (void)(t);
+    (void)(x);
 
     *out = 0.0;
-    *out = 1.0 + pow(x[order[0]],2) + pow(x[order[1]],2);
+    *out = 1.0;// + pow(x[order[0]],2) + pow(x[order[1]],2);
     (void)(u);
     
     if (grad!= NULL){
@@ -147,6 +148,7 @@ int boundcost(double t, const double * x, double * out)
 
 int ocost(const double * x,double * out)
 {
+    (void)(x);
     /* printf("absorbed \n"); */
     /* dprint(6,x); */
 
@@ -169,10 +171,11 @@ int ocost(const double * x,double * out)
 int startcost(size_t N, const double * x, double * out, void * args)
 {
     (void)(args);
+    (void)(x);
     for (size_t ii = 0; ii < N; ii++){
         /* out[ii] = pow(x[ii*4+(size_t)order[0]],2) + pow(x[ii*4+(size_t)order[1]],2); */
                  /* + pow(x[ii*4+2],2) + pow(x[ii*4+3],2); */
-        out[ii] = 10.0;
+        out[ii] = 20.0;
     }
     return 0;
 }
@@ -271,7 +274,7 @@ int main(int argc, char * argv[])
     double lb[4] = {lbs[order[0]],lbs[order[1]],lbs[order[2]],lbs[order[3]]};
     double ub[4] = {ubs[order[0]],ubs[order[1]],ubs[order[2]],ubs[order[3]]};
     size_t Narr[4] = {N,N,N,N};
-    double beta = 10.0;
+    double beta = 0.0;
 
     double lbu[2] = {-15.0*M_PI/180.0, -1.0};
     double ubu[2] = {15.0*M_PI/180.0, 1.0};
@@ -288,15 +291,15 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-7);
-    approx_args_set_round_tol(aargs,1e-3);
+    approx_args_set_cross_tol(aargs,1e-5);
+    approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_adapt(aargs,1);
     approx_args_set_kickrank(aargs,5);
     /* approx_args_set_startrank(aargs,10); */
     /* approx_args_set_maxrank(aargs,40); */
 
-    approx_args_set_startrank(aargs,45);
-    approx_args_set_maxrank(aargs,45);
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,35);
 
 
     // setup problem
@@ -313,7 +316,7 @@ int main(int argc, char * argv[])
     c3control_set_external_boundary(c3c,(size_t)order[3],"reflect");
 
     // goal region
-    double w = 1.0;
+    double w = 0.5;
     double center[4] = {0.0, 0.0, 0.0, 0.0};
     center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0;
     
@@ -351,7 +354,7 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     size_t maxiter_vi = niter;
     double abs_conv_vi = 1e-3;
-    size_t maxiter_pi = 5;
+    size_t maxiter_pi = 10;
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256];
@@ -389,27 +392,18 @@ int main(int argc, char * argv[])
     struct Integrator * ode_sys =
         integrator_create_controlled(4,2,f1,NULL,c3control_controller,c3c);
     integrator_set_type(ode_sys,odename);
-    /* integrator_set_adaptive_opts(ode_sys,1e-5,1e-2,1e-7); */
     integrator_set_dt(ode_sys,1e-3);
     integrator_set_verbose(ode_sys,0);
 //    printf("initialized integrator\n");
 
     double time = 0.0;
-    /* double state_st[4] = {1.0, 1.0, -3.0 * M_PI / 4.0, 3.0}; */
-    /* double state_st[4] = {1.0, 1.0, 3.0*M_PI/4.0, 3.0};   */
-    /* double state_st[4] = {-2.0, 3.0, -3.0 * M_PI / 4.0, 3.0}; */
-    /* double state_st[4] = {-1.0, -1.0, M_PI+0.2 , 3.0}; */
-    double state_st[4] = {1.0, 0.0,  M_PI / 4.0, 3.0};
+    double state_st[4] = {-1.0, 0.0,  3.0*M_PI / 4.0, 3.0};
     double con[2] = {0.0, 0.0};
-
     double state[4] = {state_st[order[0]], state_st[order[1]], state_st[order[2]],
                        state_st[order[3]]};
     
     struct Trajectory * traj = NULL;
-    printf("add trajectory\n");
     trajectory_add(&traj,4,2,time,state,con);
-    printf("initialized trajectory\n");
-
 
     double dt = 1e-2;
     double final_time = 4e0;
@@ -417,26 +411,99 @@ int main(int argc, char * argv[])
     while (time < final_time){
         /* printf("time = %G\n",time); */
         res = trajectory_step(traj,ode_sys,dt);
+        double * ls = trajectory_get_last_state(traj);
+        if ((fabs(ls[0]) < w/2.0) && (fabs(ls[1]) < w/2.0) ){
+            break;
+        }
         if (res != 0){
             break;
         }
-//        assert(res == 0);
         time = time + dt;
     }
-
     if (verbose == 1){
         trajectory_print(traj,stdout,4);
     }
-    
+
     sprintf(filename,"%s/%s.dat",dirout,"traj");
     FILE * fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
     fclose(fp);
-    integrator_destroy(ode_sys); ode_sys = NULL;
     trajectory_free(traj); traj = NULL;
 
+    time = 0.0;
+    state_st[0] = 3.0;
+    state_st[1] = 2.0;
+    state_st[2] = -M_PI / 2.0;
+    state_st[3] = 3.0;
     
+    con[0] = 0.0;
+    con[1] = 0.0;
+    for (size_t ii = 0; ii < 4; ii++){
+        state[ii] = state_st[order[ii]];
+    }
+    traj = NULL;
+    trajectory_add(&traj,4,2,time,state,con);
+
+    while (time < final_time){
+        res = trajectory_step(traj,ode_sys,dt);
+        double * ls = trajectory_get_last_state(traj);
+        if ((fabs(ls[0]) < w/2.0) && (fabs(ls[1]) < w/2.0) ){
+            break;
+        }
+        if (res != 0){
+            break;
+        }
+        time = time + dt;
+    }
+    if (verbose == 1){
+        trajectory_print(traj,stdout,4);
+    }
+
+    sprintf(filename,"%s/%s.dat",dirout,"traj2");
+    fp = fopen(filename,"w");
+    assert (fp != NULL);
+    trajectory_print(traj,fp,4);
+    fclose(fp);
+    trajectory_free(traj); traj = NULL;
+
+    time = 0.0;
+    state_st[0] = -3.0;
+    state_st[1] = -1.0;
+    state_st[2] = 0.3;
+    state_st[3] = 3.0;
+    
+    con[0] = 0.0;
+    con[1] = 0.0;
+    for (size_t ii = 0; ii < 4; ii++){
+        state[ii] = state_st[order[ii]];
+    }
+    traj = NULL;
+    trajectory_add(&traj,4,2,time,state,con);
+
+    while (time < final_time){
+        res = trajectory_step(traj,ode_sys,dt);
+        double * ls = trajectory_get_last_state(traj);
+        if ((fabs(ls[0]) < w/2.0) && (fabs(ls[1]) < w/2.0) ){
+            break;
+        }
+        if (res != 0){
+            break;
+        }
+        time = time + dt;
+    }
+    if (verbose == 1){
+        trajectory_print(traj,stdout,4);
+    }
+
+    sprintf(filename,"%s/%s.dat",dirout,"traj3");
+    fp = fopen(filename,"w");
+    assert (fp != NULL);
+    trajectory_print(traj,fp,4);
+    fclose(fp);
+    trajectory_free(traj); traj = NULL;
+
+    integrator_destroy(ode_sys); ode_sys = NULL;    
     valuef_destroy(cost); cost = NULL;
     c3control_destroy(c3c); c3c = NULL;
     diag_destroy(&diag); diag = NULL;
