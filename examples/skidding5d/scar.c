@@ -120,9 +120,9 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 5*5; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e0;
+    double vpos = 1e-1;
     double vorient = 1e-1;
-    double vspeed = 1e0;
+    double vspeed = 1e-1;
 
     out[0] = vpos;
     out[6] = vpos;
@@ -161,7 +161,7 @@ int boundcost(double t, const double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 1e1;
+    *out = 1e5;
     return 0;
 }
 
@@ -274,8 +274,8 @@ int main(int argc, char * argv[])
     size_t du = 1;
 
     // lower and upper bounds of standard ordering
-    double lbs[5] = {-40.0, -40.0, -M_PI, -10.0*M_PI,  -100.0};
-    double ubs[5] = {40.0, 40.0, M_PI, 10.0*M_PI,  100.0};
+    double lbs[5] = {-40.0, -40.0, -M_PI, -10.0*M_PI,  -20.0};
+    double ubs[5] = {40.0, 40.0, M_PI, 10.0*M_PI,  20.0};
     
     double lb[5] = {lbs[order[0]],lbs[order[1]],lbs[order[2]],lbs[order[3]],lbs[order[4]]};
     double ub[5] = {ubs[order[0]],ubs[order[1]],ubs[order[2]],ubs[order[3]],ubs[order[4]]};
@@ -288,7 +288,7 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    size_t dopts = 20;
+    size_t dopts = 41;
     double * uopts = linspace(lbu[0],ubu[0],dopts);
     c3opt_set_brute_force_vals(opt,dopts,uopts);
 
@@ -302,12 +302,12 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-4);
-    approx_args_set_round_tol(aargs,1e-3);
+    approx_args_set_cross_tol(aargs,1e-6);
+    approx_args_set_round_tol(aargs,1e-6);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_kickrank(aargs,10);
-    approx_args_set_startrank(aargs,30);
-    approx_args_set_maxrank(aargs,30);
+    approx_args_set_kickrank(aargs,40);
+    approx_args_set_startrank(aargs,20);
+    approx_args_set_maxrank(aargs,60);
 
 
     // setup problem
@@ -318,11 +318,11 @@ int main(int argc, char * argv[])
     c3control_add_boundcost(c3c,boundcost);
     c3control_add_obscost(c3c,ocost);
 
-    /* c3control_set_external_boundary(c3c,(size_t)order[0],"reflect"); */
-    /* c3control_set_external_boundary(c3c,(size_t)order[1],"reflect"); */
+    c3control_set_external_boundary(c3c,(size_t)order[0],"reflect");
+    c3control_set_external_boundary(c3c,(size_t)order[1],"reflect");
     c3control_set_external_boundary(c3c,(size_t)order[2],"periodic");
     c3control_set_external_boundary(c3c,(size_t)order[3],"reflect");
-    /* c3control_set_external_boundary(c3c,(size_t)order[4],"reflect"); */
+    c3control_set_external_boundary(c3c,(size_t)order[4],"reflect");
 
     // possible obstacle
     double w = 10.0;
@@ -400,8 +400,11 @@ int main(int argc, char * argv[])
     /* double state_st[5] = {30.0, 3.0, -M_PI / 2.0, 0.0, 3.0}; */
     /* double state_st[5] = {30.0, 30.0, - M_PI / 1.5, 0.0, 0.0}; */
 
-    double state_st[5] = {30.0, 30.0, - 3*M_PI / 4.0, 0.0, 0.0};
-    /* double state_st[5] = {10.0, 20.0, 3.0*M_PI / 4.0, 0.0, 0.0}; */
+    /* double state_st[5] = {30.0, 30.0, - 3*M_PI / 4.0, 0.0, 0.0}; */
+    /* double state_st[5] = {10.0, 20.0, M_PI, 0.0, 0.0}; */
+
+    double state_st[5] = {10.0, 20.0, 3.0*M_PI/4.0, 0.0, 0.0}; // doesnt work
+    /* double state_st[5] = {-30.0, 20.0, -M_PI/3.0, 0.0, 0.0}; */
     double con[1] = {0.0};
 
     double state[5] = {state_st[order[0]], state_st[order[1]], state_st[order[2]],
@@ -414,7 +417,7 @@ int main(int argc, char * argv[])
 
 
     double dt = 1e-3;
-    double final_time = 2e0;
+    double final_time = 1.5;
     int res;
     while (time < final_time){
         /* printf("time = %G\n",time); */

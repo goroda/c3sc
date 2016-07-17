@@ -293,8 +293,9 @@ int main(int argc, char * argv[])
     approx_args_set_cross_tol(aargs,1e-5);
     approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,5);
-    approx_args_set_maxrank(aargs,15);
-    approx_args_set_startrank(aargs,15);
+
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,35);
 
 
     // setup problem
@@ -326,7 +327,8 @@ int main(int argc, char * argv[])
     size_t maxiter_pi = 10;
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
-    char filename_diag[256] = "diagnostic.dat";
+    char filename_diag[256]; 
+    sprintf(filename_diag,"%s/%s",dirout,"diagnostic.dat");
 
     printf("\n\n\n\n\n\n\n\n\n\n");
     printf("Start Solver Iterations\n");

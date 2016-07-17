@@ -366,8 +366,12 @@ int main(int argc, char * argv[])
     printf("\n\n\nmaxiter_vi = %zu\\n\n", maxiter_vi);
     for (size_t ii = 0; ii < maxiter_vi; ii++){
         printf("\n\n\n\n\n\n\n");
+
+        // comment the next call and uncomment the copy for pure VI
         struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
                                                   cost,aargs,opt,verbose,&diag);
+
+        /* struct ValueF * next = valuef_copy(cost); */
 
         valuef_destroy(cost); cost = NULL;
         cost = c3control_vi_solve(c3c,1,abs_conv_vi,next,aargs,opt,verbose,&diag);
