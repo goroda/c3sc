@@ -126,7 +126,7 @@ int stagecost(double t,const double * x,const double * u, double * out,
     (void)(x);
 
     *out = 0.0;
-    *out = 1.0;// + pow(x[order[0]],2) + pow(x[order[1]],2);
+    *out = 1.0 + pow(x[order[0]],2) + pow(x[order[1]],2);
     (void)(u);
     
     if (grad!= NULL){
@@ -298,8 +298,8 @@ int main(int argc, char * argv[])
     /* approx_args_set_startrank(aargs,10); */
     /* approx_args_set_maxrank(aargs,40); */
 
-    approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,35);
+    approx_args_set_startrank(aargs,20);
+    approx_args_set_maxrank(aargs,20);
 
 
     // setup problem
@@ -316,7 +316,7 @@ int main(int argc, char * argv[])
     c3control_set_external_boundary(c3c,(size_t)order[3],"reflect");
 
     // goal region
-    double w = 0.5;
+    double w = 1.0;
     double center[4] = {0.0, 0.0, 0.0, 0.0};
     center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0;
     
@@ -386,6 +386,7 @@ int main(int argc, char * argv[])
 
     c3control_add_policy_sim(c3c,cost,opt,state_transform);
 
+    printf("start simulation\n");
 /* //    printf("created policy\n"); */
     /* char odename[256] = "rk4"; */
     char odename[256] = "forward-euler";

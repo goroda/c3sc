@@ -9,6 +9,9 @@
 #include "cdyn/src/simulate.h"
 #include "cdyn/src/integrate.h"
 
+#include "nodeutil.h"
+#include "valuefunc.h"
+#include "bellman.h"
 #include "c3sc.h"
 
 static char * program_name;
@@ -64,7 +67,7 @@ int f1(double t, const double * x, const double * u, double * out,
     double ub[7] = {0.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
 
     if ((x[0] < lb[0]) || (x[0] > ub[0]) ){
-        printf(" state[0] out of bounds, %G\n",x[0]);
+        /* printf(" state[0] out of bounds, %G\n",x[0]); */
         /* return 1; */
     }
     if ((x[1] < lb[1]) || (x[1] > ub[1]) ){
@@ -72,20 +75,20 @@ int f1(double t, const double * x, const double * u, double * out,
         /* return 1; */
     }
     if ((x[2] < lb[2]) || (x[2] > ub[2]) ){
-        printf(" state[2] out of bounds, %G\n",x[2]);
-        dprint(6,(double *)x);
+        /* printf(" state[2] out of bounds, %G\n",x[2]); */
+        /* dprint(7,(double *)x); */
         /* return 1; */
     }
     if ((x[3] < lb[3]) || (x[3] > ub[3]) ){
-        printf(" state[3] out of bounds, %G\n",x[3]);
+        /* printf(" state[3] out of bounds, %G\n",x[3]); */
         /* return 1; */
     }
     if ((x[4] < lb[4]) || (x[4] > ub[4]) ){
-        printf(" state[4] out of bounds, %G\n",x[4]);
+        /* printf(" state[4] out of bounds, %G\n",x[4]); */
         /* return 1; */
     }
     if ((x[5] < lb[5]) || (x[5] > ub[5]) ){
-        printf(" state[5] out of bounds, %G\n",x[5]);
+        /* printf(" state[5] out of bounds, %G\n",x[5]); */
         /* return 1; */
     }
     if ((x[6] < lb[6]) || (x[6] > ub[6]) ){
@@ -187,8 +190,8 @@ int stagecost(double t,const double * x,const double * u, double * out,
     // states
     *out += 20.0 * x[0]*x[0];
     *out += 50.0 * x[1]*x[1];
-    /* *out += 10.0 * x[2]*x[2]; // original */
-    *out +=  1.0 * x[2]*x[2]; 
+    *out += 10.0 * x[2]*x[2]; // original
+    /* *out +=  1.0 * x[2]*x[2];  */
     *out +=  1.0 * x[3]*x[3];
     *out +=  1.0 * x[4]*x[4];
     *out +=  1.0 * x[5]*x[5];
@@ -209,32 +212,38 @@ int boundcost(double t,const double * x, double * out)
     (void)(t);
     *out = 0.0;
     *out += 600.0    * x[0]*x[0]; // original
+    /* *out += 400 * x[0]*x[0]; */
     /* *out += 400.0    * x[0]*x[0]; */
-    *out += 400.0    * x[1]*x[1];// original
+    *out += 400.0 * x[1]*x[1];// original
+    *out += 300.0 * x[1] * x[1]; //addition
     /* *out += 800.0    * x[1]*x[1]; */
     *out += 1.0/9.0  * x[2]*x[2];
     *out += 1.0/9.0  * x[3]*x[3];
     *out +=  1.0     * x[4]*x[4]; // original
     /* *out +=  100.0     * x[4]*x[4]; */
-    *out +=  1.0     * x[5]*x[5]; // original
+    *out +=  1.0     * (x[5]+1.5)*(x[5]+1.5); // original 
+    *out +=  100.0     * (x[5]+1.5)*(x[5]+1.5); // original 
     *out += 1.0/9.0  * (x[6]+0.5)*(x[6]+0.5);
     
     return 0;
 }
 
-double startcost(const double * x, void * args)
+int startcost(size_t N, const double * xin, double * out, void * args)
 {
     (void)(args);
-    
-    double out = 0.0;
-    out += 600.0    * x[0]*x[0];
-    out += 400.0    * x[1]*x[1];
-    out += 1.0/9.0  * x[2]*x[2];
-    out += 1.0/9.0  * x[3]*x[3];
-    out +=  1.0     * x[4]*x[4];
-    out +=  1.0     * x[5]*x[5];
-    out += 1.0/9.0  * x[6]*x[6];
-    return out;
+    for (size_t ii = 0; ii < N; ii++){
+        double x[7] = {xin[ii*7+0],xin[ii*7+1],xin[ii*7+2],xin[ii*6+3],
+                       xin[ii*7+4],xin[ii*7+5],xin[ii*7+6]};
+        out[ii] = 0.0;
+        out[ii] += 600.0    * x[0]*x[0];
+        out[ii] += 400.0    * x[1]*x[1];
+        out[ii] += 1.0/9.0  * x[2]*x[2];
+        out[ii] += 1.0/9.0  * x[3]*x[3];
+        out[ii] +=  1.0     * x[4]*x[4];
+        out[ii] +=  1.0     * x[5]*x[5];
+        out[ii] += 1.0/9.0  * x[6]*x[6];
+    }
+    return 0.0;
 }
 
 int main(int argc, char * argv[])
@@ -288,6 +297,7 @@ int main(int argc, char * argv[])
     double lb[7] = {-4.0, -1.0, -M_PI/2.0, -2.0*M_PI/9.0, 0.0, -5.0, -10.0};
     double ub[7] = {0.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
     size_t Narr[7] = {N, N, N, N, N, N, N};
+    double beta = 1.0;
 
     /* struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du); */
     /* size_t nopts = 5; */
@@ -301,7 +311,7 @@ int main(int argc, char * argv[])
     c3opt_add_ub(opt,ubu);
     c3opt_set_absxtol(opt,1e-10);
     c3opt_set_relftol(opt,1e-10);
-    c3opt_set_gtol(opt,1e-10);
+    c3opt_set_gtol(opt,1e-30);
     
     c3opt_ls_set_maxiter(opt,10);
     c3opt_ls_set_alpha(opt,0.3);
@@ -310,91 +320,85 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_cross_tol(aargs,1e-5);
+    approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,10);
-    approx_args_set_maxrank(aargs,5);
+    approx_args_set_adapt(aargs,1);
+
     approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,5);
 
-    double beta = 1.0;
-
-    /* double * xt = linspace(lb[4],ub[4],N); */
-    /* dprint(N,xt); */
-    /* free(xt); */
-    //exit(1);
     // setup problem
-    c3sc sc = c3sc_create(IH,dx,du,dw);
-    c3sc_set_state_bounds(sc,lb,ub);
-    /* for (size_t ii = 0; ii < dx; ii++){ */
-    /*     c3sc_set_external_boundary(sc,ii,"reflect"); */
-    /* } */
-    c3sc_add_dynamics(sc,f1,NULL,s1,NULL);
-    c3sc_init_mca(sc,Narr);
-    c3sc_attach_opt(sc,opt);
-    c3sc_init_dp(sc,beta,stagecost,boundcost,NULL);
-    int load_success = c3sc_cost_load(sc,"saved_cost.dat");
-    if (load_success != 0){
-        c3sc_cost_approx(sc,startcost,NULL,0,aargs);
-    }
+    struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,Narr,beta);
+    c3control_add_drift(c3c,f1,NULL);
+    c3control_add_diff(c3c,s1,NULL);
+    c3control_add_stagecost(c3c,stagecost);
+    c3control_add_boundcost(c3c,boundcost);
 
-    double solve_tol = 1e-5;
-    size_t npol = 5;
+    /* c3control_set_external_boundary(c3c,0,"reflect"); */
+    /* c3control_set_external_boundary(c3c,1,"reflect"); */
+    /* c3control_set_external_boundary(c3c,2,"periodic"); */
+    /* c3control_set_external_boundary(c3c,3,"reflect"); */
+    /* c3control_set_external_boundary(c3c,4,"reflect"); */
+    /* c3control_set_external_boundary(c3c,5,"reflect"); */
+    /* c3control_set_external_boundary(c3c,6,"reflect"); */
 
-    struct C3SCDiagnostic * diag = c3sc_diagnostic_init();
     char filename[256];
-    FILE *fp;//, *fp2;
+    sprintf(filename,"%s/%s.c3",dirout,"cost");
+    double ** xgrid = c3control_get_xgrid(c3c);
+    struct ValueF * cost = valuef_load(filename,Narr,xgrid);
+    if (cost == NULL){
+        cost = c3control_init_value(c3c,startcost,NULL,aargs,0);
+    }
 
     printf("\n\n\n\n\n\n\n");
     printf("Start Solver Iterations\n");
     printf("\n\n\n\n\n\n\n\n");
-    for (size_t ii = 0; ii < niter; ii++){
+    size_t maxiter_vi = niter;
+    double abs_conv_vi = 1e-3;
+    size_t maxiter_pi = 10;
+    double abs_conv_pi = 1e-2;
+    struct Diag * diag = NULL;
+    char filename_diag[256];
+    sprintf(filename_diag,"%s/%s.dat",dirout,"diagnostic");
+    printf("filename = %s\n",filename_diag);
 
-        if (ii > 3){
-            c3sc_pol_solve(sc,npol,solve_tol,verbose,aargs);
-        }
-        double diff = c3sc_iter_vi(sc,verbose,aargs,diag);
+    for (size_t ii = 0; ii < maxiter_vi; ii++){
 
-        struct Cost * cost = c3sc_get_cost(sc);
-        int saved = cost_save(cost,"saved_cost.dat");
+        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
+                                                  cost,aargs,opt,verbose,&diag);
+
+        valuef_destroy(cost); cost = NULL;
+        cost = c3control_vi_solve(c3c,1,abs_conv_vi,next,aargs,opt,verbose,&diag);
+        valuef_destroy(next); next = NULL;
+
+        sprintf(filename,"%s/%s.c3",dirout,"cost");
+        int saved = valuef_save(cost,filename);
         assert (saved == 0);
 
-        size_t * ranks = cost_get_ranks(cost);
-        double normval = cost_norm2(cost);
+        saved = diag_save(diag,filename_diag);
+        assert (saved == 0);
+
+        size_t * ranks = valuef_get_ranks(cost);
         if (verbose != 0){
-            printf("ii=%zu diff=%G,norm=%G ranks=",ii,diff,normval);
-            iprint_sz(8,ranks);
+            printf("ii=%zu ranks=",ii);
+            iprint_sz(dx+1,ranks);
         }
-        sprintf(filename,"%s/%s.dat",dirout,"diagnostic");
-        int dres = c3sc_diagnostic_save(diag,filename,4);
-        assert (dres == 0);
-        if (diff < 1e-2){
-            break;
-        }
+
     }
-    /* exit(1); */
-    struct Cost * cost = c3sc_get_cost(sc);
-    int saved = cost_save(cost,"saved_cost.dat");
-    assert (saved == 0);
-    /* exit(1); */
 
-    /* sprintf(filename,"%s/%s.dat",dirout,"diagnostic"); */
-    /* int dres = c3sc_diagnostic_save(diag,filename,4); */
-    /* assert (dres == 0); */
+    printf("beginning simulations\n");
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
 
-    struct ImplicitPolicy * pol = c3sc_create_implicit_policy(sc);
-//    printf("created policy\n");
-    /* char odename[256] = "rkf45"; */
     char odename[256] = "forward-euler";
     struct Integrator * ode_sys =
-        integrator_create_controlled(7,1,f1,NULL,implicit_policy_controller,pol);
+        integrator_create_controlled(7,1,f1,NULL,c3control_controller,c3c);
     integrator_set_type(ode_sys,odename);
-    /* integrator_set_adaptive_opts(ode_sys,1e-5,1e-2,1e-7); */
     integrator_set_dt(ode_sys,1e-4);
     integrator_set_verbose(ode_sys,0);
-//    printf("initialized integrator\n");
 
     double time = 0.0;
-    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
+    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.5, 0.0, 0.0};
     /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     /* double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     double con[1] = {0.0};
@@ -403,31 +407,36 @@ int main(int argc, char * argv[])
     trajectory_add(&traj,7,1,time,state,con);
     printf("initialized trajectory\n");
     /* double final_time = 2.5; */
-    double final_time = 0.5;
+    double final_time = 1.2;
     double dt = 1e-2;
     int res;
     while (time < final_time){
         /* printf("time = %G\n",time); */
         res = trajectory_step(traj,ode_sys,dt);
+        double * ls = trajectory_get_last_state(traj);
+        if ( (ls[0] > 0.05) || (fabs(ls[1]) > 1)){
+            break;
+        }
         if (res != 0){
             break;
         }
 //        assert(res == 0);
         time = time + dt;
     }
-    /* if (verbose == 1){ */
-    /*     trajectory_print(traj,stdout,10); */
-    /* } */
+    if (verbose == 1){
+        trajectory_print(traj,stdout,4);
+    }
     sprintf(filename,"%s/%s.dat",dirout,"traj");
-    fp = fopen(filename,"w");
+    FILE * fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
     fclose(fp);
     
-    printf("cost ranks are ");
-    size_t * ranks = cost_get_ranks(cost);
-    iprint_sz(dx+1,ranks);
-
-    c3sc_destroy(sc);
+    integrator_destroy(ode_sys); ode_sys = NULL;    
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
+    diag_destroy(&diag); diag = NULL;
+    c3opt_free(opt); opt = NULL;
+    approx_args_free(aargs); aargs = NULL;
     return 0;
 }
