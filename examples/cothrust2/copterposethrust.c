@@ -483,7 +483,7 @@ int main(int argc, char * argv[])
     trajectory_add(&traj,6,3,time,ss,con);
     printf("initialized trajectory\n");
 
-    double final_time = 1.8e0;
+    double final_time = 1.9e0;
     double dt = 1e-3;
     int res;
     while (time < final_time){

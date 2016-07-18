@@ -506,9 +506,13 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
 
     // first do zero;
     /* valtemp = bellman_control(du,ucurr,NULL,arg); */
-    c3opt_minimize(opt,ucurr,&valtemp);
+    /* c3opt_minimize(opt,ucurr,&valtemp); */
+    /* minval = valtemp; */
+    /* memmove(umin,ucurr,du*sizeof(double)); */
+
+    c3opt_minimize(opt,u,&valtemp);
     minval = valtemp;
-    memmove(umin,ucurr,du*sizeof(double));
+    memmove(umin,u,du*sizeof(double));
     
 
     if (justrand == 1){
@@ -576,8 +580,10 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             pts1 = NULL; pts2 = NULL;
         }
         else if (du == 3){
-            nrand = 2;
-            npert = 1;
+            nrand = 2; // 2
+            npert = 2; // 1
+            /* nrand = 2; */
+            /* npert = 1; */
             double ut[3];
             for (size_t ii = 0; ii < 2; ii++){
                 double distx = (ubu[0]-lbu[0])/4.0;
@@ -1183,6 +1189,7 @@ struct C3Control
     struct ValueF * policy_sim;
     struct c3Opt * opt_sim;
     void (*transform_sim)(size_t,const double*,double*);
+    double * prevpol;
 };
 
 struct C3Control *
@@ -1215,6 +1222,7 @@ c3control_create(size_t dx, size_t du, size_t dw,
     c3c->policy_sim = NULL;
     c3c->opt_sim = NULL;
     c3c->transform_sim = NULL;
+    c3c->prevpol = NULL;
     return c3c;
 }
 
@@ -1227,6 +1235,7 @@ void c3control_destroy(struct C3Control * c3c)
         for (size_t ii = 0; ii < c3c->dx; ii++){
             free(c3c->xgrid[ii]); c3c->xgrid[ii] = NULL;
         }
+        free(c3c->prevpol); c3c->prevpol = NULL;
         free(c3c->xgrid); c3c->xgrid = NULL;
         free(c3c->h);     c3c->h     = NULL;
         free(c3c); c3c = NULL;
@@ -1351,14 +1360,21 @@ int c3control_policy_eval(struct C3Control * c3c, double t,
     /* } */
 
     assert (res == 0);
+    if (c3c->prevpol == NULL){
+        c3c->prevpol = calloc_double(c3c->du);
+    }
+
     for (size_t ii = 0; ii < c3c->du; ii++){
-        u[ii] = 0.0;
+        u[ii] = c3c->prevpol[ii];
     }
     control_params_add_state_info(cp,t,x,absorbed,costs);
     int res2 = bellman_optimal(c3c->du,u,&val,cp);
     /* printf("val = %G u choose = ",val); dprint(c3c->du,u); */
     assert (res2 == 0);
     /* exit(1); */
+    for (size_t ii = 0; ii < c3c->du; ii++){
+        c3c->prevpol[ii] = u[ii];
+    }
 
 
     free(costs); costs = NULL;

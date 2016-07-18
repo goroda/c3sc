@@ -190,6 +190,7 @@ int stagecost(double t,const double * x,const double * u, double * out,
     // states
     *out += 20.0 * x[0]*x[0];
     *out += 50.0 * x[1]*x[1];
+    *out += -40.0 * x[1]*x[1];
     *out += 10.0 * x[2]*x[2]; // original
     /* *out +=  1.0 * x[2]*x[2];  */
     *out +=  1.0 * x[3]*x[3];
@@ -325,8 +326,8 @@ int main(int argc, char * argv[])
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
 
-    approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,5);
+    approx_args_set_startrank(aargs,10);
+    approx_args_set_maxrank(aargs,10);
 
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,Narr,beta);
