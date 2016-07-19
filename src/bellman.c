@@ -611,7 +611,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
                         }
                         c3opt_minimize(opt,ucurr,&valtemp);
                         /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
-                        if (valtemp < minval){
+                        double dd = 0.0; // sufficient decrease
+                        if (valtemp < (minval-dd)){
                             /* printf("\t updating current min!\n"); */
                             minval = valtemp;
                             memmove(umin,ucurr,du*sizeof(double));
@@ -629,7 +630,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
                                 }
                             }
                             c3opt_minimize(opt,ut,&valtemp);
-                            if (valtemp < minval){
+                            if (valtemp < (minval-dd)){
                                 /* printf("\t updating current min!\n"); */
                                 minval = valtemp;
                                 memmove(umin,ut,du*sizeof(double));

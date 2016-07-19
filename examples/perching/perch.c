@@ -97,7 +97,7 @@ int f1(double t, const double * x, const double * u, double * out,
     }
 
     // \vec{x} = [x, z, \theta, \phi, \dot{x}, \dot{z}, \dot{\theta}]
-    //    = [0, 1, 2,      3,    4,       5,       6]
+    //         = [0, 1, 2,      3,    4,       5,       6]
 
     double c_t = cos(x[2]);
     double c_tp = cos(x[2]+x[3]);
@@ -170,7 +170,7 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
         out[ii] = 0.0;
     }
     for (size_t ii = 0; ii < 7; ii++){
-        out[ii*7+ii] = 1e-1;
+        out[ii*7+ii] = 1e-9;
     }
     
     if (grad != NULL){
@@ -187,15 +187,28 @@ int stagecost(double t,const double * x,const double * u, double * out,
     (void)(t);
     *out = 0.0;
 
+    //*out += 10.0;
+
     // states
     *out += 20.0 * x[0]*x[0];
-    *out += 50.0 * x[1]*x[1];
-    *out += -40.0 * x[1]*x[1];
-    *out += 10.0 * x[2]*x[2]; // original
+    /* *out += 100 * x[0]*x[0]; */
+    *out += 50.0 * x[1]*x[1]; // original
+
+    /* *out += 50.0 * x[1]*x[1]; */
+
+
+    /* *out += 10.0 * x[2]*x[2]; // original */
     /* *out +=  1.0 * x[2]*x[2];  */
     *out +=  1.0 * x[3]*x[3];
-    *out +=  1.0 * x[4]*x[4];
+    *out +=  1.0 * x[4]*x[4]; // original
+
+    *out += 10.0 * x[4]*x[4];
+    //*out +=  4.0 * x[4]*x[4]; // addition
+
     *out +=  1.0 * x[5]*x[5];
+
+    *out += 5.0 * x[5]*x[5]; // addition
+
     *out +=  1.0 * x[6]*x[6];
 
     // control
@@ -216,14 +229,14 @@ int boundcost(double t,const double * x, double * out)
     /* *out += 400 * x[0]*x[0]; */
     /* *out += 400.0    * x[0]*x[0]; */
     *out += 400.0 * x[1]*x[1];// original
-    *out += 300.0 * x[1] * x[1]; //addition
+    /* *out += 600.0 * x[1] * x[1]; //addition */
     /* *out += 800.0    * x[1]*x[1]; */
     *out += 1.0/9.0  * x[2]*x[2];
     *out += 1.0/9.0  * x[3]*x[3];
     *out +=  1.0     * x[4]*x[4]; // original
     /* *out +=  100.0     * x[4]*x[4]; */
     *out +=  1.0     * (x[5]+1.5)*(x[5]+1.5); // original 
-    *out +=  100.0     * (x[5]+1.5)*(x[5]+1.5); // original 
+    /* *out +=  100.0     * (x[5]+1.5)*(x[5]+1.5); // original  */
     *out += 1.0/9.0  * (x[6]+0.5)*(x[6]+0.5);
     
     return 0;
@@ -245,6 +258,17 @@ int startcost(size_t N, const double * xin, double * out, void * args)
         out[ii] += 1.0/9.0  * x[6]*x[6];
     }
     return 0.0;
+}
+
+static int inobs;
+int ocost(const double * x,double * out)
+{
+    /* dprint(6,x); */
+    /* printf("here\n"); */
+    (void)(x);
+    inobs = 1;
+    *out = 0.0;
+    return 0;
 }
 
 int main(int argc, char * argv[])
@@ -298,25 +322,27 @@ int main(int argc, char * argv[])
     double lb[7] = {-4.0, -1.0, -M_PI/2.0, -2.0*M_PI/9.0, 0.0, -5.0, -10.0};
     double ub[7] = {0.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
     size_t Narr[7] = {N, N, N, N, N, N, N};
-    double beta = 1.0;
-
-    /* struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du); */
-    /* size_t nopts = 5; */
-    /* double * uopts = linspace(-2.0*M_PI,2.0*M_PI,nopts); */
-    /* c3opt_set_brute_force_vals(opt,nopts,uopts); */
+    double beta = 10.0;
 
     double lbu[1] = {-2.0*M_PI};
     double ubu[1] = {2.0*M_PI};
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-10);
-    c3opt_set_relftol(opt,1e-10);
-    c3opt_set_gtol(opt,1e-30);
+
+    size_t nopts = 40;
+    double * uopts = linspace(lbu[0],ubu[0],nopts);
+    c3opt_set_brute_force_vals(opt,nopts,uopts);
+
+    /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
+
+    /* c3opt_set_absxtol(opt,1e-10); */
+    /* c3opt_set_relftol(opt,1e-10); */
+    /* c3opt_set_gtol(opt,1e-30); */
     
-    c3opt_ls_set_maxiter(opt,10);
-    c3opt_ls_set_alpha(opt,0.3);
-    c3opt_ls_set_beta(opt,0.2);
+    /* c3opt_ls_set_maxiter(opt,10); */
+    /* c3opt_ls_set_alpha(opt,0.3); */
+    /* c3opt_ls_set_beta(opt,0.2); */
     c3opt_set_verbose(opt,0);
 
     // cross approximation tolerances
@@ -326,8 +352,8 @@ int main(int argc, char * argv[])
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
 
-    approx_args_set_startrank(aargs,10);
-    approx_args_set_maxrank(aargs,10);
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,20);
 
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,Narr,beta);
@@ -335,14 +361,28 @@ int main(int argc, char * argv[])
     c3control_add_diff(c3c,s1,NULL);
     c3control_add_stagecost(c3c,stagecost);
     c3control_add_boundcost(c3c,boundcost);
+    c3control_add_obscost(c3c,ocost);
+    
+    // x y aoa phi dx dy daoa
+    double center[7];
+    double width[7];
+    center[0] = 0.0; width[0] = 0.1;
+    center[1] = 0.0, width[1] = 0.1;
+    center[2] = 0.0; width[2] = ub[2]-lb[2];
+    center[3] = 0.0; width[3] = ub[3]-lb[3];
+    center[4] = 0.0; width[4] = 0.5;
+    center[5] = -2.0; width[5] = 0.5;
+    center[6] = 0.0; width[6] = ub[6] - lb[6];
 
-    /* c3control_set_external_boundary(c3c,0,"reflect"); */
-    /* c3control_set_external_boundary(c3c,1,"reflect"); */
-    /* c3control_set_external_boundary(c3c,2,"periodic"); */
-    /* c3control_set_external_boundary(c3c,3,"reflect"); */
-    /* c3control_set_external_boundary(c3c,4,"reflect"); */
-    /* c3control_set_external_boundary(c3c,5,"reflect"); */
-    /* c3control_set_external_boundary(c3c,6,"reflect"); */
+    c3control_add_obstacle(c3c,center,width);
+    
+    c3control_set_external_boundary(c3c,0,"reflect");
+    c3control_set_external_boundary(c3c,1,"reflect");
+    c3control_set_external_boundary(c3c,2,"reflect");
+    c3control_set_external_boundary(c3c,3,"reflect");
+    c3control_set_external_boundary(c3c,4,"reflect");
+    c3control_set_external_boundary(c3c,5,"reflect");
+    c3control_set_external_boundary(c3c,6,"reflect");
 
     char filename[256];
     sprintf(filename,"%s/%s.c3",dirout,"cost");
@@ -366,12 +406,15 @@ int main(int argc, char * argv[])
 
     for (size_t ii = 0; ii < maxiter_vi; ii++){
 
+        inobs = 0;
         struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
                                                   cost,aargs,opt,verbose,&diag);
-
+        //assert (inobs == 1);
+        inobs = 0;
         valuef_destroy(cost); cost = NULL;
         cost = c3control_vi_solve(c3c,1,abs_conv_vi,next,aargs,opt,verbose,&diag);
         valuef_destroy(next); next = NULL;
+        //assert (inobs == 1);
 
         sprintf(filename,"%s/%s.c3",dirout,"cost");
         int saved = valuef_save(cost,filename);
@@ -399,7 +442,7 @@ int main(int argc, char * argv[])
     integrator_set_verbose(ode_sys,0);
 
     double time = 0.0;
-    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.5, 0.0, 0.0};
+    double state[7] = {-2.5, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
     /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     /* double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     double con[1] = {0.0};
@@ -415,7 +458,7 @@ int main(int argc, char * argv[])
         /* printf("time = %G\n",time); */
         res = trajectory_step(traj,ode_sys,dt);
         double * ls = trajectory_get_last_state(traj);
-        if ( (ls[0] > 0.05) || (fabs(ls[1]) > 1)){
+        if ( (ls[0] > 0.1) || (fabs(ls[1]) > 1.0)){
             break;
         }
         if (res != 0){

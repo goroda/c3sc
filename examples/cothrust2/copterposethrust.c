@@ -183,6 +183,13 @@ int stagecost(double t,const double * x,const double * u, double * out,
     *out = *out + 8.0*pow(x[2],2.0);
     *out = *out + 6.0*pow(x[1],2.0);
     *out = *out + 8.0*pow(x[0],2.0);
+
+    // additions!
+    /* *out = *out + 100; */
+    /* *out = *out + 8.0*pow(x[2],2); */
+    /* *out = *out + 1.0*pow(x[3]-1.0,2.0); */
+    /* *out = *out + 1.0*pow(x[4],2.0); */
+    /* *out = *out + 1.0*pow(x[5],2.0); */
     
     if (grad!= NULL){
         grad[0] = 2.0 * wu1 * u[0];
@@ -350,13 +357,16 @@ int main(int argc, char * argv[])
     approx_args_set_round_tol(aargs,1e-5); //decrtease to e-6 at some point
     approx_args_set_kickrank(aargs,5);
 
+    // for thesis!!
     approx_args_set_startrank(aargs,10);
     approx_args_set_maxrank(aargs,10); //5 better since matches guess (?), 10 gives nice results
 
+    /* approx_args_set_startrank(aargs,5); */
+    /* approx_args_set_maxrank(aargs,5); //5 better since matches guess (?), 10 gives nice resu */
 
     double beta = 1.0;
 
-    /* double * xt = linspace(lb[4],ub[4],N); */
+    /* double * xt = linspace(lb[4],ub[4],N);
     /* dprint(N,xt); */
     /* free(xt); */
     //exit(1);
@@ -376,7 +386,8 @@ int main(int argc, char * argv[])
     }
     double center[6] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
     //double width[6] = {2,2,1,ub[3]-lb[3],ub[4]-lb[4],1};
-    double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.3, 0.3};
+    double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.4, 0.4};
+    /* double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.3, 0.3}; */
 
     double c[6];
     double w[6];
@@ -386,7 +397,7 @@ int main(int argc, char * argv[])
     }
 
     dprint(6,width);
-    c3control_add_obstacle(c3c,c,w);
+    /* c3control_add_obstacle(c3c,c,w); */
     
 
     char filename[256];
@@ -465,9 +476,9 @@ int main(int argc, char * argv[])
         //double state[6] = {-2.0, 0.005, 0.005, -0.005, -0.02, -0.0005};
 	//double state[6] = {-1.0, 0.1, 1.0, 0.0, 0.0, 0.0};
 
-	//double state[6] = {-1.0,2.0,1.0,-0.1,0.5,1.2};
-	double state[6] = {-3.0, -1.0, -0.5, 0.0, 0.0, 0.0}; 
-	// double state[6] = {-3.0, -0.5, 0.5, 0.0, 0.0, 0.0}; 
+	/* double state[6] = {-3.0,0.5,-1.0,-0.1,0.5,0.5}; */
+	/* double state[6] = {-3.0, -1.0, -0.5, 0.0, -0.1, 0.1}; */
+	double state[6] = {-3.5, -0.8, -0.5, 0.0, -1.0, 0.0};
         
     // these three work
     
@@ -489,6 +500,17 @@ int main(int argc, char * argv[])
     while (time < final_time){
         /* printf("time = %G\n",time); */
         res = trajectory_step(traj,ode_sys,dt);
+        double * ls = trajectory_get_last_state(traj);
+        if ((fabs(ls[0]) < width[0]/2.0) && 
+            (fabs(ls[1]) < width[1]/2.0) && 
+            (fabs(ls[2]) < width[2]/2.0) &&
+            (fabs(ls[3]-1.0) < width[3]/2) && 
+            (fabs(ls[4]) < width[4]/2.0) &&
+            (fabs(ls[5]) < width[5]/2.0))
+            
+        {
+            break;
+        }
         if (res != 0){
             break;
         }
