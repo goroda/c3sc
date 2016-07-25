@@ -81,8 +81,8 @@ int f1(double t, const double * x, const double * u, double * out,
     // derivative of ff
     double dff = cf;
 
-    out[order[0]] = s * co - 0.5*speed * so;
-    out[order[1]] = s * so + 0.5*speed * co;
+    out[order[0]] = s * co - speed * so;
+    out[order[1]] = s * so + speed * co;
     out[order[2]] = angvel;
     out[order[3]] = (a * ff - b * ft)/ I;
     out[order[4]] = -s * angvel + (ff + ft)/m;
@@ -119,9 +119,9 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     for (size_t ii = 0; ii < 5*5; ii++){
         out[ii] = 0.0;
     }
-    double vpos = 1e0;
-    double vorient = 1e-1;
-    double vspeed = 1e0;
+    double vpos = 1e-5;
+    double vorient = 1e-5;
+    double vspeed = 1e-5;
 
     out[0] = vpos;
     out[6] = vpos;
@@ -145,7 +145,8 @@ int stagecost(double t,const double * x,const double * u, double * out,
 
     *out = 0.0;
     /* *out = 10.0 + 10.0*pow(x[order[0]],2) + 10.0*pow(x[order[1]],2);// + 5.0*pow(x[order[4]],2); */
-    *out = 1.0 + 0.001*pow(x[order[0]],2) + 0.1*pow(x[order[1]],2) + 1e4*pow(x[order[3]],2) + 1e4*pow(x[order[4]],2);
+    *out = pow(x[order[0]],2) +pow(x[order[1]],2);
+    *out = *out + 1e1*pow(x[order[3]],2) + 1e4*pow(x[order[4]],2);
     (void)(u);
     
     if (grad!= NULL){
@@ -282,8 +283,8 @@ int main(int argc, char * argv[])
     size_t Narr[5] = {N,N,N,N,N};
     double beta = 1.0;
 
-    double lbu[1] = {-30.0*M_PI/180.0};//, -1.0};
-    double ubu[1] = {30.0*M_PI/180.0};//, 1.0};
+    double lbu[1] = {-60.0*M_PI/180.0};//, -1.0};
+    double ubu[1] = {60.0*M_PI/180.0};//, 1.0};
 
     struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
     c3opt_add_lb(opt,lbu);
@@ -326,18 +327,18 @@ int main(int argc, char * argv[])
 
     // possible obstacle
     double w = 20.0;
-    /* double center[5] = {0.0, 0.0, 0.0, 0.0,0.0}; */
-    /* center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0; */
-    /* center[order[4]] = (ubs[order[4]]+lbs[order[4]])/2.0; */
+    double center[5] = {0.0, 0.0, 0.0, 0.0,0.0};
+    center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0;
+    center[order[4]] = (ubs[order[4]]+lbs[order[4]])/2.0;
     
-    /* double width[5]; */
-    /* width[order[0]] = w; */
-    /* width[order[1]] = w; */
-    /* width[order[2]] = (ubs[order[2]] - lbs[order[2]]); */
-    /* width[order[3]] = (ubs[order[3]] - lbs[order[3]]); */
-    /* width[order[4]] = (ubs[order[4]] - lbs[order[4]]); */
+    double width[5];
+    width[order[0]] = w;
+    width[order[1]] = w;
+    width[order[2]] = (ubs[order[2]] - lbs[order[2]]);
+    width[order[3]] = (ubs[order[3]] - lbs[order[3]]);
+    width[order[4]] = (ubs[order[4]] - lbs[order[4]]);
     
-    /* c3control_add_obstacle(c3c,center,width); */
+    c3control_add_obstacle(c3c,center,width);
 
     char filename[256];
     sprintf(filename,"%s/%s.c3",dirout,"cost");

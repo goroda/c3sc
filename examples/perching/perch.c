@@ -353,7 +353,7 @@ int main(int argc, char * argv[])
     approx_args_set_adapt(aargs,1);
 
     approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,20);
+    approx_args_set_maxrank(aargs,10);
 
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,Narr,beta);
@@ -376,13 +376,13 @@ int main(int argc, char * argv[])
 
     c3control_add_obstacle(c3c,center,width);
     
-    c3control_set_external_boundary(c3c,0,"reflect");
-    c3control_set_external_boundary(c3c,1,"reflect");
-    c3control_set_external_boundary(c3c,2,"reflect");
-    c3control_set_external_boundary(c3c,3,"reflect");
-    c3control_set_external_boundary(c3c,4,"reflect");
-    c3control_set_external_boundary(c3c,5,"reflect");
-    c3control_set_external_boundary(c3c,6,"reflect");
+    /* c3control_set_external_boundary(c3c,0,"reflect"); */
+    /* c3control_set_external_boundary(c3c,1,"reflect"); */
+    /* c3control_set_external_boundary(c3c,2,"reflect"); */
+    /* c3control_set_external_boundary(c3c,3,"reflect"); */
+    /* c3control_set_external_boundary(c3c,4,"reflect"); */
+    /* c3control_set_external_boundary(c3c,5,"reflect"); */
+    /* c3control_set_external_boundary(c3c,6,"reflect"); */
 
     char filename[256];
     sprintf(filename,"%s/%s.c3",dirout,"cost");
@@ -442,8 +442,8 @@ int main(int argc, char * argv[])
     integrator_set_verbose(ode_sys,0);
 
     double time = 0.0;
-    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
-    /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 6.0, 0.0, 0.0}; */
+    /* double state[7] = {-3.5, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0}; */
+    double state[7] = {-3.0, 0.2, 0.0, 0.0, 4.5, 0.0, 0.0};
     /* double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     double con[1] = {0.0};
     struct Trajectory * traj = NULL;
