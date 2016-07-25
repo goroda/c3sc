@@ -104,7 +104,7 @@ int f1(double t, const double * xin, const double * u, double * out,
     double mg=m*g;
     
     double cphi = cos(u[1]);
-    double sphi = sin(u[1]);
+//    double sphi = sin(u[1]);
     double tphi = tan(u[1]);
     
     double cth = cos(u[2]);

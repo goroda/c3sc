@@ -218,7 +218,7 @@ int ocost(const double * x,double * out)
 int startcost(size_t N, const double * x, double * out, void * args)
 {
     (void)(args);
-
+    (void)(x);
     for (size_t ii = 0; ii < N; ii++){
         /* printf("ii = %zu, x = ",ii); dprint(2,x+ii); */
         out[ii] = 0.2;

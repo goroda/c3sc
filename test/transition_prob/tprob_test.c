@@ -2331,8 +2331,8 @@ void Test_bellman_c3control3d(CuTest * tc)
     /* struct ValueF * pol_cost = c3control_step_vi(c3c,pol_copy,aargs,opt); */
     /* struct ValueF * pol_cost = c3control_step_pi(c3c,pol_copy,pol,aargs,opt); */
 
-    size_t maxiter_vi = 10;
-    double abs_conv_vi = 1e-3;
+    /* size_t maxiter_vi = 10; */
+    /* double abs_conv_vi = 1e-3; */
     size_t maxiter_pi = 20;
     double abs_conv_pi = 1e-6;
     struct Diag * diag = NULL;

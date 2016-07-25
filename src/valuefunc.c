@@ -152,6 +152,44 @@ struct ValueF * valuef_load(char * filename, size_t * ngrid, double ** xgrid)
     return vf;
 }
 
+/**********************************************************//**
+    Save a value function in text format for portability
+**************************************************************/
+int valuef_savetxt(struct ValueF * vf, char * filename)
+{
+    assert (vf != NULL);
+    assert (vf->cost != NULL);
+    FILE * fp = fopen(filename,"w+");
+    assert (fp != NULL);
+    size_t prec = 21;
+    function_train_savetxt(vf->cost,fp,prec);
+    fclose(fp);
+    return 0;
+}
+
+/**********************************************************//**
+    Load a cost function that was saved in text format
+**************************************************************/
+struct ValueF * valuef_loadtxt(char * filename, size_t * ngrid, double ** xgrid)
+{
+
+    FILE * fp = fopen(filename,"r");
+    assert (fp != NULL);
+    struct FunctionTrain * cost = function_train_loadtxt(fp);
+    if (cost == NULL){
+        return NULL;
+    }
+    struct ValueF * vf = valuef_create(cost->dim);
+    memmove(vf->N, ngrid, cost->dim * sizeof(size_t));
+    
+    vf->cost = function_train_create_nodal(cost,ngrid,xgrid);
+    valuef_precompute_cores(vf);
+
+    function_train_free(cost); cost = NULL;
+    fclose(fp);
+    return vf;
+}
+
 
 /**********************************************************//**
     Get the value function ranks

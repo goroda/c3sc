@@ -366,7 +366,7 @@ int main(int argc, char * argv[])
 
     double beta = 1.0;
 
-    /* double * xt = linspace(lb[4],ub[4],N);
+    /* double * xt = linspace(lb[4],ub[4],N); */
     /* dprint(N,xt); */
     /* free(xt); */
     //exit(1);
@@ -384,19 +384,19 @@ int main(int argc, char * argv[])
         c3control_set_external_boundary(c3c,ii,"reflect");
         printf("(%3.14G,%3.14G)\n",lb[ii],ub[ii]);
     }
-    double center[6] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+    /* double center[6] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0}; */
     //double width[6] = {2,2,1,ub[3]-lb[3],ub[4]-lb[4],1};
     double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.4, 0.4};
     /* double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.3, 0.3}; */
 
-    double c[6];
-    double w[6];
-    for (size_t ii = 0; ii < 6; ii++){
-        c[order[ii]] = center[ii];
-        w[order[ii]] = width[ii];
-    }
+    /* double c[6]; */
+    /* double w[6]; */
+    /* for (size_t ii = 0; ii < 6; ii++){ */
+    /*     c[order[ii]] = center[ii]; */
+    /*     w[order[ii]] = width[ii]; */
+    /* } */
 
-    dprint(6,width);
+    /* dprint(6,width); */
     /* c3control_add_obstacle(c3c,c,w); */
     
 
@@ -545,8 +545,3 @@ int main(int argc, char * argv[])
     return 0;
 }
 
-//optim log
-/*
--y cheaper
--ychaper
-*/

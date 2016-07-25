@@ -207,7 +207,7 @@ int stagecost(double t,const double * x,const double * u, double * out,
 
     *out +=  1.0 * x[5]*x[5];
 
-    *out += 5.0 * x[5]*x[5]; // addition
+//    *out += 5.0 * x[5]*x[5]; // addition
 
     *out +=  1.0 * x[6]*x[6];
 
@@ -442,7 +442,7 @@ int main(int argc, char * argv[])
     integrator_set_verbose(ode_sys,0);
 
     double time = 0.0;
-    double state[7] = {-2.5, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
+    double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0};
     /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     /* double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0}; */
     double con[1] = {0.0};
