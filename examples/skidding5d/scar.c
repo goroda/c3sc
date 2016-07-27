@@ -145,8 +145,8 @@ int stagecost(double t,const double * x,const double * u, double * out,
 
     *out = 0.0;
     /* *out = 10.0 + 10.0*pow(x[order[0]],2) + 10.0*pow(x[order[1]],2);// + 5.0*pow(x[order[4]],2); */
-    *out = pow(x[order[0]],2) +pow(x[order[1]],2);
-    *out = *out + 1e1*pow(x[order[3]],2) + 1e4*pow(x[order[4]],2);
+    *out = 1.0 + 0.02 * pow(x[order[0]],2) + 0.02 * pow(x[order[1]],2);
+    *out = *out + pow(x[order[3]],2) + pow(x[order[4]],2);
     (void)(u);
     
     if (grad!= NULL){
@@ -161,7 +161,8 @@ int boundcost(double t, const double * x, double * out)
     /* printf("not here!!\n"); */
     (void)(t);
     *out = 0.0;
-    *out = 100.0*pow(x[order[0]],2) + 100.0*pow(x[order[1]],2) + 40*pow(x[order[3]],2) + 40*pow(x[order[3]],2);;
+    *out = 0.1 * pow(x[order[0]],2) + 0.1 * pow(x[order[1]],2);
+    *out = *out + 0.1 * pow(x[order[3]],2) + 0.1*pow(x[order[4]],2);;
     return 0;
 }
 
@@ -275,16 +276,16 @@ int main(int argc, char * argv[])
     size_t du = 1;
 
     // lower and upper bounds of standard ordering
-    double lbs[5] = {-100.0, -100.0, -M_PI, -10.0*M_PI,  -10.0};
-    double ubs[5] = {100.0, 100.0, M_PI, 10.0*M_PI,  10.0};
+    double lbs[5] = {-500.0, -500.0, -M_PI, -0.5,  -10.0};
+    double ubs[5] = {500.0, 500.0, M_PI, 0.5,  10.0};
     
     double lb[5] = {lbs[order[0]],lbs[order[1]],lbs[order[2]],lbs[order[3]],lbs[order[4]]};
     double ub[5] = {ubs[order[0]],ubs[order[1]],ubs[order[2]],ubs[order[3]],ubs[order[4]]};
     size_t Narr[5] = {N,N,N,N,N};
     double beta = 1.0;
 
-    double lbu[1] = {-60.0*M_PI/180.0};//, -1.0};
-    double ubu[1] = {60.0*M_PI/180.0};//, 1.0};
+    double lbu[1] = {-5.0*M_PI/180.0};//, -1.0};
+    double ubu[1] = {5.0*M_PI/180.0};//, 1.0};
 
     struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
     c3opt_add_lb(opt,lbu);
@@ -303,12 +304,12 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-5);
+    approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_adapt(aargs,1);
     approx_args_set_kickrank(aargs,10);
     approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,5);
+    approx_args_set_maxrank(aargs,15);
 
 
     // setup problem
@@ -322,11 +323,11 @@ int main(int argc, char * argv[])
     c3control_set_external_boundary(c3c,(size_t)order[0],"reflect");
     c3control_set_external_boundary(c3c,(size_t)order[1],"reflect");
     c3control_set_external_boundary(c3c,(size_t)order[2],"periodic");
-    c3control_set_external_boundary(c3c,(size_t)order[3],"reflect");
-    c3control_set_external_boundary(c3c,(size_t)order[4],"reflect");
+    /* c3control_set_external_boundary(c3c,(size_t)order[3],"reflect"); */
+    /* c3control_set_external_boundary(c3c,(size_t)order[4],"reflect"); */
 
     // possible obstacle
-    double w = 20.0;
+    double w = 40.0;
     double center[5] = {0.0, 0.0, 0.0, 0.0,0.0};
     center[order[3]] = (ubs[order[3]]+lbs[order[3]])/2.0;
     center[order[4]] = (ubs[order[4]]+lbs[order[4]])/2.0;
@@ -353,7 +354,7 @@ int main(int argc, char * argv[])
     printf("\n\n\n\n\n\n\n\n");
     size_t maxiter_vi = niter;
     double abs_conv_vi = 1e-3;
-    size_t maxiter_pi = 5;
+    size_t maxiter_pi = 40;
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256];
@@ -387,12 +388,12 @@ int main(int argc, char * argv[])
     c3control_add_policy_sim(c3c,cost,opt,state_transform);
 
 /* //    printf("created policy\n"); */
-    char odename[256] = "rk4";
-    /* char odename[256] = "forward-euler"; */
+    /* char odename[256] = "rk4"; */
+    char odename[256] = "forward-euler";
     struct Integrator * ode_sys =
-        integrator_create_controlled(5,1,f1,NULL,c3control_controller,c3c);
+        integrator_create_controlled(dx,du,f1,NULL,c3control_controller,c3c);
     integrator_set_type(ode_sys,odename);
-    integrator_set_dt(ode_sys,1e-4);
+    integrator_set_dt(ode_sys,1e-2);
     integrator_set_verbose(ode_sys,0);
 //    printf("initialized integrator\n");
 
@@ -409,9 +410,9 @@ int main(int argc, char * argv[])
 
     double time = 0.0;    
     struct Trajectory * traj = NULL;
-    trajectory_add(&traj,5,1,time,state,con);
-    double dt = 1e-3;
-    double final_time = 4.0;
+    trajectory_add(&traj,dx,du,time,state,con);
+    double dt = 1e-2;
+    double final_time = 4e0;
     int res;
     while (time < final_time){
         res = trajectory_step(traj,ode_sys,dt);

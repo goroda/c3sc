@@ -91,6 +91,7 @@ int f1(double t, const double * xin, const double * u, double * out,
     out[0] = x[5];
     out[1] = x[6];
     out[2] = x[7];
+
     out[3] = 1.0/tau * (u[1] - x[3]);
     out[4] = 1.0/tau * (u[2] - x[4]);
 
@@ -185,9 +186,9 @@ int stagecost(double t,const double * x,const double * u, double * out,
     *out = *out + 60.0 + wu1 * pow(u[0],2) + wu2 * pow(u[1],2) + wu3 * pow(u[2],2); //30 //40
 
     /* *out = *out + 8.0*pow(x[3]-1.0,2.0); */
-    *out = *out + 8.0*pow(x[2],2.0);
-    *out = *out + 6.0*pow(x[1],2.0);
-    *out = *out + 8.0*pow(x[0],2.0);
+    *out = *out + 1.0*pow(x[2],2.0);
+    *out = *out + 1.0*pow(x[1],2.0);
+    *out = *out + 1.0*pow(x[0],2.0);
     
     if (grad!= NULL){
         grad[0] = 2.0 * wu1 * u[0];
@@ -289,8 +290,6 @@ int main(int argc, char * argv[])
         ub[ii] = ubs[order[ii]];
     }
 
-
-
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     char datum[128];
@@ -321,7 +320,6 @@ int main(int argc, char * argv[])
 
     approx_args_set_startrank(aargs,5);
     approx_args_set_maxrank(aargs,10); //5 better since matches guess (?), 10 gives nice results
-
 
     double beta = 1.0;
 

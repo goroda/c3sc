@@ -197,12 +197,12 @@ int stagecost(double t,const double * x,const double * u, double * out,
     /* *out += 50.0 * x[1]*x[1]; */
 
 
-    /* *out += 10.0 * x[2]*x[2]; // original */
+    *out += 10.0 * x[2]*x[2]; // original
     /* *out +=  1.0 * x[2]*x[2];  */
     *out +=  1.0 * x[3]*x[3];
     *out +=  1.0 * x[4]*x[4]; // original
 
-    *out += 10.0 * x[4]*x[4];
+    /* *out += 10.0 * x[4]*x[4]; */
     //*out +=  4.0 * x[4]*x[4]; // addition
 
     *out +=  1.0 * x[5]*x[5];
@@ -232,6 +232,7 @@ int boundcost(double t,const double * x, double * out)
     /* *out += 600.0 * x[1] * x[1]; //addition */
     /* *out += 800.0    * x[1]*x[1]; */
     *out += 1.0/9.0  * x[2]*x[2];
+    *out += 5.0 * (x[2]-M_PI/2.0) * (x[2]-M_PI/2.0);
     *out += 1.0/9.0  * x[3]*x[3];
     *out +=  1.0     * x[4]*x[4]; // original
     /* *out +=  100.0     * x[4]*x[4]; */
@@ -322,7 +323,7 @@ int main(int argc, char * argv[])
     double lb[7] = {-4.0, -1.0, -M_PI/2.0, -2.0*M_PI/9.0, 0.0, -5.0, -10.0};
     double ub[7] = {0.0, 1.0, M_PI/2.0, 2.0*M_PI/9.0, 7.0, 5.0, 10.0};
     size_t Narr[7] = {N, N, N, N, N, N, N};
-    double beta = 10.0;
+    double beta = 1.0;
 
     double lbu[1] = {-2.0*M_PI};
     double ubu[1] = {2.0*M_PI};
@@ -347,8 +348,8 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-5);
-    approx_args_set_round_tol(aargs,1e-5);
+    approx_args_set_cross_tol(aargs,1e-10);
+    approx_args_set_round_tol(aargs,1e-10);
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
 
@@ -443,8 +444,8 @@ int main(int argc, char * argv[])
 
     double time = 0.0;
     /* double state[7] = {-3.5, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0}; */
-    double state[7] = {-3.0, 0.2, 0.0, 0.0, 4.5, 0.0, 0.0};
-    /* double state[7] = {-3.0, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0}; */
+    /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 4.5, 0.0, 0.0}; */
+    double state[7] = {-3.5, 0.0, 0.0, 0.0, 6.5, 0.0, 0.0};
     double con[1] = {0.0};
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");
