@@ -69,69 +69,6 @@ void print_cost(char * filename, struct ValueF * cost,
     fclose(fp2);
 }
 
-/* void print_policy(FILE * fp2, struct Policy *pol, size_t N1, size_t N2, */
-/*                   double * lb, double * ub) */
-/* { */
-
-/*     fprintf(fp2,"x y u1 u2\n"); */
-/*     double * xtest = linspace(lb[0],ub[0],N1); */
-/*     double * ytest = linspace(lb[1],ub[1],N2); */
-
-/*     double pt3[2]; */
-/*     for (size_t zz = 0; zz < N1; zz++){ */
-/*         for (size_t jj = 0; jj < N2; jj++){ */
-
-/*             pt3[0] = xtest[zz]; pt3[1] = ytest[jj]; */
-/*             /\* printf("\n\n\n\n\n\n"); *\/ */
-/*             /\* printf("pt = "); dprint(2,pt3); *\/ */
-/*             struct Control * u = NULL; */
-/*             policy_eval(pol,0.0,pt3,&u); */
-/* //            assert (res == 0); */
-/*             /\* printf("done computing policy\n"); *\/ */
-/*             fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
-/*                     xtest[zz],ytest[jj],u->u[0],0.0);//u->u[1]); */
-/*             control_free(u); */
-/*         } */
-/*         fprintf(fp2,"\n"); */
-/*     } */
-/*     free(xtest); xtest = NULL; */
-/*     free(ytest); ytest = NULL; */
-/* } */
-
-void print_policy_implict(FILE * fp2, struct ImplicitPolicy * pol,
-                          size_t N1, size_t N2,
-                          double * lb, double * ub)
-{
-    
-    fprintf(fp2,"x y u1 u2\n");
-    double * xtest = linspace(lb[0],ub[0],N1);
-    double * ytest = linspace(lb[1],ub[1],N2);
-
-    double pt3[2];
-//    double u[2];
-    double u[1];
-    for (size_t zz = 0; zz < N1; zz++){
-        for (size_t jj = 0; jj < N2; jj++){
-
-            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
-            /* printf("\n\n\n\n\n\n"); */
-            /* printf("pt = "); dprint(2,pt3); */
-
-            int res = implicit_policy_eval(pol,0.0,pt3,u);
-            assert (res >-1);
-            /* printf("done computing policy\n"); */
-            /* fprintf(fp2, "%3.5f %3.5f %3.5f %3.5f\n", */
-            /*         xtest[zz],ytest[jj],u[0],u[1]); */
-            fprintf(fp2, "%3.5f %3.5f %3.5f\n",
-                    xtest[zz],ytest[jj],u[0]);
-
-        }
-        fprintf(fp2,"\n");
-    }
-    free(xtest); xtest = NULL;
-    free(ytest); ytest = NULL;
-}
-
 int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
 {
