@@ -363,13 +363,15 @@ int main(int argc, char * argv[])
     struct Diag * diag = NULL;
     char filename_diag[256];
     sprintf(filename_diag,"%s/%s",dirout,"diagnostic.dat");
-    printf("\n\n\nmaxiter_vi = %zu\\n\n", maxiter_vi);
+    printf("\n\n\nmaxiter_vi = %zu\n", maxiter_vi);
     for (size_t ii = 0; ii < maxiter_vi; ii++){
         printf("\n\n\n\n\n\n\n");
 
         // comment the next call and uncomment the copy for pure VI
-        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
-                                                  cost,aargs,opt,verbose,&diag);
+        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,
+                                                  abs_conv_pi,
+                                                  cost,aargs,opt,
+                                                  verbose,&diag);
 
         /* struct ValueF * next = valuef_copy(cost); */
 
@@ -395,6 +397,11 @@ int main(int argc, char * argv[])
     }
 
     
+    if (verbose != 0){
+        size_t * ranks = valuef_get_ranks(cost);
+        iprint_sz(dx+1,ranks);
+    }
+
     sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
             dirout,lbu[0],ubu[0],ss[0],ss[1],"cost");
     print_cost(filename,cost,30,30,lb,ub);
