@@ -39,7 +39,10 @@
 #include <string.h>
 #include <assert.h>
 
-#include "c3.h"
+/* #include "c3.h" */
+#include "c3/lib_linalg.h"
+#include "c3/lib_clinalg.h"
+
 #include "util.h"
 
 /** \struct ValueF

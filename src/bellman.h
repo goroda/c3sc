@@ -37,6 +37,8 @@
 #define BELLMAN_H
 
 #include <stdlib.h>
+#include "c3/lib_linalg.h"
+#include "c3/lib_optimization.h"
 
 double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_grad, 
                       double discount, const double * prob, const double * prob_grad, 

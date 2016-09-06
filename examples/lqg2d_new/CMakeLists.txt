@@ -6,5 +6,7 @@ target_link_libraries(lqg2d_new
     -g 
     c3sc
     ${blas_lapack} 
-    -lm)
+    -lm
+    c3 )
+# target_link_libraries(lqg2d_new PUBLIC c3)
 

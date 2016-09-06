@@ -37,7 +37,7 @@
 #include <assert.h>
 #include <math.h>
 
-#include "c3.h"
+#include "c3/array.h"
 #include "util.h"
 #include "nodeutil.h"
 #include "dynamics.h"

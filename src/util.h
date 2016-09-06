@@ -37,7 +37,9 @@
 #ifndef C3SC_UTIL_H
 #define C3SC_UTIL_H
 
-#include "c3.h"
+/* #include "c3.h" */
+
+#include "c3/array.h"
 
 struct ApproxArgs;
 struct ApproxArgs * approx_args_init();

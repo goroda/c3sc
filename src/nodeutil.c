@@ -40,7 +40,8 @@
 #include <assert.h>
 #include <math.h>
 
-#include "c3.h"
+/* #include "c3.h" */
+#include "c3/lib_linalg.h"
 
 #include "boundary.h"
 #include "valuefunc.h"

@@ -32,17 +32,3 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //Code
-
-#ifndef C3SC_H
-#define C3SC_H
-
-/* #include "c3.h" */
-#include "c3/array.h"
-#include "c3/lib_optimization.h"
-
-#include "util.h"
-#include "dynamics.h"
-#include "boundary.h"
-
-
-#endif

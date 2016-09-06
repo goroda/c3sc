@@ -37,7 +37,8 @@
 #include <stdio.h>
 #include <assert.h>
 
-#include "c3.h"
+/* #include "c3.h" */
+#include "c3/array.h"
 
 #include "dynamics.h"
 

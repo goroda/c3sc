@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <getopt.h>
 
-#include "c3.h"
+/* #include "c3.h" */
 #include "cdyn/src/simulate.h"
 #include "cdyn/src/integrate.h"
 
@@ -13,6 +13,10 @@
 #include "valuefunc.h"
 #include "bellman.h"
 #include "c3sc.h"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 static char * program_name;
 

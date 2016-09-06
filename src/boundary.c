@@ -39,8 +39,8 @@
 #include <math.h>
 #include <assert.h>
 
-#include "c3.h"
-
+/* #include "c3.h" */
+#include "c3/array.h"
 #include "boundary.h"
 
 /** \struct ExternalBoundary

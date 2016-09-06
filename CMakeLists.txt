@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.6)
-project (TTC)
+project (C3SC)
 
 if (APPLE)
     option(USE_CLANG "build application with clang" ON)
@@ -18,7 +18,7 @@ if (APPLE)
     set(compiler_flags "-std=c99 -O3 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn")
     set(CMAKE_C_COMPILER "clang")
 else ()
-    set(compiler_flags "-g -O2 -Wall -Wextra -std=c99")
+    set(compiler_flags "-g -O2 -Wall -Wextra -std=c99 ")
     # test coverage
     #set(compiler_flags "-g -O0 -W -Wall -Wextra -std=c99 -fprofile-arcs -ftest-coverage")
     set(CMAKE_C_COMPILER "gcc")
@@ -26,12 +26,24 @@ else ()
     find_package(BLAS REQUIRED)
     find_package(LAPACK REQUIRED)
 
+    find_package(c3 REQUIRED)
+
     include_directories(/usr/include)
     set(blas_lapack "-lblas -llapack")
 
-    set(PROJECT_LINK_LIBS libcdyn.so libc3.so)
+
+    # include(/usr/local/lib/c3/c3.cmake)
+
+    set(PROJECT_LINK_LIBS 
+            libcdyn.so 
+            c3
+            # libc3.so
+            )
     link_directories(/home/goroda/GitProjects/cdyn/build/src
-                     /home/goroda/GitProjects/c3/lib/)
+                     # /home/goroda/GitProjects/c3/lib/
+                     )
+
+                   
     
     #find_package(SWIG REQUIRED)
     #include(${SWIG_USE_FILE})
@@ -43,7 +55,7 @@ set(CMAKE_CXX_COMPILER "gcc")
 set(static_libs 0)
 
 include_directories(${BLAS_INCLUDE_DIR}, ${LAPACK_INCLUDE_DIR})
-include_directories("../c3/include")
+# include_directories("../c3/include")
 include_directories(..)
 include_directories("src")
 
