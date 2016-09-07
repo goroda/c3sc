@@ -37,8 +37,9 @@ else ()
     find_package(BLAS REQUIRED)
     find_package(LAPACK REQUIRED)
 
-    find_package(c3 REQUIRED)
     find_package(cdyn REQUIRED)
+    find_package(c3 REQUIRED)
+
 
     include_directories(/usr/include)
     set(blas_lapack "-lblas -llapack")
