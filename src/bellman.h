@@ -40,6 +40,8 @@
 #include "c3/lib_linalg.h"
 #include "c3/lib_optimization.h"
 
+#include "util.h"
+
 double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_grad, 
                       double discount, const double * prob, const double * prob_grad, 
                       double dt, const double * dtgrad, const double * cost, double * grad);
@@ -72,7 +74,7 @@ void dp_param_add_obscost(struct DPparam *, int (*)(const double*,double*));
 struct ControlParams;
 struct ControlParams *
 control_params_create(size_t, size_t, struct DPparam *,
-                      struct MCAparam *, struct c3Opt *);
+                      struct MCAparam *, struct Workspace *, struct c3Opt *);
 void control_params_add_state_info(struct ControlParams *,
                                    double, const double *, int,
                                    const double *);

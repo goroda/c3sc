@@ -106,14 +106,6 @@ struct MCAparam{
     double ** xgrid;
     double hmin;
     double * hvec;
-
-    double dt;
-    double * grad_dt; // (du,1)
-
-    double * prob; // (2dx+1,1)
-    double * grad_prob; //(du * (2dx+1),1)
-    
-    double * workspace; //(du,1);
 };
 
 /**********************************************************//**
@@ -132,10 +124,6 @@ struct MCAparam * mca_param_create(size_t dx, size_t du)
     assert (mca != NULL);
     mca->dx = dx;
     mca->du = du;
-    mca->grad_dt = calloc_double(du);
-    mca->prob = calloc_double(2*dx+1);
-    mca->grad_prob = calloc_double(du * (2*dx+1));
-    mca->workspace = calloc_double(du);
 
     mca->ngrid = NULL;
     mca->xgrid = NULL;
@@ -173,10 +161,6 @@ void mca_add_grid_refs(struct MCAparam * mca, size_t * ngrid, double ** xgrid,
 void mca_param_destroy(struct MCAparam * mca)
 {
     if (mca != NULL){
-        free(mca->grad_dt); mca->grad_dt = NULL;
-        free(mca->prob); mca->prob = NULL;
-        free(mca->grad_prob); mca->grad_prob = NULL;
-        free(mca->workspace); mca->workspace = NULL;
         free(mca); mca = NULL;
     }
 }
@@ -189,17 +173,11 @@ struct DPparam{
     // dynamics and storage space
     struct Drift * dyn_drift;
     struct Diff * dyn_diff;
-    double * drift;
-    double * grad_drift;
-    double * diff;
-    double * grad_diff;
-
     struct Boundary * bound;
     
     // cost functions
     double discount; // discount factor
     int (*stagecost)(double,const double*,const double*,double*,double*);
-    double * grad_stage;
     int (*boundcost)(double,const double*,double*);
     int (*obscost)(const double*,double*);
 };
@@ -211,19 +189,9 @@ struct DPparam * dp_param_create(size_t dx, size_t du, size_t dw, double discoun
     
     dp->dyn_drift = drift_alloc(dx,du);
     dp->dyn_diff = diff_alloc(dx,du,dw);
-
-    dp->drift = calloc_double(dx);
-    dp->grad_drift = calloc_double(dx*du);
-    dp->diff = calloc_double(dx*dw);
-    /* printf("allocated diff\n"); */
-    /* dprint2d_col(dx,dw,dp->diff); */
-    dp->grad_diff = calloc_double(dx*dw*du);
-
     dp->bound = NULL;
-    
-    dp->discount = discount;
-    dp->grad_stage = calloc_double(du);
 
+    dp->discount = discount;
     dp->stagecost = NULL;
     dp->boundcost = NULL;
     dp->obscost = NULL;
@@ -236,11 +204,6 @@ void dp_param_destroy(struct DPparam * dp)
     if (dp != NULL){
         drift_free(dp->dyn_drift); dp->dyn_drift = NULL;
         diff_free(dp->dyn_diff); dp->dyn_diff = NULL;
-        free(dp->drift); dp->drift = NULL;
-        free(dp->grad_drift); dp->grad_drift = NULL;
-        free(dp->diff); dp->diff = NULL;
-        free(dp->grad_diff); dp->grad_diff = NULL;
-        free(dp->grad_stage); dp->grad_stage = NULL;
         free(dp); dp = NULL;
     }
 }
@@ -302,6 +265,7 @@ struct ControlParams
     const double * costs;
     struct DPparam * dp;
     struct MCAparam * mca;
+    struct Workspace * work;
     struct c3Opt * opt;
 
     int res_last_grad; // result of the last gradient evaluation
@@ -310,7 +274,8 @@ struct ControlParams
 
 struct ControlParams * control_params_create(size_t dx, size_t dw,
                                              struct DPparam * dp,
-                                             struct MCAparam * mca, 
+                                             struct MCAparam * mca,
+                                             struct Workspace * work,
                                              struct c3Opt * opt)
 {
     struct ControlParams * c = malloc(sizeof(struct ControlParams));
@@ -319,6 +284,7 @@ struct ControlParams * control_params_create(size_t dx, size_t dw,
     c->dw = dw;
     c->dp = dp;
     c->mca = mca;
+    c->work = work;
     c->opt = opt;
     c->res_last_grad = 0;
     return c;
@@ -372,6 +338,8 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     // unpack
     struct DPparam * dp = param->dp;
     struct MCAparam * mca = param->mca;
+    struct Workspace * work = param->work;
+    
     const double * costs = param->costs;
     const double * x = param->x;
     double time = param->time;
@@ -383,75 +351,73 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     assert (mca != NULL);
     assert (costs != NULL);
     assert (x != NULL);
-    
+    assert (work != NULL);
+
+    // stage cost
+    double val;
+    double stage_cost;
+
+    size_t node         = workspace_get_active(work);
+    double * drift      = workspace_get_drift             (work, node);
+    double * grad_drift = workspace_get_grad_drift        (work, node);
+    double * diff       = workspace_get_diff              (work, node);
+    double * grad_diff  = workspace_get_grad_diff         (work, node);
+    double * dt         = workspace_get_dt                (work, node);
+    double * grad_dt    = workspace_get_grad_dt           (work, node);
+    double * prob       = workspace_get_prob              (work, node);
+    double * grad_prob  = workspace_get_grad_prob         (work, node);
+    double * grad_stage = workspace_get_grad_stage        (work, node);
+    double * workspace  = workspace_get_control_size_extra(work, node);
+
     //get drift and diffusion
     int res;
     if (grad_u != NULL){
         for (size_t ii = 0; ii < du; ii++){
             grad_u[ii] = 0.0;
         }
-        res = drift_eval(dp->dyn_drift,time,x,u,
-                         dp->drift,dp->grad_drift);
-        /* printf("drift = "); dprint(dx,dp->drift); */
+        res = drift_eval(dp->dyn_drift,time,x,u,drift,grad_drift);
         assert (res == 0);
-        res = diff_eval(dp->dyn_diff,time,x,u,
-                        dp->diff,dp->grad_diff);
+        res = diff_eval(dp->dyn_diff,time,x,u,diff,grad_diff);
+
     }
     else{
         /* printf("x = ");dprint(dx,x); */
-        res = drift_eval(dp->dyn_drift,time,x,u,
-                         dp->drift,NULL);
+        res = drift_eval(dp->dyn_drift,time,x,u,drift,NULL);
         assert (res == 0);
-        /* printf("drift = "); dprint(dx,dp->drift); */
-        res = diff_eval(dp->dyn_diff,time,x,u,
-                        dp->diff,NULL);
-        /* printf("diffusion = \n"); */
-        /* dprint2d_col(dx,dw,dp->diff); */
-        /* exit(1); */
+        res = diff_eval(dp->dyn_diff,time,x,u,diff,NULL);
+
+
     }
     assert (res == 0);
 
-    // stage cost
-    double val;
-    double stage_cost;
-        
+
     if (absorbed == 0){ // not absorbed
         if (grad_u != NULL){
-            res = dp->stagecost(time,x,u,&stage_cost,dp->grad_stage);
+            res = dp->stagecost(time,x,u,&stage_cost,grad_stage);
             assert (res == 0);
             res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec,
-                                      dp->drift,dp->grad_drift,dp->diff,dp->grad_diff,mca->prob,
-                                      mca->grad_prob,&(mca->dt),mca->grad_dt,mca->workspace);
+                                      drift,grad_drift,diff,grad_diff,prob,
+                                      grad_prob,dt,grad_dt,workspace);
 
             param->res_last_grad = res;
             /* assert (res == 0); */
-            val = bellmanrhs(dx,du,stage_cost,dp->grad_stage,dp->discount,
-                             mca->prob,mca->grad_prob,mca->dt,mca->grad_dt,
+            val = bellmanrhs(dx,du,stage_cost,grad_stage,dp->discount,
+                             prob,grad_prob,*dt,grad_dt,
                              costs, grad_u);
         }
         else{
-            /* printf("here\n"); */
             res = dp->stagecost(time,x,u,&stage_cost,NULL);
-            /* Printf("Stagecost = %G\n",stage_cost); */
-            /* printf("drift = "); dprint(dx,dp->drift); */
-            /* printf("diff =  "); dprint2d_col(dx,dw,dp->diff); */
             assert (res == 0);
-            /* printf("assemble transition\n"); */
             res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec,
-                                      dp->drift,NULL,dp->diff,NULL,mca->prob,
-                                      NULL,&(mca->dt),NULL,NULL);
-            /* printf("bellmanrhs \n"); */
-            /* printf("mca->prob = \n"); */
-            /* dprint(2*dx+1,mca->prob); */
+                                      drift,NULL,diff,NULL,prob,
+                                      NULL,dt,NULL,NULL);
             assert (res == 0);
-            val = bellmanrhs(dx,du,stage_cost,NULL,dp->discount,mca->prob,NULL,mca->dt,NULL,
+            val = bellmanrhs(dx,du,stage_cost,NULL,dp->discount,prob,NULL,*dt,NULL,
                              costs,NULL);
         }
     }
     else if (absorbed == 1){ // absorbed cost
-        /* printf("asborbed\n"); */
         res = dp->boundcost(time,x,&val);
-        /* printf("val = %G\n",val); */
         assert (res == 0);
     }
     else if (absorbed == -1){
@@ -527,7 +493,6 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
                 memmove(umin,ucurr,du*sizeof(double));
             }
         }
-
 
         /* printf("val = %G finished newu = \n",*val); dprint(du,umin); */
         /* printf("umin = "); dprint(du,umin); */
@@ -987,16 +952,25 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 control_params_add_state_info(cp,time,x+ii*dx,
                                               absorbed_pol[ii],
                                               costs_pol+ii*(2*dx+1));
+
+                
+                workspace_set_active(cp->work,ii); 
+                    
                 double val;
                 int res2 = bellman_optimal(du,u,&val,cp);
 
+
+                double * drift = workspace_get_drift(cp->work, ii);
+                double * diff  = workspace_get_diff (cp->work, ii);
+                
                 // build transition probabilities
+                // at optimal
                 assert (res2 == 0);
-                res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,dp->drift,NULL);
+                res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,drift,NULL);
                 assert (res2 == 0);
-                res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,dp->diff,NULL);
+                res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,diff,NULL);
                 res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec,
-                                          dp->drift,NULL,dp->diff,NULL,
+                                          drift,NULL,diff,NULL,
                                           probs + ii*(2*dx+1),
                                           NULL,probs + N*(2*dx+1)+ii, // dt
                                           NULL,NULL);
@@ -1183,7 +1157,8 @@ struct C3Control
     struct Boundary * bound;
     struct MCAparam * mca;
     struct DPparam * dp;
-
+    struct Workspace * work;
+    
     struct ValueF * policy_sim;
     struct c3Opt * opt_sim;
     void (*transform_sim)(size_t,const double*,double*);
@@ -1204,11 +1179,15 @@ c3control_create(size_t dx, size_t du, size_t dw,
     c3c->xgrid = malloc(dx * sizeof(double *));
     c3c->h     = calloc_double(dx);
     c3c->hmin  = ub[0] - lb[0];
+    size_t maxn = ngrid[0];
     for (size_t ii = 0; ii < dx; ii++){
         c3c->xgrid[ii] = linspace(lb[ii],ub[ii],ngrid[ii]);
         c3c->h[ii] = c3c->xgrid[ii][1] - c3c->xgrid[ii][0];
         if (c3c->h[ii] < c3c->hmin){
             c3c->hmin = c3c->h[ii];
+        }
+        if (ngrid[ii] > maxn){
+            maxn = ngrid[ii];
         }
     }
     c3c->bound = boundary_alloc(dx,lb,ub);
@@ -1216,6 +1195,7 @@ c3control_create(size_t dx, size_t du, size_t dw,
     mca_add_grid_refs(c3c->mca,c3c->ngrid,c3c->xgrid,c3c->hmin,c3c->h);
     c3c->dp    = dp_param_create(dx,du,dw,discount);
     dp_param_add_boundary(c3c->dp, c3c->bound);
+    c3c->work = workspace_alloc(dx,du,dw,maxn);
 
     c3c->policy_sim = NULL;
     c3c->opt_sim = NULL;
@@ -1233,10 +1213,11 @@ void c3control_destroy(struct C3Control * c3c)
         for (size_t ii = 0; ii < c3c->dx; ii++){
             free(c3c->xgrid[ii]); c3c->xgrid[ii] = NULL;
         }
+        free(c3c->work);    c3c->work = NULL;
         free(c3c->prevpol); c3c->prevpol = NULL;
-        free(c3c->xgrid); c3c->xgrid = NULL;
-        free(c3c->h);     c3c->h     = NULL;
-        free(c3c); c3c = NULL;
+        free(c3c->xgrid);   c3c->xgrid = NULL;
+        free(c3c->h);       c3c->h     = NULL;
+        free(c3c);          c3c = NULL;
     }
 }
 
@@ -1346,7 +1327,8 @@ int c3control_policy_eval(struct C3Control * c3c, double t,
     assert (opt != NULL);
 
     struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,
-                                                      c3c->dp,c3c->mca,opt);
+                                                      c3c->dp,c3c->mca,
+                                                      c3c->work,opt);
 
     double val;
     int res = mca_get_neighbor_node_costs(dx, x, bound, policy_sim,
@@ -1421,7 +1403,7 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
         }
     }
 
-    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,opt);
+    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,c3c->work,opt);
     struct VIparam * vi = vi_param_create(1e-10);
     vi_param_add_cp(vi,cp);
     vi_param_add_value(vi,vf);
@@ -1472,7 +1454,7 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
         /* printf("\t start = "); dprint(start_rank,start[ii]); */
     }
 
-    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,opt);
+    struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,c3c->work,opt);
 
     pi_param_add_cp(poli,cp);
     pi_param_add_value(poli,vf);

@@ -73,4 +73,23 @@ int hash_grid_ndgrid_get_ind(struct HashGrid **, size_t, const double *, size_t 
 void hash_grid_free(struct HashGrid *);
 
 size_t uniform_stride(size_t, size_t);
+
+
+struct Workspace;
+struct Workspace * workspace_alloc(size_t,size_t,size_t,size_t);
+void workspace_free(struct Workspace *);
+void workspace_set_active(struct Workspace * w, size_t active);
+size_t workspace_get_active(struct Workspace * w);
+double * workspace_get_drift(struct Workspace * w, size_t node);
+double * workspace_get_grad_drift(struct Workspace * w, size_t node);
+double * workspace_get_diff(struct Workspace * w, size_t node);
+double * workspace_get_grad_diff(struct Workspace * w, size_t node);
+double * workspace_get_dt(struct Workspace * w, size_t node);
+double * workspace_get_grad_dt(struct Workspace * w, size_t node);
+double * workspace_get_prob(struct Workspace * w, size_t node);
+double * workspace_get_grad_prob(struct Workspace * w, size_t node);
+double * workspace_get_grad_stage(struct Workspace * w, size_t node);
+double * workspace_get_control_size_extra(struct Workspace * w, size_t node);
+
+
 #endif

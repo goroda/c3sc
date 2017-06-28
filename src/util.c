@@ -657,6 +657,150 @@ void hash_grid_free(struct HashGrid * ht)
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
+//                       Workspace manager                                 //
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+struct Workspace
+{
+    size_t dx;
+    size_t du;
+    size_t dw;
+    size_t N; // copies of memory
+    size_t active;
+    size_t index[10]; // indexs into memory mem
+    double ** mem;
+};
+
+struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
+{
+    struct Workspace * work = malloc(sizeof(struct Workspace));
+    if (work == NULL){
+        fprintf(stderr,"Workspace cannot be allocated\n");
+        exit(1);
+    }
+    
+    work->dx = dx;
+    work->du = du;
+    work->dw = dw;
+    work->N = N;
+    work->mem = malloc(N * sizeof(double *));
+    if (work->mem == NULL){
+        fprintf(stderr,"Workspace cannot be allocated\n");
+        exit(1);
+    }
+    
+    // integers denote space in memory required by specified variable
+    work->index[0] = dx;                             // drift
+    work->index[1] = dx * du + work->index[0];       // grad_drift
+    work->index[2] = dx * dw + work->index[1];       // diff
+    work->index[3] = dx * dw * du + work->index[2];  // grad_diff
+    work->index[4] = 1 + work->index[3];             // dt
+    work->index[5] = du + work->index[4];            // grad_dt
+    work->index[6] = 2 * dx + 1 + work->index[5];    // prob
+    work->index[7] = du * (2*dx+1) + work->index[6]; // grad_prob
+    work->index[8] = du + work->index[7];            // grad_stage
+    work->index[9] = du + work->index[8];            // extra control-sized mem
+
+    work->active = 0;
+    for (size_t ii = 0; ii < N; ii++){
+        work->mem[ii] = calloc_double(work->index[9]);
+    }
+
+    return work;
+}
+
+void workspace_free(struct Workspace * w)
+{
+    if (w != NULL){
+        for (size_t ii = 0; ii <  w->N; ii++){
+            free(w->mem[ii]); w->mem[ii] = NULL;
+        }
+        free(w->mem); w->mem = NULL;
+        free(w); w = NULL;
+    }
+}
+
+void workspace_set_active(struct Workspace * w, size_t active)
+{
+    assert (w != NULL);
+    assert (active < w->N);
+    w->active = active;
+}
+
+size_t workspace_get_active(struct Workspace * w)
+{
+    return w->active;
+}
+
+double * workspace_get_drift(struct Workspace * w, size_t node)
+{
+    return w->mem[node];
+}
+
+double * workspace_get_grad_drift(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[0];
+}
+
+double * workspace_get_diff(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[1];
+}
+
+double * workspace_get_grad_diff(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[2];
+}
+
+double * workspace_get_dt(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[3];
+}
+
+double * workspace_get_grad_dt(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[4];
+}
+
+double * workspace_get_prob(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[5];
+}
+
+double * workspace_get_grad_prob(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[6];
+}
+
+double * workspace_get_grad_stage(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[7];
+}
+
+double * workspace_get_control_size_extra(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[8];
+}
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
 //                       Other useful stuff                                //
 
 /////////////////////////////////////////////////////////////////////////////

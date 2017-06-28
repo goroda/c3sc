@@ -38,8 +38,9 @@
 #include <string.h>
 #include <math.h>
 #include "CuTest.h"	
+#include <assert.h>
 
-#include "c3.h"
+#include "c3/c3.h"
 #include "nodeutil.h"
 #include "valuefunc.h"
 #include "bellman.h"
@@ -1392,10 +1393,10 @@ void Test_bellman_control1d(CuTest * tc)
     double ub[2] = {2.0, 3.0 };
     double center[2] = {0.0,0.0};
     double lengths[2] = {0.8,0.8};
+
     struct Boundary * bound = boundary_alloc(dx,lb,ub);
     boundary_add_obstacle(bound,center,lengths);
     
-
     size_t ngrid[2] = {63, 37};
     double * xgrid[2];
     xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
@@ -1404,8 +1405,10 @@ void Test_bellman_control1d(CuTest * tc)
     double hmin = fmin(h[0],h[1]);
     struct MCAparam * mca = mca_param_create(dx,du);
     mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
-    
 
+    // must be maximum grid size
+    struct Workspace * work = workspace_alloc(dx,du,dw,ngrid[0]);
+    
     double discount = 0.1;
     struct DPparam * dp = dp_param_create(dx,du,dw,discount);
     dp_param_add_drift(dp,f1,NULL);
@@ -1446,7 +1449,8 @@ void Test_bellman_control1d(CuTest * tc)
     c3opt_set_gtol(opt,1e-30);
     c3opt_set_verbose(opt,0);
 
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,work,opt);
     for (size_t kk = 0; kk < ngrid[0]; kk++){
         for (size_t ll = 0; ll < ngrid[1]; ll++){
             size_t ind[2] = {kk,ll};
@@ -1547,6 +1551,7 @@ void Test_bellman_control1d(CuTest * tc)
     free(xgrid[1]); xgrid[1] = NULL;
     free(start[0]); start[0] = NULL;
     free(start[1]); start[1] = NULL;
+    workspace_free(work); work = NULL;
     dp_param_destroy(dp); dp = NULL;
     valuef_destroy(vf); vf = NULL;
     approx_args_free(aargs); aargs = NULL;
@@ -1591,6 +1596,9 @@ void Test_bellman_control3d(CuTest * tc)
     
     struct MCAparam * mca = mca_param_create(dx,du);
     mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
+
+
+    struct Workspace * work = workspace_alloc(dx,du,dw,ngrid[0]);// must be maximum grid size
     
     double discount = 0.1;
     struct DPparam * dp = dp_param_create(dx,du,dw,discount);
@@ -1634,7 +1642,7 @@ void Test_bellman_control3d(CuTest * tc)
     c3opt_set_verbose(opt,0);
     c3opt_ls_set_beta(opt,0.8);
 
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,work,opt);
     for (size_t kk = 0; kk < ngrid[0]; kk = kk + 5){
         for (size_t ll = 0; ll < ngrid[1]; ll = ll + 5){
             for (size_t zz = 0; zz < ngrid[2]; zz = zz + 5){
@@ -1785,6 +1793,7 @@ void Test_bellman_control3d(CuTest * tc)
     free(start[0]); start[0] = NULL;
     free(start[1]); start[1] = NULL;
     free(start[2]); start[2] = NULL;
+    workspace_free(work); work = NULL;
     dp_param_destroy(dp); dp = NULL;
     valuef_destroy(vf); vf = NULL;
     approx_args_free(aargs); aargs = NULL;
@@ -2063,8 +2072,8 @@ void Test_bellman_pi3d(CuTest * tc)
     double ub[3] = {2.0, 3.0,1.0 };
     double goal_center[3] = {0.0,0.0,0.0};
     double goal_width[3] = {0.8,0.8,0.8};
-    size_t ngrid[3] = {20, 20, 20};
-    double discount = 0.1;
+    size_t ngrid[3] = {50, 50, 50};
+    double discount = 0.9;
     
     // optimization arguments
     double lbu = -5.0;
@@ -2097,8 +2106,8 @@ void Test_bellman_pi3d(CuTest * tc)
     c3control_add_obstacle(c3c,goal_center,goal_width);
     c3control_add_obscost(c3c,ocost);
 
-    size_t maxiter_vi = 2;
-    size_t maxiter_pi = 10;
+    size_t maxiter_vi = 10;
+    size_t maxiter_pi = 20;
     int verbose = 1;
     double convergence = 1e-4;
     struct ValueF * cost = c3control_init_value(c3c,quad3d,NULL,aargs,0);
@@ -2146,11 +2155,11 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
+    SUITE_ADD_TEST(suite, Test_bellman_vi);
     /* SUITE_ADD_TEST(suite, Test_bellman_pi); */
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d);; */
-    SUITE_ADD_TEST(suite, Test_bellman_pi3d);
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */
 
     return suite;
 }

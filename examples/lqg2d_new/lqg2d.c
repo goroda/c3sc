@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <getopt.h>
 
-#include "c3.h"
+#include "c3/c3.h"
 #include "cdyn/src/simulate.h"
 #include "cdyn/src/integrate.h"
 

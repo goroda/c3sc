@@ -23,7 +23,7 @@ if (APPLE)
         NO_DEFAULT_PATH)
 
     find_package(c3 REQUIRED)
-    find_package(cdyn REQUIRED)
+    #find_package(cdyn REQUIRED)
 
     set(blas_lapack ${macblas}/Accelerate)
     set(compiler_flags "-std=c99 -O3 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn")
@@ -37,8 +37,8 @@ else ()
     find_package(BLAS REQUIRED)
     find_package(LAPACK REQUIRED)
 
-    find_package(cdyn REQUIRED)
-    find_package(c3 REQUIRED)
+    #find_package(cdyn REQUIRED)
+    #find_package(c3 REQUIRED)
 
 
     include_directories(/usr/include)
