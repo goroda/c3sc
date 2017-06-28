@@ -555,7 +555,7 @@ int bound_info_set_dim(struct BoundInfo * bi, enum BOUNDRESULT br,
     else if (type == PERIODIC){
         return 1;
     }
-    else if ((type != NONE) & (type != REFLECT)){
+    else if ((type != EB_NONE) & (type != REFLECT)){
         return -1;
     }
 

@@ -45,6 +45,61 @@
 #include "bellman.h"
 #include "c3sc.h"
 
+#include "cdyn/src/simulate.h"
+#include "cdyn/src/integrate.h"
+
+struct Trajectory * run_sim_2d_1d(struct Integrator * ode_sys)
+{
+    integrator_set_type(ode_sys,"rk4");
+    integrator_set_dt(ode_sys,1e-2);
+    integrator_set_verbose(ode_sys,0);
+
+    // Initialize trajectories for state
+    double time = 0.0;
+    double state[2] = {-0.5, -0.5};
+    double con[1] = {0.0};
+    // Integrate
+    struct Trajectory * traj = NULL;
+    trajectory_add(&traj,2,1,time,state,con);
+    double final_time = 1e1;
+    double dt = 1e-2;
+    int res;
+    printf("Integrating Trajectory\n");
+    while (time < final_time){
+        res = trajectory_step(traj,ode_sys,dt);
+        assert(res == 0);
+        time = time + dt;
+    }
+
+    return traj;
+}
+
+struct Trajectory * run_sim_3d_3d(struct Integrator * ode_sys)
+{
+    integrator_set_type(ode_sys,"rk4");
+    integrator_set_dt(ode_sys,1e-2);
+    integrator_set_verbose(ode_sys,0);
+
+    // Initialize trajectories for state
+    double time = 0.0;
+    double state[3] = {-0.5, -0.5,0.5};
+    double con[3] = {0.0,0.0,0.0};
+    // Integrate
+    struct Trajectory * traj = NULL;
+    trajectory_add(&traj,3,3,time,state,con);
+    double final_time = 1e1;
+    double dt = 1e-2;
+    int res;
+    printf("Integrating Trajectory\n");
+    while (time < final_time){
+        res = trajectory_step(traj,ode_sys,dt);
+        assert(res == 0);
+        time = time + dt;
+    }
+
+    return traj;
+}
+
 //////////////////////////////////////////////////////
 // Dynamics 
 //////////////////////////////////////////////////////
@@ -232,7 +287,6 @@ int stagecost3d(double t,const double * x,const double * u, double * out,
 
 int boundcost(double t,const  double * x, double * out)
 {
-
     (void)(t);
     (void)(x);
     *out = 0.0;
@@ -1251,7 +1305,6 @@ void Test_bellman_grad3d(CuTest * tc)
                                   diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
         CuAssertIntEquals(tc,0,res==1); // res should not be 1
 
-        
         bellmanrhs(dx,du,stage_cost,grad_stage,
                    discount, prob, grad_prob, dt, dt_grad,
                    cost, grad_bellman);
@@ -1744,10 +1797,10 @@ CuSuite * BellmanGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    /* SUITE_ADD_TEST(suite, Test_process_fibers_neighbor); */
-    /* SUITE_ADD_TEST(suite, Test_bound_nodes); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_grad1); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_grad3d); */
+    SUITE_ADD_TEST(suite, Test_process_fibers_neighbor);
+    SUITE_ADD_TEST(suite, Test_bound_nodes);
+    SUITE_ADD_TEST(suite, Test_bellman_grad1);
+    SUITE_ADD_TEST(suite, Test_bellman_grad3d);
     // uncomment the buttom two but they take a long time
     /* SUITE_ADD_TEST(suite, Test_bellman_control1d); */
     /* SUITE_ADD_TEST(suite, Test_bellman_control3d); */
@@ -1758,59 +1811,18 @@ CuSuite * BellmanGetSuite()
 void Test_bellman_vi(CuTest * tc)
 {
     printf("Testing Function: bellman_vi (1d control) \n");
-    CuAssertIntEquals(tc,1,1);
     size_t dx = 2;
     size_t du = 1;
     size_t dw = 2;
 
     double lb[2] = {-1.0, -2.0};
     double ub[2] = {2.0, 3.0 };
-    double center[2] = {0.0,0.0};
-    double lengths[2] = {0.8,0.8};
-    struct Boundary * bound = boundary_alloc(dx,lb,ub);
-    boundary_add_obstacle(bound,center,lengths);
-    
-
+    double goal_center[2] = {0.0,0.0};
+    double goal_width[2] = {0.4,0.4};
     size_t ngrid[2] = {60, 90};
-    double * xgrid[2];
-    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
-    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
-    double h[2] = {xgrid[0][1]-xgrid[0][0], xgrid[1][1]-xgrid[1][0]};
-    double hmin = fmin(h[0],h[1]);
-    struct MCAparam * mca = mca_param_create(dx,du);
-    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
-    
-
     double discount = 0.1;
-    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
-    dp_param_add_drift(dp,f1b,NULL);
-    dp_param_add_diff(dp,s1,NULL);
-    dp_param_add_boundary(dp,bound);
-    dp_param_add_stagecost(dp,stagecost2d);
-    dp_param_add_boundcost(dp,boundcost);
-    dp_param_add_obscost(dp,ocost);
 
-
-    // cross approximation tolerances
-    size_t start_rank = 5;
-    struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-7);
-    approx_args_set_kickrank(aargs,5);
-    approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,start_rank);
-    approx_args_set_maxrank(aargs,20);
-
-    double * start[2];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
-    struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
-
+    // optimization arguments
     double lbu = -5.0;
     double ubu = 5.0;
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
@@ -1821,49 +1833,140 @@ void Test_bellman_vi(CuTest * tc)
     c3opt_set_gtol(opt,1e-30);
     c3opt_set_verbose(opt,0);
 
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
 
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,5);
+    approx_args_set_adapt(aargs,1);
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,20);
+    
+    // setup problem
+    struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
+    c3control_add_drift(c3c,f1b,NULL);
+    c3control_add_diff(c3c,s1,NULL);
+    c3control_add_stagecost(c3c,stagecost2d);
+    c3control_add_boundcost(c3c,boundcost);
+    c3control_add_obstacle(c3c,goal_center,goal_width);
+    c3control_add_obscost(c3c,ocost);
+
+
+    size_t maxiter_vi = 20;
+    int verbose = 1;
     double convergence = 1e-5;
-    struct VIparam * vi = vi_param_create(convergence);
-    vi_param_add_cp(vi,cp);
-    vi_param_add_value(vi,vf);
-    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
-    struct ValueF * next = NULL;
-    double norm2;
-    size_t nvi = 1;
-    for (size_t ii = 0; ii < nvi; ii++){
-        if (next == NULL){
-            /* printf("go\n"); */
-            vi_param_add_value(vi,vf);
-            next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
-            norm2 = valuef_norm(next);
-            valuef_destroy(vf); vf = NULL;
-        }
-        else{
-            /* printf("there\n"); */
-            vi_param_add_value(vi,next);
-            vf = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
-            norm2 = valuef_norm(vf);
-            valuef_destroy(next); next = NULL;
-        }
-        printf("Norm[%zu] = %G\n",ii+2,norm2);
+    struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
+    struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
+    
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(2,1,f1b,NULL,
+                                           c3control_controller,c3c);
+    struct Trajectory * traj = run_sim_2d_1d(ode_sys);
 
+    trajectory_print(traj,stdout,5);
+
+    double * s = trajectory_get_last_state(traj);
+    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
+
+    // cleanup integrator stuff
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
+
+    valuef_destroy(vf); vf = NULL;
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
+    c3opt_free(opt); opt = NULL;
+    approx_args_free(aargs); aargs = NULL;
+}
+
+void Test_bellman_pi(CuTest * tc)
+{
+    printf("Testing Function: bellman_pi (1d control) \n");
+    size_t dx = 2;
+    size_t du = 1;
+    size_t dw = 2;
+
+    double lb[2] = {-1.0, -2.0};
+    double ub[2] = {2.0, 3.0 };
+    double goal_center[2] = {0.0,0.0};
+    double goal_width[2] = {0.4,0.4};
+    size_t ngrid[2] = {60, 90};
+    double discount = 0.8;
+
+    // optimization arguments
+    double lbu = -5.0;
+    double ubu = 5.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,&lbu);
+    c3opt_add_ub(opt,&ubu);
+    c3opt_set_absxtol(opt,1e-12);
+    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_set_verbose(opt,0);
+
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,5);
+    approx_args_set_adapt(aargs,1);
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,20);
+    
+    // setup problem
+    struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
+    c3control_add_drift(c3c,f1b,NULL);
+    c3control_add_diff(c3c,s1,NULL);
+    c3control_add_stagecost(c3c,stagecost2d);
+    c3control_add_boundcost(c3c,boundcost);
+    c3control_add_obstacle(c3c,goal_center,goal_width);
+    c3control_add_obscost(c3c,ocost);
+
+
+    size_t maxiter_vi = 20;
+    size_t maxiter_pi = 60;
+    int verbose = 1;
+    double convergence = 1e-4;
+    struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,0);
+
+    for (size_t ii = 0; ii < maxiter_vi; ii++){
+        printf("Control update: %zu\n",ii);
+        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,
+                                                  convergence,
+                                                  cost,aargs,opt,
+                                                  verbose,NULL);
+        valuef_destroy(cost); cost = NULL;
+        cost = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        valuef_destroy(next); next = NULL;
     }
 
-    
-    control_params_destroy(cp); cp = NULL;
-    boundary_free(bound); bound = NULL;
-    mca_param_destroy(mca); mca = NULL;
-    free(xgrid[0]); xgrid[0] = NULL;
-    free(xgrid[1]); xgrid[1] = NULL;
-    free(start[0]); start[0] = NULL;
-    free(start[1]); start[1] = NULL;
-    dp_param_destroy(dp); dp = NULL;
-    valuef_destroy(vf); vf = NULL;
-    valuef_destroy(next); next = NULL;
-    approx_args_free(aargs); aargs = NULL;
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(2,1,f1b,NULL,
+                                           c3control_controller,c3c);
+    struct Trajectory * traj = run_sim_2d_1d(ode_sys);
+
+    trajectory_print(traj,stdout,5);
+
+    double * s = trajectory_get_last_state(traj);
+    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
+
+    // cleanup integrator stuff
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
+
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
     c3opt_free(opt); opt = NULL;
-    vi_param_destroy(vi);
+    approx_args_free(aargs); aargs = NULL;
 }
 
 void Test_bellman_vi3d(CuTest * tc)
@@ -1877,56 +1980,12 @@ void Test_bellman_vi3d(CuTest * tc)
 
     double lb[3] = {-1.0, -2.0,-3.0};
     double ub[3] = {2.0, 3.0,1.0 };
-    double center[3] = {0.0,0.0,0.0};
-    double lengths[3] = {0.8,0.8,0.8};
-    struct Boundary * bound = boundary_alloc(dx,lb,ub);
-    boundary_add_obstacle(bound,center,lengths);
-    
-
+    double goal_center[3] = {0.0,0.0,0.0};
+    double goal_width[3] = {0.8,0.8,0.8};
     size_t ngrid[3] = {20, 20, 20};
-    double * xgrid[3];
-    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
-    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
-    xgrid[2] = linspace(lb[2],ub[2],ngrid[2]);
-    double h[3] = {xgrid[0][1]-xgrid[0][0],
-                   xgrid[1][1]-xgrid[1][0],
-                   xgrid[2][1]-xgrid[2][0]};
-    double hmin = fmin(h[0],h[1]);
-    hmin = fmin(hmin,h[2]);
-    
-    struct MCAparam * mca = mca_param_create(dx,du);
-    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
-    
     double discount = 0.1;
-    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
-    dp_param_add_drift(dp,f3,NULL);
-    dp_param_add_diff(dp,s2,NULL);
-    dp_param_add_boundary(dp,bound);
-    dp_param_add_stagecost(dp,stagecost3d);
-    dp_param_add_boundcost(dp,boundcost);
-    dp_param_add_obscost(dp,ocost);
-
-
-    // cross approximation tolerances
-    size_t start_rank = 10;
-    struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-7);
-    approx_args_set_kickrank(aargs,10);
-    approx_args_set_adapt(aargs,0);
-    approx_args_set_startrank(aargs,start_rank);
-    approx_args_set_maxrank(aargs,start_rank);
-
-    double * start[3];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
-    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
-
+    
+    // optimization arguments
     double lbu = -5.0;
     double ubu = 5.0;
     double lbarr[3] = {lbu,lbu,lbu};
@@ -1934,200 +1993,61 @@ void Test_bellman_vi3d(CuTest * tc)
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbarr);
     c3opt_add_ub(opt,ubarr);
-    c3opt_set_absxtol(opt,1e-10);
-    c3opt_set_relftol(opt,1e-10);
-    c3opt_set_gtol(opt,0.0);
-    c3opt_set_verbose(opt,0);
-    /* c3opt_ls_set_beta(opt,0.8); */
-
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
-
-    double convergence = 1e-5;
-    struct VIparam * vi = vi_param_create(convergence);
-    vi_param_add_cp(vi,cp);
-    vi_param_add_value(vi,vf);
-    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
-    struct ValueF * next = NULL;
-    double norm2;
-    for (size_t ii = 0; ii < 100; ii++){
-        if (next == NULL){
-            /* printf("go\n"); */
-            vi_param_add_value(vi,vf);
-            next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
-            norm2 = valuef_norm(next);
-            valuef_destroy(vf); vf = NULL;
-        }
-        else{
-            /* printf("there\n"); */
-            vi_param_add_value(vi,next);
-            vf = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
-            norm2 = valuef_norm(vf);
-            valuef_destroy(next); next = NULL;
-
-            
-        }
-        printf("Norm[%zu] = %G\n",ii+2,norm2);
-
-    }
-    
-    control_params_destroy(cp); cp = NULL;
-    boundary_free(bound); bound = NULL;
-    mca_param_destroy(mca); mca = NULL;
-    free(xgrid[0]); xgrid[0] = NULL;
-    free(xgrid[1]); xgrid[1] = NULL;
-    free(xgrid[2]); xgrid[2] = NULL;
-    free(start[0]); start[0] = NULL;
-    free(start[1]); start[1] = NULL;
-    free(start[2]); start[2] = NULL;
-    dp_param_destroy(dp); dp = NULL;
-    valuef_destroy(vf); vf = NULL;
-    approx_args_free(aargs); aargs = NULL;
-    c3opt_free(opt); opt = NULL;
-    vi_param_destroy(vi);
-}
-
-void Test_bellman_pi(CuTest * tc)
-{
-    printf("Testing Function: bellman_pi (1d control) \n");
-    CuAssertIntEquals(tc,1,1);
-    size_t dx = 2;
-    size_t du = 1;
-    size_t dw = 2;
-
-    double lb[2] = {-1.0, -2.0};
-    double ub[2] = {2.0, 3.0 };
-    double center[2] = {0.0,0.0};
-    double lengths[2] = {0.8,0.8};
-    struct Boundary * bound = boundary_alloc(dx,lb,ub);
-    boundary_add_obstacle(bound,center,lengths);
-    
-
-    size_t ngrid[2] = {60, 90};
-    double * xgrid[2];
-    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
-    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
-    double h[2] = {xgrid[0][1]-xgrid[0][0], xgrid[1][1]-xgrid[1][0]};
-    double hmin = fmin(h[0],h[1]);
-    struct MCAparam * mca = mca_param_create(dx,du);
-    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
-    
-
-    double discount = 0.1;
-    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
-    dp_param_add_drift(dp,f1b,NULL);
-    dp_param_add_diff(dp,s1,NULL);
-    dp_param_add_boundary(dp,bound);
-    dp_param_add_stagecost(dp,stagecost2d);
-    dp_param_add_boundcost(dp,boundcost);
-    dp_param_add_obscost(dp,ocost);
-
-
-    // cross approximation tolerances
-    size_t start_rank = 10;
-    struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-9);
-    approx_args_set_round_tol(aargs,1e-9);
-    approx_args_set_kickrank(aargs,10);
-    approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,start_rank);
-    approx_args_set_maxrank(aargs,20);
-
-    double * start[2];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
-    struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
-
-    double lbu = -5.0;
-    double ubu = 5.0;
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,&lbu);
-    c3opt_add_ub(opt,&ubu);
     c3opt_set_absxtol(opt,1e-12);
     c3opt_set_relftol(opt,1e-12);
     c3opt_set_gtol(opt,1e-30);
     c3opt_set_verbose(opt,0);
 
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,10);
+    approx_args_set_adapt(aargs,0);
+    approx_args_set_startrank(aargs,10);
+    approx_args_set_maxrank(aargs,10);
 
+    // setup problem
+    struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
+    c3control_add_drift(c3c,f3,NULL);
+    c3control_add_diff(c3c,s2,NULL);
+    c3control_add_stagecost(c3c,stagecost3d);
+    c3control_add_boundcost(c3c,boundcost);
+    c3control_add_obstacle(c3c,goal_center,goal_width);
+    c3control_add_obscost(c3c,ocost);
+
+    size_t maxiter_vi = 20;
+    int verbose = 1;
     double convergence = 1e-5;
-    struct VIparam * vi = vi_param_create(convergence);
-    vi_param_add_cp(vi,cp);
-    vi_param_add_value(vi,vf);
+    struct ValueF * vf = c3control_init_value(c3c,quad3d,NULL,aargs,0);
+    struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
 
 
-    // create the value function that will yield the policy
-    
-    size_t nvi = 270;
-    size_t npi = 10;
-    
-    printf("should finish at 255\n");
-    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
-    struct ValueF * next = NULL;
-    /* next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); */
-    /* printf("Norm[%d] = %G\n",2,valuef_norm(next)); */
-    for (size_t jj = 0; jj < nvi; jj++){
-        printf("VI iteration = %zu\n",jj);
-        struct ValueF * vf_pol = NULL;
-        vf_pol = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
-        
-        struct PIparam * poli = NULL;
-        poli = pi_param_create(convergence,vf_pol);
-        pi_param_add_cp(poli,cp);
-        /* pi_param_add_value(poli,vf); */
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(dx,du,f3,NULL,
+                                           c3control_controller,c3c);
+    struct Trajectory * traj = run_sim_3d_3d(ode_sys);
 
-        double norm2;
-        /* if (jj == 269){ */
-        /*     npi = 100; */
-        /* } */
-        /* else{ */
-        /*     npi = 1; */
-        /* } */
-        for (size_t ii = 0; ii < npi; ii++){
-            if (next == NULL){
-                /* printf("go\n"); */
-                pi_param_add_value(poli,vf);
-                next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
-                norm2 = valuef_norm(next);
-                valuef_destroy(vf); vf = NULL;
-            }
-            else{
-                /* printf("there\n"); */
-                pi_param_add_value(poli,next);
-                vf = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
-                norm2 = valuef_norm(vf);
-                valuef_destroy(next); next = NULL;
-            }
-            printf("Norm[%zu] = %G\n",ii+2,norm2);
-        }
-        pi_param_destroy(poli); poli = NULL;
-        valuef_destroy(vf_pol); vf_pol = NULL;
-        if (next == NULL){
-            vi_param_add_value(vi,vf);
-        }
-        else{
-            vi_param_add_value(vi,next);
-        }
-    }
-    
-    control_params_destroy(cp); cp = NULL;
-    boundary_free(bound); bound = NULL;
-    mca_param_destroy(mca); mca = NULL;
-    free(xgrid[0]); xgrid[0] = NULL;
-    free(xgrid[1]); xgrid[1] = NULL;
-    free(start[0]); start[0] = NULL;
-    free(start[1]); start[1] = NULL;
-    dp_param_destroy(dp); dp = NULL;
+    trajectory_print(traj,stdout,5);
+
+    double * s = trajectory_get_last_state(traj);
+    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[2] < goal_center[2] + goal_width[2]/2);
+    CuAssertIntEquals(tc,1,s[2] > goal_center[2] - goal_width[2]/2);
+
+    // cleanup integrator stuff
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
+
     valuef_destroy(vf); vf = NULL;
-    valuef_destroy(next); next = NULL;
-    approx_args_free(aargs); aargs = NULL;
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
     c3opt_free(opt); opt = NULL;
-    vi_param_destroy(vi);
-
+    approx_args_free(aargs); aargs = NULL;
 }
 
 void Test_bellman_pi3d(CuTest * tc)
@@ -2141,249 +2061,84 @@ void Test_bellman_pi3d(CuTest * tc)
 
     double lb[3] = {-1.0, -2.0,-3.0};
     double ub[3] = {2.0, 3.0,1.0 };
-    /* double center[3] = {0.0,0.0,0.0}; */
-    /* double lengths[3] = {0.8,0.8,0.8}; */
-    struct Boundary * bound = boundary_alloc(dx,lb,ub);
-    /* boundary_add_obstacle(bound,center,lengths); */
-    
-
+    double goal_center[3] = {0.0,0.0,0.0};
+    double goal_width[3] = {0.8,0.8,0.8};
     size_t ngrid[3] = {20, 20, 20};
-    double * xgrid[3];
-    xgrid[0] = linspace(lb[0],ub[0],ngrid[0]);
-    xgrid[1] = linspace(lb[1],ub[1],ngrid[1]);
-    xgrid[2] = linspace(lb[2],ub[2],ngrid[2]);
-    double h[3] = {xgrid[0][1]-xgrid[0][0],
-                   xgrid[1][1]-xgrid[1][0],
-                   xgrid[2][1]-xgrid[2][0]};
-    double hmin = fmin(h[0],h[1]);
-    hmin = fmin(hmin,h[2]);
-    
-    struct MCAparam * mca = mca_param_create(dx,du);
-    mca_add_grid_refs(mca,ngrid,xgrid,hmin,h);
-    
     double discount = 0.1;
-    struct DPparam * dp = dp_param_create(dx,du,dw,discount);
-    dp_param_add_drift(dp,f3,NULL);
-    dp_param_add_diff(dp,s2,NULL);
-    dp_param_add_boundary(dp,bound);
-    dp_param_add_stagecost(dp,stagecost3d);
-    dp_param_add_boundcost(dp,boundcost);
-    dp_param_add_obscost(dp,ocost);
-
+    
+    // optimization arguments
+    double lbu = -5.0;
+    double ubu = 5.0;
+    double lbarr[3] = {lbu,lbu,lbu};
+    double ubarr[3] = {ubu,ubu,ubu};
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbarr);
+    c3opt_add_ub(opt,ubarr);
+    c3opt_set_absxtol(opt,1e-12);
+    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_set_verbose(opt,0);
 
     // cross approximation tolerances
-    size_t start_rank = 5;
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,0);
-    approx_args_set_startrank(aargs,start_rank);
-    approx_args_set_maxrank(aargs,start_rank);
+    approx_args_set_startrank(aargs,10);
+    approx_args_set_maxrank(aargs,10);
 
-    double * start[3];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
-    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
-
-    double lbu = -5.0;
-    double ubu = 5.0;
-    double lbarr[3] = {lbu,lbu,lbu};
-    double ubarr[3] = {ubu,ubu,ubu};
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,lbarr);
-    c3opt_add_ub(opt,ubarr);
-    c3opt_set_absxtol(opt,1e-5);
-    c3opt_set_relftol(opt,1e-5);
-    c3opt_set_gtol(opt,0.0);
-    c3opt_set_verbose(opt,0);
-    /* c3opt_ls_set_beta(opt,0.8); */
-
-    struct ControlParams * cp = control_params_create(dx,dw,dp,mca,opt);
-
-    double convergence = 1e-5;
-    struct VIparam * vi = vi_param_create(convergence);
-    vi_param_add_cp(vi,cp);
-    vi_param_add_value(vi,vf);
-
-    // create the value function that will yield the policy
-    
-    size_t nvi = 1000;
-    size_t npi = 10;
-    
-    printf("Norm[%d] = %G\n",1,valuef_norm(vf));
-    struct ValueF * next = NULL;
-    /* next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0); */
-    /* printf("Norm[%d] = %G\n",2,valuef_norm(next)); */
-    for (size_t jj = 0; jj < nvi; jj++){
-        printf("VI iteration = %zu\n",jj);
-        struct ValueF * vf_pol = NULL;
-        vf_pol = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,aargs,0);
-
-        struct PIparam * poli = NULL;
-        poli = pi_param_create(convergence,vf_pol);
-        pi_param_add_cp(poli,cp);
-        /* pi_param_add_value(poli,vf); */
-
-        double norm2;
-        for (size_t ii = 0; ii < npi; ii++){
-            if (next == NULL){
-                /* printf("go\n"); */
-                pi_param_add_value(poli,vf);
-                /* vi_param_add_value(vi,vf); */
-                next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
-                norm2 = valuef_norm(next);
-                valuef_destroy(vf); vf = NULL;
-            }
-            else{
-                /* printf("there\n"); */
-                pi_param_add_value(poli,next);
-                /* vi_param_add_value(vi,next); */
-                vf = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,start,aargs,0);
-                norm2 = valuef_norm(vf);
-                valuef_destroy(next); next = NULL;
-            }
-            printf("Norm[%zu] = %G\n",ii+2,norm2);
-        }
-
-        pi_param_destroy(poli); poli = NULL;
-        valuef_destroy(vf_pol); vf_pol = NULL;
-        if (next == NULL){
-            vi_param_add_value(vi,vf);
-        }
-        else{
-            vi_param_add_value(vi,next);
-        }
-    }
-    
-    control_params_destroy(cp); cp = NULL;
-    boundary_free(bound); bound = NULL;
-    mca_param_destroy(mca); mca = NULL;
-    free(xgrid[0]); xgrid[0] = NULL;
-    free(xgrid[1]); xgrid[1] = NULL;
-    free(xgrid[2]); xgrid[2] = NULL;
-    free(start[0]); start[0] = NULL;
-    free(start[1]); start[1] = NULL;
-    free(start[2]); start[2] = NULL;
-    dp_param_destroy(dp); dp = NULL;
-    valuef_destroy(vf); vf = NULL;
-    approx_args_free(aargs); aargs = NULL;
-    c3opt_free(opt); opt = NULL;
-    vi_param_destroy(vi);
-}
-
-void Test_bellman_c3control3d(CuTest * tc)
-{
-    printf("Testing Function: c3control interface (3d control) \n");
-
-    //////////////////////////////////////////////////
-    // Problem Setup
-    //////////////////////////////////////////////////
-    size_t dx = 3;
-    size_t du = 3;
-    size_t dw = 3;
-
-    double lb[3] = {-1.0, -2.0,-3.0};
-    double ub[3] = {2.0, 3.0,1.0 };
-    size_t ngrid[3] = {20, 20, 20};
-    double discount = 0.1;
-
+    // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
-    CuAssertIntEquals(tc,0,c3c==NULL);
-    // obstacle
-    /* double center[3] = {0.0,0.0,0.0}; */
-    /* double lengths[3] = {0.8,0.8,0.8}; */
-    /* c3control_add_obstacle(c3c,center,lengths); */
-
-    // dynamics
     c3control_add_drift(c3c,f3,NULL);
     c3control_add_diff(c3c,s2,NULL);
-
-    // costs
     c3control_add_stagecost(c3c,stagecost3d);
     c3control_add_boundcost(c3c,boundcost);
+    c3control_add_obstacle(c3c,goal_center,goal_width);
     c3control_add_obscost(c3c,ocost);
 
-    //////////////////////////////////////////////////
-    // Approximation and Optimization Options
-    //////////////////////////////////////////////////
-    // cross approximation tolerances
-    size_t start_rank = 5;
-    struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-3);
-    /* approx_args_set_maxiter(aargs,10); */
-    approx_args_set_kickrank(aargs,10);
-    approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,start_rank);
-    approx_args_set_maxrank(aargs,start_rank);
+    size_t maxiter_vi = 2;
+    size_t maxiter_pi = 10;
+    int verbose = 1;
+    double convergence = 1e-4;
+    struct ValueF * cost = c3control_init_value(c3c,quad3d,NULL,aargs,0);
+
+    for (size_t ii = 0; ii < maxiter_vi; ii++){
+        printf("Control update: %zu\n",ii);
+        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,
+                                                  convergence,
+                                                  cost,aargs,opt,
+                                                  verbose,NULL);
+        valuef_destroy(cost); cost = NULL;
+        cost = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        valuef_destroy(next); next = NULL;
+    }
 
 
-    double lbu = -5.0;
-    double ubu = 5.0;
-    double lbarr[3] = {lbu,lbu,lbu};
-    double ubarr[3] = {ubu,ubu,ubu};
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,lbarr);
-    c3opt_add_ub(opt,ubarr);
-    c3opt_set_absxtol(opt,1e-7);
-    c3opt_set_relftol(opt,1e-7);
-    c3opt_set_gtol(opt,0.0);
-    c3opt_set_verbose(opt,0);
-    /* c3opt_ls_set_beta(opt,0.8); */
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(dx,du,f3,NULL,
+                                           c3control_controller,c3c);
+    struct Trajectory * traj = run_sim_3d_3d(ode_sys);
 
-    
-    //////////////////////////////////////////////////
-    // Solver properties
-    //////////////////////////////////////////////////
+    trajectory_print(traj,stdout,5);
 
-    struct ValueF * pol = c3control_init_value(c3c,quad3d,NULL,aargs,0);
-    struct ValueF * pol_copy = valuef_copy(pol);
+    double * s = trajectory_get_last_state(traj);
+    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[2] < goal_center[2] + goal_width[2]/2);
+    CuAssertIntEquals(tc,1,s[2] > goal_center[2] - goal_width[2]/2);
 
-    double diff = valuef_norm2diff(pol,pol_copy);
-    CuAssertDblEquals(tc,0,diff,1e-14);
+    // cleanup integrator stuff
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
 
-    char filename[256] = "vf_save.c3";
-    int saved = valuef_save(pol_copy,filename);
-    CuAssertIntEquals(tc,0,saved);
-
-    double ** xgrid = c3control_get_xgrid(c3c);
-    struct ValueF * vf_loaded = valuef_load(filename,ngrid,xgrid);
-    diff = valuef_norm2diff(pol,vf_loaded);
-    CuAssertDblEquals(tc,0,diff,1e-14);
-
-    /* struct ValueF * pol_cost = c3control_step_vi(c3c,pol_copy,aargs,opt); */
-    /* struct ValueF * pol_cost = c3control_step_pi(c3c,pol_copy,pol,aargs,opt); */
-
-    /* size_t maxiter_vi = 10; */
-    /* double abs_conv_vi = 1e-3; */
-    size_t maxiter_pi = 20;
-    double abs_conv_pi = 1e-6;
-    struct Diag * diag = NULL;
-    struct ValueF * pol_cost = NULL;
-    struct ValueF * vf = NULL;
-    pol_cost = c3control_pi_solve(c3c,maxiter_pi,abs_conv_pi,
-                                  pol,aargs,opt,1,&diag);
-
-    /* vf = c3control_vi_solve(c3c,maxiter_vi,abs_conv_vi,pol, */
-    /*                         aargs,opt,1,&diag); */
-
-    diag_print(diag,stdout);
-
-    diag_destroy(&diag); diag = NULL;
-    approx_args_free(aargs); aargs = NULL;
-    c3opt_free(opt); opt = NULL;
-    valuef_destroy(vf_loaded); vf_loaded = NULL;
-    valuef_destroy(pol); pol = NULL;
-    valuef_destroy(pol_copy); pol_copy = NULL;
-    valuef_destroy(pol_cost); pol_cost = NULL;
-    valuef_destroy(vf); vf = NULL;
+    valuef_destroy(cost); cost = NULL;
     c3control_destroy(c3c); c3c = NULL;
+    c3opt_free(opt); opt = NULL;
+    approx_args_free(aargs); aargs = NULL;
 }
 
 CuSuite * DPAlgsGetSuite()
@@ -2392,10 +2147,10 @@ CuSuite * DPAlgsGetSuite()
 
     CuSuite * suite = CuSuiteNew();
     /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_vi3d); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */
-    SUITE_ADD_TEST(suite, Test_bellman_c3control3d);
+
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi3d);; */
+    SUITE_ADD_TEST(suite, Test_bellman_pi3d);
 
     return suite;
 }

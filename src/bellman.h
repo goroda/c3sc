@@ -80,7 +80,7 @@ int control_params_get_last_res(const struct ControlParams *);
 void control_params_destroy(struct ControlParams *);
 
 ///////////////////////////////////////////////////////////////
-double bellman_control(size_t, double *, double *, void *);
+double bellman_control(size_t, const double *, double *, void *);
 int bellman_optimal(size_t, double *, double *, void *);
 
 

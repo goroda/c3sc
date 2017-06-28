@@ -79,23 +79,12 @@ double bellmanrhs(size_t dx, size_t du, double stage_cost, const double * stage_
     double out = dt * stage_cost + ebt * cost_to_go;
 
     if (grad != NULL){
-        /* printf("dtgrad = "); dprint(du,dtgrad); */
-        /* printf("stagegrad = "); dprint(du,stage_grad); */
-        /* printf("stagecost = %G\n",stage_cost); */
-        /* printf("dt = %G\n",dt); */
-        /* printf("ebt = %G\n",ebt); */
         for (size_t jj = 0; jj < du; jj++){
-            /* printf("jj = %zu\n",jj); */
             // derivative of stage cost
             grad[jj] = stage_grad[jj] * dt + dtgrad[jj]*stage_cost ;
             grad[jj] += (-discount) * dtgrad[jj] * ebt * cost_to_go;
-            /* printf("grad[jj] til noow = %G\n",grad[jj]); */
             for (size_t ii = 0; ii < 2*dx+1; ii++){
-                /* printf("ii = %zu, cost=%G\n",ii,cost[ii]); */
-                /* printf("prob grad = %G\n",prob_grad[jj*(2*dx+1)+ii]);  */
                 grad[jj] += ebt * prob_grad[ii*du + jj] * cost[ii];
-                /* printf("grad[jj] is now %G\n",grad[jj]); */
-
             }
         }
         /* printf("grad = ");dprint(du,grad); */
@@ -376,7 +365,7 @@ void control_params_destroy(struct ControlParams * cp)
 
     \return value of bellmans equation
 **************************************************************/
-double bellman_control(size_t du, double * u, double * grad_u, void * args)
+double bellman_control(size_t du, const double * u, double * grad_u, void * args)
 {
     struct ControlParams * param = args;
 

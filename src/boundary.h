@@ -37,7 +37,7 @@
 #define C3SC_BOUNDARY_H
 
 enum EBTYPE {
-    NONE=0,
+    EB_NONE=0,
     ABSORB=1,
     PERIODIC=2,
     REFLECT=3

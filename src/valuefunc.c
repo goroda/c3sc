@@ -42,6 +42,7 @@
 /* #include "c3.h" */
 #include "c3/lib_linalg.h"
 #include "c3/lib_clinalg.h"
+#include "c3/c3_interface.h"
 
 #include "util.h"
 
