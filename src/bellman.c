@@ -1213,7 +1213,7 @@ void c3control_destroy(struct C3Control * c3c)
         for (size_t ii = 0; ii < c3c->dx; ii++){
             free(c3c->xgrid[ii]); c3c->xgrid[ii] = NULL;
         }
-        free(c3c->work);    c3c->work = NULL;
+        workspace_free(c3c->work);  c3c->work = NULL;
         free(c3c->prevpol); c3c->prevpol = NULL;
         free(c3c->xgrid);   c3c->xgrid = NULL;
         free(c3c->h);       c3c->h     = NULL;
