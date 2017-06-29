@@ -44,6 +44,12 @@
 #include "hashgrid.h"
 #include "bellman.h"
 
+struct Memory
+{
+    void * shared;
+    size_t private;
+};
+
 
 /**********************************************************//**
     Evaluate the rhs of the bellman equation
@@ -260,9 +266,10 @@ struct ControlParams
     double time;
     size_t dx;
     size_t dw;
+
+    size_t N;
     const double * x;
-    int absorbed;
-    const double * costs;
+    
     struct DPparam * dp;
     struct MCAparam * mca;
     struct Workspace * work;
@@ -290,15 +297,12 @@ struct ControlParams * control_params_create(size_t dx, size_t dw,
     return c;
 }
 
-void control_params_add_state_info(struct ControlParams * cp,
-                                   double time, const double * x, int absorbed,
-                                   const double * costs)
+void control_params_add_time_and_states(struct ControlParams * cp, double time, size_t N, const double * x)
 {
     assert (cp != NULL);
     cp->time = time;
+    cp->N = N;
     cp->x = x;
-    cp->absorbed = absorbed;
-    cp->costs = costs;
 }
 
 int control_params_get_last_res(const struct ControlParams * cp)
@@ -333,42 +337,46 @@ void control_params_destroy(struct ControlParams * cp)
 **************************************************************/
 double bellman_control(size_t du, const double * u, double * grad_u, void * args)
 {
-    struct ControlParams * param = args;
+    struct Memory * mem = args;
+    struct ControlParams * param = mem->shared;
+    size_t mem_node = mem->private;
 
     // unpack
     struct DPparam * dp = param->dp;
     struct MCAparam * mca = param->mca;
     struct Workspace * work = param->work;
-    
-    const double * costs = param->costs;
-    const double * x = param->x;
-    double time = param->time;
-    size_t dx = param->dx;
-    size_t dw = param->dw;
-    int absorbed = param->absorbed;
 
     assert (dp != NULL);
     assert (mca != NULL);
-    assert (costs != NULL);
-    assert (x != NULL);
     assert (work != NULL);
+
+    
+
+    double time = param->time;
+    size_t dx = param->dx;
+    size_t dw = param->dw;
+
 
     // stage cost
     double val;
     double stage_cost;
 
-    size_t node         = workspace_get_active(work);
-    double * drift      = workspace_get_drift             (work, node);
-    double * grad_drift = workspace_get_grad_drift        (work, node);
-    double * diff       = workspace_get_diff              (work, node);
-    double * grad_diff  = workspace_get_grad_diff         (work, node);
-    double * dt         = workspace_get_dt                (work, node);
-    double * grad_dt    = workspace_get_grad_dt           (work, node);
-    double * prob       = workspace_get_prob              (work, node);
-    double * grad_prob  = workspace_get_grad_prob         (work, node);
-    double * grad_stage = workspace_get_grad_stage        (work, node);
-    double * workspace  = workspace_get_control_size_extra(work, node);
 
+    const double * x = param->x + mem_node * dx;
+
+    int absorbed        = *(workspace_get_absorbed        (work, mem_node));
+    double * costs      = workspace_get_costs             (work, mem_node);
+    double * drift      = workspace_get_drift             (work, mem_node);
+    double * grad_drift = workspace_get_grad_drift        (work, mem_node);
+    double * diff       = workspace_get_diff              (work, mem_node);
+    double * grad_diff  = workspace_get_grad_diff         (work, mem_node);
+    double * dt         = workspace_get_dt                (work, mem_node);
+    double * grad_dt    = workspace_get_grad_dt           (work, mem_node);
+    double * prob       = workspace_get_prob              (work, mem_node);
+    double * grad_prob  = workspace_get_grad_prob         (work, mem_node);
+    double * grad_stage = workspace_get_grad_stage        (work, mem_node);
+    double * workspace  = workspace_get_control_size_extra(work, mem_node);
+    
     //get drift and diffusion
     int res;
     if (grad_u != NULL){
@@ -433,23 +441,23 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
 /**********************************************************//**
     Find the optimal control
 
-    \param[in]     du  - number of control variables
-    \param[in,out] u   - control
-    \param[in]     val - value of bellman function at optimal control
-    \param[in]     arg - pointer to problem parameters (ControlParams)
+    \param[in]     du       - number of control variables
+    \param[in,out] u        - control
+    \param[in]     val      - value of bellman function at optimal control
+    \param[in]     arg      - pointer to memory
 
     \return 0 if successful, otherwise not
 **************************************************************/
 int bellman_optimal(size_t du, double * u, double * val, void * arg)
 {
     assert (arg != NULL);
-    struct ControlParams * param = arg;
-
-
+    struct Memory * mem = arg;
+    struct ControlParams * param = mem->shared;
+    
     // unpack
     struct c3Opt * opt = param->opt;
     assert (opt != NULL);
-    c3opt_add_objective(opt,&bellman_control,param);
+    c3opt_add_objective(opt,&bellman_control,mem);
 
     if (c3opt_is_bruteforce(opt) == 1){
         c3opt_minimize(opt,u,val);
@@ -465,7 +473,6 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     size_t npert = 2;
     double valtemp;
     int justrand = -1;
-
 
     // first do zero;
     /* valtemp = bellman_control(du,ucurr,NULL,arg); */
@@ -529,7 +536,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
                 for (size_t jj = 0; jj < npts; jj++){
                     pt[0] = pts1[ii];
                     pt[1] = pts2[jj];
-                    valtemp = bellman_control(du,pt,NULL,param);
+                    valtemp = bellman_control(du,pt,NULL,mem);
                     /* c3opt_minimize(opt,pt,&valtemp); */
                     if (valtemp < minval){
                         minval = valtemp;
@@ -707,17 +714,12 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     struct HTable * htable_node = param->htable_node;
     struct Boundary * bound = dp->bound;
 
-    int * absorbed = calloc_int(N);
-    double * costs = calloc_double(N*(2*dx+1));
-    double * u = calloc_double(du);
+    int * absorbed = workspace_get_absorbed(cp->work,0);
+    double * costs = workspace_get_costs(cp->work,0);
 
-    /* printf("lets go!\n"); */
-    /* for (size_t ii = 0; ii < N; ii++){ */
-    /*     dprint(dx,x+ii*dx); */
-    /* } */
     /* printf("get neighbor cost\n"); */
     size_t * fi = calloc_size_t(dx);
-    size_t * fit = calloc_size_t(dx);
+
     size_t dim_vary;
     int res = mca_get_neighbor_costs(dx,N,x,
                                      bound,vf,ngrid,xgrid,
@@ -725,6 +727,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
                                      absorbed,costs);
     assert (res == 0);
     size_t * ind_to_serialize = calloc_size_t(dx+1);
+    size_t * fit = calloc_size_t(dx);
     for (size_t ii = 0; ii < dx; ii++){
         fit[ii] = fi[ii];
         if (ii != dim_vary){
@@ -742,6 +745,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     if (out_stored == NULL){
         /* printf("got it\n"); */
         double time = 0.0;
+        control_params_add_time_and_states(cp,time,N,x);
         param->nstate_evals = param->nstate_evals + N;
         for (size_t ii = 0; ii < N; ii++){
 
@@ -760,13 +764,16 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
                 free(key1); key1 = NULL;
             }
 
-            // calculate
-            control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],
-                                          costs+ii*(2*dx+1));
-            int res2 = bellman_optimal(du,u,out+ii,cp);
+
+            struct Memory mem;
+            mem.shared = cp;
+            mem.private = ii;
+            double * u = workspace_get_u(cp->work,ii);
+            int res2 = bellman_optimal(du,u,out+ii,&mem);
             assert (res2 == 0);
            
         }
+        /* param->nnode_evals += N; */
         htable_add_element(htable,key,out,N * sizeof(double));
     }
     else{
@@ -778,9 +785,6 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
 
     free(fi); fi = NULL;
     free(fit); fit = NULL;
-    free(absorbed); absorbed = NULL;
-    free(costs); costs = NULL;
-    free(u); u = NULL;
 
     return 0;
     
@@ -893,25 +897,19 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     assert (htable != NULL);
     assert (htable_iter != NULL);
     // handle the policy
+
     double time = 0.0;
-
-
-    /* printf("prep\n"); */
-    int * absorbed_pol = calloc_int(N);
-    double * costs_pol = calloc_double(N*(2*dx+1));
+    int * absorbed_pol = workspace_get_absorbed(cp->work,0);
+    double * costs_pol = workspace_get_costs(cp->work,0);
 
     size_t * fi = calloc_size_t(dx);
     size_t dim_vary;
-    /* printf("get neighbor costs\n"); */
-    /* printf("\t %zu,%zu\n",dx,N); */
-    int res = mca_get_neighbor_costs(dx,N,x,
-                                     bound,vf_policy,ngrid,xgrid,
-                                     fi,&dim_vary,
-                                     absorbed_pol,costs_pol);
-    /* printf("got them\n"); */
-    assert (res == 0);
+    int res = mca_get_neighbor_costs(dx,N,x,bound,vf_policy,ngrid,xgrid,
+                                     fi,&dim_vary, absorbed_pol,costs_pol);
 
+    assert (res == 0);
     assert (dim_vary < dx);
+
     size_t * ind_to_serialize = calloc_size_t(dx+1);
     for (size_t ii = 0; ii < dx; ii++){
         assert (fi[ii] < ngrid[ii]);
@@ -944,27 +942,24 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
             probs = calloc_double(nprobs); // last N are dts
             probs_alloc = 1;
 
-            double * u = calloc_double(du);
-            /* printf("lets go\n"); */
+            control_params_add_time_and_states(cp,time,N,x);
             for (size_t ii = 0; ii < N; ii++){
-                /* printf("ii=%zu/%zu",ii+1,N); */
-                param->npol_evals++;                                
-                control_params_add_state_info(cp,time,x+ii*dx,
-                                              absorbed_pol[ii],
-                                              costs_pol+ii*(2*dx+1));
 
+                struct Memory mem;
+                mem.shared = cp;
+                mem.private = ii;
                 
-                workspace_set_active(cp->work,ii); 
-                    
-                double val;
-                int res2 = bellman_optimal(du,u,&val,cp);
 
-
+                double * u     = workspace_get_u(cp->work,ii);
                 double * drift = workspace_get_drift(cp->work, ii);
                 double * diff  = workspace_get_diff (cp->work, ii);
-                
-                // build transition probabilities
-                // at optimal
+
+                    
+                double val;
+                int res2 = bellman_optimal(du,u,&val,&mem);
+
+
+                // build transition probabilities at optimal
                 assert (res2 == 0);
                 res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,drift,NULL);
                 assert (res2 == 0);
@@ -977,12 +972,12 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
                 res2 = dp->stagecost(time,x+ii*dx,u,probs + N*(2*dx+1)+N+ii,NULL);
                 assert (res2 == 0);
+
+                param->npol_evals++;                                
             }
-            /* printf("done with going over all points\n"); */
+
             htable_add_element(htable,key2,probs,nprobs * sizeof(double));
-            /* printf("added element"); */
-            free(u); u = NULL;
-            /* printf("freed control\n"); */
+
         }
         else{
             /* printf("probs is null"); */
@@ -1000,7 +995,6 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                                      absorbed,costs);
         /* printf("got other \n"); iprint(N,absorbed); */
         
-
         assert (res == 0);
 
 
@@ -1063,13 +1057,9 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         if (probs_alloc == 1){
             free(probs); probs = NULL;
         }
-        free(absorbed); absorbed = NULL;
-        free(costs); costs = NULL;
         free(fi); fi = NULL;
 
-        /* printf("add the element\n"); */
         htable_add_element(htable_iter,key3,out,N * sizeof(double));
-        /* printf("dealt with it\n"); */
     }
     else{
         /* printf("got saved\n"); */
@@ -1084,10 +1074,6 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     free(key1); key1 = NULL;
     /* free(key2); key2 = NULL; */
 
-    free(absorbed_pol); absorbed_pol = NULL;
-    free(costs_pol); costs_pol = NULL;
-
-    /* printf("finished pi\n"); */
     return 0;
     
 }
@@ -1317,8 +1303,10 @@ int c3control_policy_eval(struct C3Control * c3c, double t,
     size_t dx = c3c->dx;
     size_t * ngrid = c3c->ngrid;
     double ** xgrid = c3c->xgrid;
-    double * costs = calloc_double(2*dx+1);
-    int absorbed;
+
+
+    int * absorbed = workspace_get_absorbed(c3c->work,0);
+    double * costs = workspace_get_costs(c3c->work,0);
 
     struct Boundary * bound = c3c->bound;
     struct ValueF * policy_sim = c3c->policy_sim;
@@ -1332,12 +1320,8 @@ int c3control_policy_eval(struct C3Control * c3c, double t,
 
     double val;
     int res = mca_get_neighbor_node_costs(dx, x, bound, policy_sim,
-                                          ngrid, xgrid, &absorbed, costs);
+                                          ngrid, xgrid, absorbed, costs);
 
-    /* if (absorbed != 0){ */
-    /*     printf("x = "); dprint(dx,x); */
-    /*     printf("absorbed = %d\n ",absorbed); */
-    /* } */
 
     assert (res == 0);
     if (c3c->prevpol == NULL){
@@ -1347,8 +1331,13 @@ int c3control_policy_eval(struct C3Control * c3c, double t,
     for (size_t ii = 0; ii < c3c->du; ii++){
         u[ii] = c3c->prevpol[ii];
     }
-    control_params_add_state_info(cp,t,x,absorbed,costs);
-    int res2 = bellman_optimal(c3c->du,u,&val,cp);
+
+    control_params_add_time_and_states(cp,t,1,x);
+
+    struct Memory mem;
+    mem.shared = cp;
+    mem.private = 0;
+    int res2 = bellman_optimal(c3c->du,u,&val,&mem);
     /* printf("val = %G u choose = ",val); dprint(c3c->du,u); */
     assert (res2 == 0);
     /* exit(1); */
@@ -1356,10 +1345,7 @@ int c3control_policy_eval(struct C3Control * c3c, double t,
         c3c->prevpol[ii] = u[ii];
     }
 
-
-    free(costs); costs = NULL;
     control_params_destroy(cp); cp = NULL;
-
     return 0;
 }
 

@@ -90,6 +90,7 @@ double * workspace_get_prob(struct Workspace * w, size_t node);
 double * workspace_get_grad_prob(struct Workspace * w, size_t node);
 double * workspace_get_grad_stage(struct Workspace * w, size_t node);
 double * workspace_get_control_size_extra(struct Workspace * w, size_t node);
-
-
+double * workspace_get_u(struct Workspace * w, size_t node);
+double * workspace_get_costs(struct Workspace * w, size_t node);
+int *    workspace_get_absorbed(struct Workspace * w, size_t node);
 #endif

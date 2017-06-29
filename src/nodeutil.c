@@ -442,9 +442,15 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
     // BellmanParam must have
 
     // convert fibers to indices
-    /* size_t * fixed_ind = calloc_size_t(d); */
-    /* size_t dim_vary; */
-    /* printf("convert fiber\n"); */
+
+    // initialization just to be safe
+    for (size_t ii = 0; ii < N; ii++){
+        absorbed[ii] = 0;
+        for (size_t jj = 0; jj < 2*d+1; jj++){
+            out[ii*(2*d+1)+jj] = 0.0;
+        }
+    }
+    
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
     if (res != 0){
         printf("\n======================================\n");

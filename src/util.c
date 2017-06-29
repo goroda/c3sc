@@ -674,9 +674,11 @@ struct Workspace
     size_t du;
     size_t dw;
     size_t N; // copies of memory
-    size_t active;
-    size_t index[10]; // indexs into memory mem
+    size_t index[11]; // indexs into memory mem
     double ** mem;
+
+    double * costs_pol;
+    int    * absorbed_pol;
 };
 
 struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
@@ -708,11 +710,14 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
     work->index[7] = du * (2*dx+1) + work->index[6]; // grad_prob
     work->index[8] = du + work->index[7];            // grad_stage
     work->index[9] = du + work->index[8];            // extra control-sized mem
+    work->index[10] = du + work->index[9];           // u
 
-    work->active = 0;
     for (size_t ii = 0; ii < N; ii++){
-        work->mem[ii] = calloc_double(work->index[9]);
+        work->mem[ii] = calloc_double(work->index[10]);
     }
+
+    work->costs_pol = calloc_double(N*(2*dx+1));
+    work->absorbed_pol = calloc_int(N);
 
     return work;
 }
@@ -724,21 +729,12 @@ void workspace_free(struct Workspace * w)
             free(w->mem[ii]); w->mem[ii] = NULL;
         }
         free(w->mem); w->mem = NULL;
+        free(w->costs_pol); w->costs_pol = NULL;
+        free(w->absorbed_pol); w->absorbed_pol = NULL;
         free(w); w = NULL;
     }
 }
 
-void workspace_set_active(struct Workspace * w, size_t active)
-{
-    assert (w != NULL);
-    assert (active < w->N);
-    w->active = active;
-}
-
-size_t workspace_get_active(struct Workspace * w)
-{
-    return w->active;
-}
 
 double * workspace_get_drift(struct Workspace * w, size_t node)
 {
@@ -790,7 +786,20 @@ double * workspace_get_control_size_extra(struct Workspace * w, size_t node)
     return w->mem[node] + w->index[8];
 }
 
+double * workspace_get_u(struct Workspace * w, size_t node)
+{
+    return w->mem[node] + w->index[9];
+}
 
+double * workspace_get_costs(struct Workspace * w, size_t node)
+{
+    return w->costs_pol + node * (2 * w->dx + 1);
+}
+
+int * workspace_get_absorbed(struct Workspace * w, size_t node)
+{
+    return w->absorbed_pol + node;
+}
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////

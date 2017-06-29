@@ -49,6 +49,12 @@
 #include "cdyn/src/simulate.h"
 #include "cdyn/src/integrate.h"
 
+struct Memory
+{
+    void * shared;
+    size_t private;
+};
+
 struct Trajectory * run_sim_2d_1d(struct Integrator * ode_sys)
 {
     integrator_set_type(ode_sys,"rk4");
@@ -1458,8 +1464,8 @@ void Test_bellman_control1d(CuTest * tc)
 
                 /* size_t vary_ind = 0;; */
                 double * x = calloc_double(dx*ngrid[vary_ind]);
-                int * absorbed = calloc_int(ngrid[vary_ind]);
-                double * costs = calloc_double(ngrid[vary_ind]*(2*dx+1));
+                int * absorbed = workspace_get_absorbed(work,0);
+                double * costs = workspace_get_costs(work,0);
                 for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
                     for (size_t jj = 0; jj < dx; jj++){
                         x[ii*dx+jj] = xgrid[jj][ind[jj]];
@@ -1478,8 +1484,6 @@ void Test_bellman_control1d(CuTest * tc)
                 CuAssertIntEquals(tc,vary_ind,dv);
                 CuAssertIntEquals(tc,ngrid[vary_ind],fi[vary_ind]);
                 
-
-
                 double time = 0.0;
                 double val = 0.0;
                 double val2 = 0.0;
@@ -1488,10 +1492,15 @@ void Test_bellman_control1d(CuTest * tc)
                 double grad[1];
                 size_t nopts = 100;
                 double * uopts = linspace(lbu,ubu,nopts);
+
+                control_params_add_time_and_states(cp,time,ngrid[vary_ind],x);
                 for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
                     /* printf("ii=%zu\n",ii); */
-                    control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],costs+ii*(2*dx+1));
-
+                
+                    struct Memory mem;
+                    mem.shared = cp;
+                    mem.private = ii;
+                    
                     double umin = 1000;
                     /* double minim = 0.0; */
                     for (size_t jj = 0; jj < nopts; jj++){
@@ -1499,15 +1508,15 @@ void Test_bellman_control1d(CuTest * tc)
                         double v[1] = {u[0]+delta};
         
                         /* printf("control\n"); */
-                        val = bellman_control(du,u,grad,cp);
+                        val = bellman_control(du,u,grad,&mem);
                         if (val < umin){
                             umin = val;
                             /* minim = u[0]; */
                         }
                         
-                        val2 = bellman_control(du,v,NULL,cp);
+                        val2 = bellman_control(du,v,NULL,&mem);
                         v[0] = u[0]-delta;
-                        val3 = bellman_control(du,v,NULL,cp);
+                        val3 = bellman_control(du,v,NULL,&mem);
 
                         double diff_should = (val2-val3)/2.0/delta;
                         double diff_is = grad[0];
@@ -1522,7 +1531,7 @@ void Test_bellman_control1d(CuTest * tc)
                     if (absorbed[ii] == 0){ // this breaks!!! ofcourse...
                         double uopt[1];
                         double valopt;
-                        int res2 = bellman_optimal(du,uopt,&valopt,cp);
+                        int res2 = bellman_optimal(du,uopt,&valopt,&mem);
                         CuAssertIntEquals(tc,0,res2);
                         /* printf("valopt = %3.10G, optbf=%3.10G\n",valopt,umin); */
                         /* printf("locminopt = %3.10G\n",uopt[0]); */
@@ -1533,8 +1542,6 @@ void Test_bellman_control1d(CuTest * tc)
 
                 free(uopts); uopts = NULL;
                 free(x); x = NULL;
-                free(absorbed); absorbed = NULL;
-                free(costs); costs = NULL;
             }
         }
     }
@@ -1653,8 +1660,10 @@ void Test_bellman_control3d(CuTest * tc)
 
                     /* size_t vary_ind = 0;; */
                     double * x = calloc_double(dx*ngrid[vary_ind]);
-                    int * absorbed = calloc_int(ngrid[vary_ind]);
-                    double * costs = calloc_double(ngrid[vary_ind]*(2*dx+1));
+
+                    int * absorbed = workspace_get_absorbed(work,0);
+                    double * costs = workspace_get_costs(work,0);
+                    
                     for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
                         for (size_t jj = 0; jj < dx; jj++){
                             x[ii*dx+jj] = xgrid[jj][ind[jj]];
@@ -1683,10 +1692,12 @@ void Test_bellman_control3d(CuTest * tc)
                     /* double lbu = -5.0; */
                     /* double ubu = 5.0; */
                     double * uopts = linspace(lbu+5e-1,ubu-5e-1,nopts);
+                    control_params_add_time_and_states(cp,time,ngrid[vary_ind],x);
                     for (size_t ii = 0; ii < ngrid[vary_ind]; ii++){
                         /* printf("ii=%zu\n",ii); */
-                        control_params_add_state_info(cp,time,x+ii*dx,absorbed[ii],
-                                                      costs+ii*(2*dx+1));
+                        struct Memory mem;
+                        mem.shared = cp;
+                        mem.private = ii;
 
                         /* double umin = 1000; */
                         /* double minim[3] = {0.0, 0.0, 0.0}; */
@@ -1696,7 +1707,7 @@ void Test_bellman_control3d(CuTest * tc)
                                     
                                     double u[3] = {uopts[jj],uopts[ff],uopts[qq]};
                                                                 /* printf("control\n"); */
-                                    val = bellman_control(du,u,grad,cp);
+                                    val = bellman_control(du,u,grad,&mem);
                                     CuAssertIntEquals(tc,1,val>-1);
                                     /* if (val < umin){ */
                                     /*     umin = val; */
@@ -1709,9 +1720,9 @@ void Test_bellman_control3d(CuTest * tc)
                                     double v[3] = {u[0],u[1],u[2]};
                                     for (size_t rr = 0; rr < du; rr++){
                                         v[rr] = u[rr]+delta;
-                                        val2 = bellman_control(du,v,NULL,cp);
+                                        val2 = bellman_control(du,v,NULL,&mem);
                                         v[rr] = u[rr]-delta;
-                                        val3 = bellman_control(du,v,NULL,cp);
+                                        val3 = bellman_control(du,v,NULL,&mem);
                                         v[rr] = u[rr];
                                         double diff_should = (val2-val3)/2.0/delta;
                                         /* double diff_should = (val2-val3)/delta; */
@@ -1772,8 +1783,6 @@ void Test_bellman_control3d(CuTest * tc)
 
                     free(uopts); uopts = NULL;
                     free(x); x = NULL;
-                    free(absorbed); absorbed = NULL;
-                    free(costs); costs = NULL;
                 }
             }
         }
@@ -1862,7 +1871,7 @@ void Test_bellman_vi(CuTest * tc)
     c3control_add_obscost(c3c,ocost);
 
 
-    size_t maxiter_vi = 20;
+    size_t maxiter_vi = 2;
     int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);

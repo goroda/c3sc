@@ -75,9 +75,7 @@ struct ControlParams;
 struct ControlParams *
 control_params_create(size_t, size_t, struct DPparam *,
                       struct MCAparam *, struct Workspace *, struct c3Opt *);
-void control_params_add_state_info(struct ControlParams *,
-                                   double, const double *, int,
-                                   const double *);
+void control_params_add_time_and_states(struct ControlParams *, double, size_t, const double *);
 int control_params_get_last_res(const struct ControlParams *);
 void control_params_destroy(struct ControlParams *);
 
