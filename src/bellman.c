@@ -44,6 +44,10 @@
 #include "hashgrid.h"
 #include "bellman.h"
 
+#ifdef _OPENMP
+#include "omp.h"
+#endif
+
 struct Memory
 {
     void * shared;
@@ -350,8 +354,6 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     assert (mca != NULL);
     assert (work != NULL);
 
-    
-
     double time = param->time;
     size_t dx = param->dx;
     size_t dw = param->dw;
@@ -454,8 +456,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     struct Memory * mem = arg;
     struct ControlParams * param = mem->shared;
     
-    // unpack
-    struct c3Opt * opt = param->opt;
+
+    struct c3Opt * opt = c3opt_copy(param->opt);
     assert (opt != NULL);
     c3opt_add_objective(opt,&bellman_control,mem);
 
@@ -623,9 +625,10 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
         }
     }
     
-
     memmove(u,umin,du*sizeof(double));
     *val = minval;
+
+    c3opt_free(opt); opt = NULL;
     free(umin); umin = NULL;
     free(ucurr); ucurr = NULL;
     return 0;
@@ -700,18 +703,20 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
 {
     struct VIparam * param = arg;
     struct ControlParams * cp = param->cp;
+    struct ValueF * vf = param->vf;
     assert (cp != NULL);
+    assert (vf != NULL);
     struct MCAparam * mca = cp->mca;
     struct DPparam * dp = cp->dp;
+
     size_t dx = mca->dx;
     size_t du = mca->du;
     size_t * ngrid = mca->ngrid;
     double ** xgrid = mca->xgrid;
     
-    struct ValueF * vf = param->vf;
-    assert (vf != NULL);
+
     struct HTable * htable = param->htable;
-    struct HTable * htable_node = param->htable_node;
+    /* struct HTable * htable_node = param->htable_node; */
     struct Boundary * bound = dp->bound;
 
     int * absorbed = workspace_get_absorbed(cp->work,0);
@@ -721,15 +726,12 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     size_t * fi = calloc_size_t(dx);
 
     size_t dim_vary;
-    int res = mca_get_neighbor_costs(dx,N,x,
-                                     bound,vf,ngrid,xgrid,
-                                     fi,&dim_vary,
-                                     absorbed,costs);
+    int res = mca_get_neighbor_costs(dx,N,x, bound,vf,ngrid,xgrid,
+                                     fi,&dim_vary, absorbed,costs);
+
     assert (res == 0);
-    size_t * ind_to_serialize = calloc_size_t(dx+1);
-    size_t * fit = calloc_size_t(dx);
+    size_t * ind_to_serialize = workspace_get_ind_to_serialize(cp->work);
     for (size_t ii = 0; ii < dx; ii++){
-        fit[ii] = fi[ii];
         if (ii != dim_vary){
             ind_to_serialize[ii] = fi[ii];
         }
@@ -737,43 +739,28 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     ind_to_serialize[dx] = dim_vary;
 
     char * key = size_t_a_to_char(ind_to_serialize,dx+1);
-    free(ind_to_serialize); ind_to_serialize = NULL;
-
     size_t nbytes = 0;
     double * out_stored = htable_get_element(htable,key,&nbytes);
-
     if (out_stored == NULL){
-        /* printf("got it\n"); */
         double time = 0.0;
         control_params_add_time_and_states(cp,time,N,x);
         param->nstate_evals = param->nstate_evals + N;
+
+        /* printf("\n\n\n\n"); */
+        #pragma omp parallel for schedule(guided)
         for (size_t ii = 0; ii < N; ii++){
-
-            //hack for computing how many individual nodes accessed
-            // for some reason table doesnt work yet
-            fit[dim_vary] = ii;
-            char * key1 = size_t_a_to_char(fit,dx);
-            size_t nb = 0;
-            double * val =  htable_get_element(htable_node,key1,&nb);
-            if (val == NULL){
-                param->nnode_evals++;
-                double vv = 2.0;
-                htable_add_element(htable_node,key1,&vv,sizeof(double));
-            }
-            else{
-                free(key1); key1 = NULL;
-            }
-
-
+            /* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); */
             struct Memory mem;
             mem.shared = cp;
             mem.private = ii;
+            
             double * u = workspace_get_u(cp->work,ii);
-            int res2 = bellman_optimal(du,u,out+ii,&mem);
+            double val;
+            int res2 = bellman_optimal(du,u,&val,&mem);
             assert (res2 == 0);
-           
+            out[ii] = val;
         }
-        /* param->nnode_evals += N; */
+        param->nnode_evals += N;
         htable_add_element(htable,key,out,N * sizeof(double));
     }
     else{
@@ -784,7 +771,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     }
 
     free(fi); fi = NULL;
-    free(fit); fit = NULL;
+
 
     return 0;
     
@@ -910,7 +897,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     assert (res == 0);
     assert (dim_vary < dx);
 
-    size_t * ind_to_serialize = calloc_size_t(dx+1);
+    size_t * ind_to_serialize = workspace_get_ind_to_serialize(cp->work);
     for (size_t ii = 0; ii < dx; ii++){
         assert (fi[ii] < ngrid[ii]);
         if (ii != dim_vary){
@@ -922,7 +909,6 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     char * key1 = size_t_a_to_char(ind_to_serialize,dx+1);
     char * key2 = size_t_a_to_char(ind_to_serialize,dx+1);
     char * key3 = size_t_a_to_char(ind_to_serialize,dx+1);
-    free(ind_to_serialize); ind_to_serialize = NULL;
 
     // see if already computed the output for this function
     size_t nbytes1 = 0;

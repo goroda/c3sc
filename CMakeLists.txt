@@ -48,7 +48,11 @@ else ()
     #include(${SWIG_USE_FILE})
 endif()
 
-set(CMAKE_CXX_COMPILER "gcc")
+
+find_package(OpenMP)
+set(compiler_flags "${compiler_flags} ${OpenMP_C_FLAGS}" )
+
+# set(CMAKE_CXX_COMPILER "gcc")
 
 #set(static_libs 1)
 set(static_libs 0)
@@ -65,7 +69,7 @@ include_directories(src/include)
 
 add_subdirectory(src)
 add_subdirectory(examples)
-
+add_subdirectory(miscellaneous)
 add_subdirectory(test)
 
 install(FILES cmake/c3sc-config.cmake DESTINATION ${main_lib_dest})

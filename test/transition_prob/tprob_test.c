@@ -1851,7 +1851,6 @@ void Test_bellman_vi(CuTest * tc)
     c3opt_set_gtol(opt,1e-30);
     c3opt_set_verbose(opt,0);
 
-
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
@@ -1870,8 +1869,7 @@ void Test_bellman_vi(CuTest * tc)
     c3control_add_obstacle(c3c,goal_center,goal_width);
     c3control_add_obscost(c3c,ocost);
 
-
-    size_t maxiter_vi = 2;
+    size_t maxiter_vi = 30;
     int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
