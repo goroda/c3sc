@@ -36,6 +36,8 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <time.h>
+
 
 #include "c3/array.h"
 #include "util.h"
@@ -358,11 +360,9 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     size_t dx = param->dx;
     size_t dw = param->dw;
 
-
     // stage cost
     double val;
     double stage_cost;
-
 
     const double * x = param->x + mem_node * dx;
 
@@ -455,6 +455,28 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     assert (arg != NULL);
     struct Memory * mem = arg;
     struct ControlParams * param = mem->shared;
+    
+    size_t mem_node = mem->private;
+    int absorbed = *(workspace_get_absorbed(param->work, mem_node));    
+    if (absorbed == 1){ // absorbed cost
+        double time = param->time;
+        struct DPparam * dp = param->dp;
+        const double * x = param->x + mem_node * param->dx;
+        int res = dp->boundcost(time,x,val);
+        for (size_t ii = 0; ii < du; ii++){
+            u[ii] = 0.0;
+        }
+        return res;
+    }
+    else if (absorbed == -1){
+        struct DPparam * dp = param->dp;
+        const double * x = param->x + mem_node * param->dx;
+        int res = dp->obscost(x,val);
+        for (size_t ii = 0; ii < du; ii++){
+            u[ii] = 0.0;
+        }
+        return res;
+    }
     
 
     struct c3Opt * opt = c3opt_copy(param->opt);
@@ -650,6 +672,7 @@ struct VIparam
     size_t nstate_evals;
     size_t nnode_evals;
     double convergence;
+    double time_in_loop;
 };
 
 struct VIparam * vi_param_create(double convergence)
@@ -664,7 +687,7 @@ struct VIparam * vi_param_create(double convergence)
     vi->nnode_evals = 0; // counts in terms of nodes (should be smaller)
     vi->cp = NULL;
     vi->vf = NULL;
-    
+    vi->time_in_loop = 0;
 
     return vi;
 }
@@ -746,20 +769,54 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         control_params_add_time_and_states(cp,time,N,x);
         param->nstate_evals = param->nstate_evals + N;
 
-        /* printf("\n\n\n\n"); */
-        /* #pragma omp parallel for schedule(guided) */
+        size_t * absorbed_no = workspace_get_absorbed_no(cp->work);
+        size_t * absorbed_yes = workspace_get_absorbed_yes(cp->work);
+        size_t ano_ind = 0;
+        size_t ayes_ind = 0;
         for (size_t ii = 0; ii < N; ii++){
+            if (absorbed[ii] == 0){
+                absorbed_no[ano_ind] = ii;
+                ano_ind++;
+            }
+            else{
+                absorbed_yes[ayes_ind] = ii;
+                ayes_ind++;;
+            }
+        }
+
+        // this loop is very fast because only deals with absorbed things
+        for (size_t ii = 0; ii < ayes_ind; ii++){
+            struct Memory mem;
+            mem.shared = cp;
+            mem.private = absorbed_yes[ii];
+            double * u = workspace_get_u(cp->work,absorbed_yes[ii]);
+            bellman_optimal(du,u,out+absorbed_yes[ii],&mem);
+        }
+        
+        /* printf("\n\n\n\n"); */
+        double t_start = omp_get_wtime();
+        /* #pragma omp parallel for schedule(guided) */
+        for (size_t ii = 0; ii < ano_ind; ii++){
             /* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); */
             struct Memory mem;
             mem.shared = cp;
-            mem.private = ii;
+            mem.private = absorbed_no[ii];
             
-            double * u = workspace_get_u(cp->work,ii);
+            double * u = workspace_get_u(cp->work,absorbed_no[ii]);
             double val;
+            /* double t_start_2 = omp_get_wtime(); */
             int res2 = bellman_optimal(du,u,&val,&mem);
+            /* double t_end_2 = omp_get_wtime(); */
+            /* printf("Timing: %zu ,%d, %G\n",absorbed_no[ii],absorbed[absorbed_no[ii]],t_end_2-t_start_2); */
+            /* printf("\t x = (%G,%G)\n\n\n",x[ absorbed_no[ii]*dx], x[absorbed_no[ii]*dx + 1] ); */
             assert (res2 == 0);
-            out[ii] = val;
+            out[absorbed_no[ii]] = val;
         }
+        double t_end = omp_get_wtime();
+        double run_time = (double)(t_end - t_start); /* / CLOCKS_PER_SEC; */
+        param->time_in_loop += run_time;
+        /* printf("%G\n",run_time); */
+
         param->nnode_evals += N;
         htable_add_element(htable,key,out,N * sizeof(double));
     }
@@ -1387,7 +1444,8 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     vi->nnode_evals = 0;
     struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,verbose);
     *nevals = vi->nnode_evals;
-
+    printf("time in interation = %G\n",vi->time_in_loop);
+    
     vi_param_destroy(vi); vi = NULL;
     control_params_destroy(cp); cp = NULL;
     for (size_t ii = 0; ii < dx; ii++){
