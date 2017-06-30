@@ -368,7 +368,7 @@ int main(int argc, char * argv[])
     double center[7];
     double width[7];
     center[0] = 0.0; width[0] = 0.1;
-    center[1] = 0.0, width[1] = 0.1;
+    center[1] = 0.0; width[1] = 0.1;
     center[2] = 0.0; width[2] = ub[2]-lb[2];
     center[3] = 0.0; width[3] = ub[3]-lb[3];
     center[4] = 0.0; width[4] = 0.5;

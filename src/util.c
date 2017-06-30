@@ -107,7 +107,7 @@ struct ApproxArgs
     int adapt;
 };
 
-struct ApproxArgs * approx_args_init()
+struct ApproxArgs * approx_args_init(void)
 {
     struct ApproxArgs * aargs = malloc(sizeof(struct ApproxArgs));
     if (aargs == NULL){
@@ -224,10 +224,10 @@ int c3sc_check_bounds(size_t dx, double * lbx,
 
 static int compareDouble (const void * a, const void * b)
 {
-    if (*(double*)a < *(double*)b){
+    if (*(const double*)a < *(const double*)b){
         return -1;
     }
-    else if (*(double*)a > *(double*)b){
+    else if (*(const double*)a > *(const double*)b){
         return 1;
     }
     return 0;
@@ -264,8 +264,8 @@ struct c3sc_SortCouple
     
 int c3sc_compare (const void * a, const void * b)
 {
-    struct c3sc_SortCouple *as = (struct c3sc_SortCouple *)a;
-    struct c3sc_SortCouple *bs = (struct c3sc_SortCouple *)b;
+    const struct c3sc_SortCouple *as = (const struct c3sc_SortCouple *)a;
+    const struct c3sc_SortCouple *bs = (const struct c3sc_SortCouple *)b;
     if ( as->val < bs->val ){
       return -1;  
     } 

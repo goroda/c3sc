@@ -42,7 +42,7 @@
 #include "c3/array.h"
 
 struct ApproxArgs;
-struct ApproxArgs * approx_args_init();
+struct ApproxArgs * approx_args_init(void);
 void approx_args_free(struct ApproxArgs *);
 void approx_args_set_cross_tol(struct ApproxArgs *, double);
 double approx_args_get_cross_tol(const struct ApproxArgs *);

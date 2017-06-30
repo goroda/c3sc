@@ -9,10 +9,10 @@
 #include <stdlib.h>
 #include "CuTest.h"
 
-CuSuite * TProbGetSuite();
-CuSuite * ValueFGetSuite();
-CuSuite * BellmanGetSuite();
-CuSuite * DPAlgsGetSuite();
+CuSuite * TProbGetSuite(void);
+CuSuite * ValueFGetSuite(void);
+CuSuite * BellmanGetSuite(void);
+CuSuite * DPAlgsGetSuite(void);
 
 void RunAllTests(void) {
     

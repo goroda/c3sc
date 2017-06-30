@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include "CuTest.h"
 
-CuSuite * HashGridGetSuite();
-CuSuite * HTableGetSuite();
+CuSuite * HashGridGetSuite(void);
+CuSuite * HTableGetSuite(void);
 
 
 void RunAllTests(void) {
