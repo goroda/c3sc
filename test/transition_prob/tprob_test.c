@@ -58,12 +58,12 @@ struct Memory
 struct Trajectory * run_sim_2d_1d(struct Integrator * ode_sys)
 {
     integrator_set_type(ode_sys,"rk4");
-    integrator_set_dt(ode_sys,1e-1);
+    integrator_set_dt(ode_sys,1e-3);
     integrator_set_verbose(ode_sys,0);
 
     // Initialize trajectories for state
     double time = 0.0;
-    double state[2] = {-0.5, -0.5};
+    double state[2] = {-0.5, 0.5};
     double con[1] = {0.0};
     // Integrate
     struct Trajectory * traj = NULL;
@@ -251,13 +251,13 @@ int stagecost2d(double t,const double * x,const double * u, double * out,
     *out = 0.0;
 
     // states
-    *out += 20.0 * x[0]*x[0];
-    *out += 50.0 * x[1]*x[1];
+    *out += x[0]*x[0];
+    *out += x[1]*x[1];
 
     // control
-    *out += 0.1 * u[0] * u[0];
+    *out += u[0] * u[0];
     if (grad!= NULL){
-        grad[0] = 0.1 * 2.0 * u[0];
+        grad[0] = 2.0 * u[0];
     }
 
     return 0;
@@ -1382,7 +1382,8 @@ int quad2d(size_t N, const double * x,double * out, void * arg)
 {
     (void)(arg);
     for (size_t ii = 0; ii < N; ii++){
-        out[ii] = x[2*ii+0]*x[2*ii+0] + x[2*ii+1]*x[2*ii+1];
+        /* out[ii] = x[2*ii+0]*x[2*ii+0] + x[2*ii+1]*x[2*ii+1]; */
+        out[ii] = 0.2;
     }
     return 0;
 }
@@ -1833,33 +1834,33 @@ void Test_bellman_vi(CuTest * tc)
     size_t du = 1;
     size_t dw = 2;
 
-    double lb[2] = {-1.0, -2.0};
-    double ub[2] = {2.0, 3.0 };
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0 };
     double goal_center[2] = {0.0,0.0};
     double goal_width[2] = {0.4,0.4};
-    size_t ngrid[2] = {60, 90};
+    size_t ngrid[2] = {25, 25};
     double discount = 0.1;
 
     // optimization arguments
-    double lbu = -5.0;
-    double ubu = 5.0;
+    double lbu = -3.0;
+    double ubu = 3.0;
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,&lbu);
     c3opt_add_ub(opt,&ubu);
-    c3opt_set_absxtol(opt,1e-12);
-    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_absxtol(opt,1e-8);
+    c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-30);
-    c3opt_ls_set_maxiter(opt,100);
+    c3opt_ls_set_maxiter(opt,50);
     c3opt_set_verbose(opt,0);
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,5);
     approx_args_set_adapt(aargs,1);
     approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,20);
+    approx_args_set_maxrank(aargs,30);
     
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
@@ -1867,10 +1868,13 @@ void Test_bellman_vi(CuTest * tc)
     c3control_add_diff(c3c,s1,NULL);
     c3control_add_stagecost(c3c,stagecost2d);
     c3control_add_boundcost(c3c,boundcost);
-    c3control_add_obstacle(c3c,goal_center,goal_width);
+    /* c3control_add_obstacle(c3c,goal_center,goal_width); */
     c3control_add_obscost(c3c,ocost);
 
-    size_t maxiter_vi = 2;
+    c3control_set_external_boundary(c3c,0,"reflect");
+    c3control_set_external_boundary(c3c,1,"reflect");        
+    
+    size_t maxiter_vi = 100;
     int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
@@ -1908,24 +1912,24 @@ void Test_bellman_pi(CuTest * tc)
     size_t du = 1;
     size_t dw = 2;
 
-    double lb[2] = {-1.0, -2.0};
-    double ub[2] = {2.0, 3.0 };
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0 };
     double goal_center[2] = {0.0,0.0};
     double goal_width[2] = {0.4,0.4};
-    size_t ngrid[2] = {60, 90};
-    double discount = 0.8;
+    size_t ngrid[2] = {25, 25};
+    double discount = 0.1;
 
     // optimization arguments
-    double lbu = -5.0;
-    double ubu = 5.0;
+    double lbu = -3.0;
+    double ubu = 3.0;
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,&lbu);
     c3opt_add_ub(opt,&ubu);
-    c3opt_set_absxtol(opt,1e-12);
-    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_absxtol(opt,1e-8);
+    c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-30);
     c3opt_set_verbose(opt,0);
-    c3opt_ls_set_maxiter(opt,100);
+    c3opt_ls_set_maxiter(opt,50);
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
@@ -1942,12 +1946,15 @@ void Test_bellman_pi(CuTest * tc)
     c3control_add_diff(c3c,s1,NULL);
     c3control_add_stagecost(c3c,stagecost2d);
     c3control_add_boundcost(c3c,boundcost);
-    c3control_add_obstacle(c3c,goal_center,goal_width);
+    /* c3control_add_obstacle(c3c,goal_center,goal_width); */
     c3control_add_obscost(c3c,ocost);
+    
+    c3control_set_external_boundary(c3c,0,"reflect");
+    c3control_set_external_boundary(c3c,1,"reflect");        
 
 
-    size_t maxiter_vi = 5;
-    size_t maxiter_pi = 30;
+    size_t maxiter_vi = 1000;
+    size_t maxiter_pi = 10;
     int verbose = 1;
     double convergence = 1e-4;
     struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,0);

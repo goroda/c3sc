@@ -795,7 +795,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         
         /* printf("\n\n\n\n"); */
         double t_start = omp_get_wtime();
-        /* #pragma omp parallel for schedule(guided) */
+        #pragma omp parallel for schedule(guided)
         for (size_t ii = 0; ii < ano_ind; ii++){
             /* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); */
             struct Memory mem;
@@ -1584,7 +1584,7 @@ struct ValueF * c3control_vi_solve(struct C3Control * c3c,
                 stot *= c3c->ngrid[jj];
             }
             double frac = (double) niter_evals / (double) stot;
-            assert (frac < 1.0);
+            /* assert (frac < 1.0); */
             size_t * ranks = valuef_get_ranks(next);
             diag_append(diag,ii,1,norm,diff,c3c->dx,ranks,frac);
         }
