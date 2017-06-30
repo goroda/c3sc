@@ -58,7 +58,7 @@ struct Memory
 struct Trajectory * run_sim_2d_1d(struct Integrator * ode_sys)
 {
     integrator_set_type(ode_sys,"rk4");
-    integrator_set_dt(ode_sys,1e-2);
+    integrator_set_dt(ode_sys,1e-1);
     integrator_set_verbose(ode_sys,0);
 
     // Initialize trajectories for state
@@ -1911,7 +1911,7 @@ void Test_bellman_pi(CuTest * tc)
     double ub[2] = {2.0, 3.0 };
     double goal_center[2] = {0.0,0.0};
     double goal_width[2] = {0.4,0.4};
-    size_t ngrid[2] = {60, 90};
+    size_t ngrid[2] = {80, 80};
     double discount = 0.8;
 
     // optimization arguments
@@ -1929,10 +1929,10 @@ void Test_bellman_pi(CuTest * tc)
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
-    approx_args_set_kickrank(aargs,5);
+    approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
     approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,20);
+    approx_args_set_maxrank(aargs,36);
     
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
@@ -1944,8 +1944,8 @@ void Test_bellman_pi(CuTest * tc)
     c3control_add_obscost(c3c,ocost);
 
 
-    size_t maxiter_vi = 20;
-    size_t maxiter_pi = 60;
+    size_t maxiter_vi = 1;
+    size_t maxiter_pi = 200;
     int verbose = 1;
     double convergence = 1e-4;
     struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,0);
@@ -2162,8 +2162,8 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, Test_bellman_vi);
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
+    SUITE_ADD_TEST(suite, Test_bellman_pi);
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d);; */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */

@@ -747,7 +747,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         param->nstate_evals = param->nstate_evals + N;
 
         /* printf("\n\n\n\n"); */
-        #pragma omp parallel for schedule(guided)
+        /* #pragma omp parallel for schedule(guided) */
         for (size_t ii = 0; ii < N; ii++){
             /* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); */
             struct Memory mem;
@@ -929,6 +929,9 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
             probs_alloc = 1;
 
             control_params_add_time_and_states(cp,time,N,x);
+
+            #pragma omp parallel for schedule(guided)
+            /* #pragma omp parallel for schedule(static) */
             for (size_t ii = 0; ii < N; ii++){
 
                 struct Memory mem;
@@ -936,13 +939,14 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 mem.private = ii;
                 
 
-                double * u     = workspace_get_u(cp->work,ii);
-                double * drift = workspace_get_drift(cp->work, ii);
-                double * diff  = workspace_get_diff (cp->work, ii);
+                double * u = workspace_get_u(cp->work,ii);
 
-                    
                 double val;
                 int res2 = bellman_optimal(du,u,&val,&mem);
+
+                
+                double * drift = workspace_get_drift(cp->work, ii);
+                double * diff  = workspace_get_diff (cp->work, ii);
 
 
                 // build transition probabilities at optimal
@@ -959,9 +963,9 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 res2 = dp->stagecost(time,x+ii*dx,u,probs + N*(2*dx+1)+N+ii,NULL);
                 assert (res2 == 0);
 
-                param->npol_evals++;                                
-            }
 
+            }
+            param->npol_evals += N;
             htable_add_element(htable,key2,probs,nprobs * sizeof(double));
 
         }

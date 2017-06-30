@@ -98,12 +98,14 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
     int res = 0;
     for (size_t ii = 0; ii < dx; ii++){
         /* printf("ii = %zu\n",ii); */
-        t = h2/hvec[ii];
+        t  = h2 / hvec[ii];
+        t2 = t  / hvec[ii];
         diff = ddiff[ii*dx+ii] * ddiff[ii*dx+ii];
-        t2 = h2 / hvec[ii] / hvec[ii];
 
-        prob[2*ii] = t2 * diff / 2.0;
-        prob[2*ii+1] = t2 * diff / 2.0;
+        double t2_diff_d2 = t2 * diff / 2.0;
+        
+        prob[2*ii] = t2_diff_d2;
+        prob[2*ii+1] = t2_diff_d2;
         if (drift[ii] < -1e-14){ // add transition to the left
             prob[2*ii] -= t * drift[ii];
         }
@@ -120,7 +122,8 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
                 grad_prob[2*ii*du+jj] = 0.0;
                 grad_prob[(2*ii+1)*du+jj] = 0.0;
             }
-            // add diffusions
+            
+            // add diffusions            
             cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + 2*ii*du,1);
             cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + (2*ii+1)*du,1);
             
@@ -166,9 +169,10 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
     prob[2*dx] = 1.0;    
     if (grad_prob != NULL){
         double norm2 = normalization * normalization;
+        double h2_over_norm2 = h2 / norm2;
         for (size_t jj = 0; jj < du; jj++){
             grad_prob[2*dx*du+jj] = 0.0;            
-            grad_dt[jj] = -space[jj]*h2 / norm2;
+            grad_dt[jj] = -space[jj] * h2_over_norm2;
         }
 
         for (size_t ii = 0; ii < 2*dx; ii++){
