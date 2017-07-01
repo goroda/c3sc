@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include "boundary.h"
 #include "valuefunc.h"
-int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec,
+int transition_assemble(size_t dx, size_t du, size_t dw, double h, const double * hvec,
                         const double * drift, const double * grad_drift,
                         const double * ddiff, const double * grad_ddiff,
                         double * prob, double * grad_prob,

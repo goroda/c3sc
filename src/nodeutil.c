@@ -76,7 +76,8 @@
      dfm/du1  ..... dfm/dun)
     
 **************************************************************/
-int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec,
+int transition_assemble(size_t dx, size_t du, size_t dw, double h,
+                        const double * hvec,
                         const double * drift, const double * grad_drift,
                         const double * ddiff, const double * grad_ddiff,
                         double * prob, double * grad_prob,
@@ -118,21 +119,32 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
         normalization += prob[2*ii+1];
 
         if (grad_prob != NULL){
-            for (size_t jj = 0; jj < du; jj++){
-                grad_prob[2*ii*du+jj] = 0.0;
-                grad_prob[(2*ii+1)*du+jj] = 0.0;
-            }
+            /* for (size_t jj = 0; jj < du; jj++){ */
+            /*     grad_prob[2*ii*du+jj] = 0.0; */
+            /*     grad_prob[(2*ii+1)*du+jj] = 0.0; */
+            /* } */
+
+           /* cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + 2*ii*du,1); */
+            /* cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + (2*ii+1)*du,1); */
             
-            // add diffusions            
-            cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + 2*ii*du,1);
-            cblas_daxpy(du,t2,grad_ddiff+ii*dx+ii,dx*dw,grad_prob + (2*ii+1)*du,1);
+            
+            for (size_t jj = 0; jj < du; jj++){
+                grad_prob[2*ii*du + jj] = t2 * grad_ddiff[ii*dx+ii + jj * dx * dw];
+                grad_prob[(2*ii+1)*du + jj] = t2 * grad_ddiff[ii*dx+ii + jj * dx * dw];
+            }
             
             // now drifts
             if (drift[ii] < -1e-14){
-                cblas_daxpy(du,-t,grad_drift+ii,dx,grad_prob + (2*ii)*du,1);
+                /* cblas_daxpy(du,-t,grad_drift+ii,dx,grad_prob + (2*ii)*du,1); */
+                for (size_t jj = 0; jj < du; jj++){
+                    grad_prob[2*ii*du + jj] += -t * grad_drift[ii + jj * dx];
+                }
             }
             else if (drift[ii] > 1e-14){
-                cblas_daxpy(du,t,grad_drift+ii,dx,grad_prob + (2*ii+1)*du,1);
+                /* cblas_daxpy(du,t,grad_drift+ii,dx,grad_prob + (2*ii+1)*du,1); */
+                for (size_t jj = 0; jj < du; jj++){
+                    grad_prob[(2*ii+1)*du + jj] += t * grad_drift[ii + jj * dx];
+                }
             }
             else{
                 /* printf("warning! not sure what to do here!\n"); */
@@ -140,9 +152,15 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
                     /* printf("jj = %zu\n",jj); */
                     if (grad_drift[jj*dx+ii] < 0){ // wants to go left with changing u
                         cblas_daxpy(du,-t,grad_drift+ii,dx,grad_prob + (2*ii)*du,1);
+                        for (size_t kk = 0; kk < du; kk++){
+                            grad_prob[2*ii*du + kk] -= (t* grad_drift[ii + kk*dx]);
+                        }
                     }
                     else if (grad_drift[jj*dx+ii] > 0){ // wants to go right with changing u
-                        cblas_daxpy(du,t,grad_drift+ii,dx,grad_prob + (2*ii+1)*du,1);
+                        /* cblas_daxpy(du,t,grad_drift+ii,dx,grad_prob + (2*ii+1)*du,1); */
+                        for (size_t kk = 0; kk < du; kk++){
+                            grad_prob[(2*ii+1)*du + kk] += (t* grad_drift[ii + kk*dx]);
+                        }
                     }
                     else{ // do nothing because doesn't want to change!
                         res = 2;
@@ -155,8 +173,16 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
             /* printf("\t (g-,g+) = (%G,%G)\n",grad_prob[2*ii],grad_prob[2*ii+1]); */
 
             // now the normalizations
-            cblas_daxpy(du,1,grad_prob+(2*ii  )*du,1,space,1);
-            cblas_daxpy(du,1,grad_prob+(2*ii+1)*du,1,space,1);
+                            
+            /* cblas_daxpy(du,1,grad_prob+(2*ii  )*du,1,space,1); */
+            /* cblas_daxpy(du,1,grad_prob+(2*ii+1)*du,1,space,1); */
+            for (size_t jj = 0; jj < du; jj++){
+                space[jj] += (grad_prob[2*ii*du + jj]);
+            }
+            for (size_t jj = 0; jj < du; jj++){
+                space[jj] += grad_prob[(2*ii+1)*du + jj];
+            }
+
         }
     }
 
@@ -184,7 +210,11 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h, double * hvec
             /* printf("\t (ii,g) = (%zu,%G)\n",ii,grad_prob[ii]); */
             prob[ii] /= normalization;
             prob[2*dx] -= prob[ii];
-            cblas_daxpy(du,-1.0,grad_prob+ii*du,1,grad_prob + 2*dx*du,1);
+            /* cblas_daxpy(du,-1.0,grad_prob+ii*du,1,grad_prob + 2*dx*du,1); */
+
+            for (size_t jj = 0; jj < du; jj++){
+                grad_prob[2*dx*du + jj] -= grad_prob[ii*du + jj];
+            }
         }
     }
     else{

@@ -27,7 +27,7 @@ if (APPLE)
     set(compiler_flags "-std=c99 -O3 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn -fopenmp=libomp")
     set(CMAKE_C_COMPILER "/opt/local/bin/clang-mp-4.0")
 else ()
-    set(compiler_flags "-g -O3 -ftree-vectorize -Wall -Wextra -std=c99 ")
+    set(compiler_flags "-g -O3 -ftree-vectorize -Wall -Wextra -std=c99 -fno-omit-frame-pointer")
     # test coverage
     #set(compiler_flags "-g -O0 -W -Wall -Wextra -std=c99 -fprofile-arcs -ftest-coverage")
     set(CMAKE_C_COMPILER "gcc")

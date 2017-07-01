@@ -681,6 +681,8 @@ struct Workspace
     double * costs_pol;
     int    * absorbed_pol;
     size_t * ind_to_serialize;
+    size_t * absorbed_no;
+    size_t * absorbed_yes;
 };
 
 struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
@@ -721,7 +723,9 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
     work->costs_pol = calloc_double(N*(2*dx+1));
     work->absorbed_pol = calloc_int(N);
     work->ind_to_serialize = calloc_size_t(dx+1);
-    
+    work->absorbed_no = calloc_size_t(N);
+    work->absorbed_yes = calloc_size_t(N);
+        
     return work;
 }
 
@@ -735,6 +739,8 @@ void workspace_free(struct Workspace * w)
         free(w->costs_pol); w->costs_pol = NULL;
         free(w->absorbed_pol); w->absorbed_pol = NULL;
         free(w->ind_to_serialize); w->ind_to_serialize = NULL;
+        free(w->absorbed_no); w->absorbed_no = NULL;
+        free(w->absorbed_yes); w->absorbed_yes = NULL;
         free(w); w = NULL;
     }
 }
@@ -809,6 +815,17 @@ size_t * workspace_get_ind_to_serialize(struct Workspace * w)
 {
     return w->ind_to_serialize;
 }
+
+size_t * workspace_get_absorbed_no(struct Workspace * w)
+{
+    return w->absorbed_no;
+}
+
+size_t * workspace_get_absorbed_yes(struct Workspace * w)
+{
+    return w->absorbed_yes;
+}
+    
 
 /////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
