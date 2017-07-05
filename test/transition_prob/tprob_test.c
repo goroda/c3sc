@@ -1841,7 +1841,7 @@ void Test_bellman_vi(CuTest * tc)
     double ub[2] = {2.0, 2.0 };
     double goal_center[2] = {0.0,0.0};
     double goal_width[2] = {0.4,0.4};
-    size_t ngrid[2] = {25, 25};
+    size_t ngrid[2] = {100, 100};
     double discount = 0.1;
 
     // optimization arguments
@@ -1884,23 +1884,23 @@ void Test_bellman_vi(CuTest * tc)
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
     struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
     
-    c3control_add_policy_sim(c3c,cost,opt,NULL);
-    struct Integrator * ode_sys = NULL;
-    ode_sys = integrator_create_controlled(2,1,f1b,NULL,
-                                           c3control_controller,c3c);
-    struct Trajectory * traj = run_sim_2d_1d(ode_sys);
+    /* c3control_add_policy_sim(c3c,cost,opt,NULL); */
+    /* struct Integrator * ode_sys = NULL; */
+    /* ode_sys = integrator_create_controlled(2,1,f1b,NULL, */
+    /*                                        c3control_controller,c3c); */
+    /* struct Trajectory * traj = run_sim_2d_1d(ode_sys); */
 
-    trajectory_print(traj,stdout,5);
+    /* trajectory_print(traj,stdout,5); */
 
-    double * s = trajectory_get_last_state(traj);
-    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
-    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
-    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
-    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
+    /* double * s = trajectory_get_last_state(traj); */
+    /* CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2); */
+    /* CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2); */
+    /* CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2); */
+    /* CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2); */
 
-    // cleanup integrator stuff
-    integrator_destroy(ode_sys); ode_sys = NULL;
-    trajectory_free(traj); traj = NULL;
+    /* // cleanup integrator stuff */
+    /* integrator_destroy(ode_sys); ode_sys = NULL; */
+    /* trajectory_free(traj); traj = NULL; */
 
     valuef_destroy(vf); vf = NULL;
     valuef_destroy(cost); cost = NULL;
@@ -2109,7 +2109,6 @@ void Test_bellman_pi_100(CuTest * tc)
     c3control_set_external_boundary(c3c,0,"reflect");
     c3control_set_external_boundary(c3c,1,"reflect");        
 
-
     size_t maxiter_vi = 60000;
     size_t maxiter_pi = 10;
     int verbose = 1;
@@ -2316,10 +2315,10 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
+    SUITE_ADD_TEST(suite, Test_bellman_vi);
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_25); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_50); */
-    SUITE_ADD_TEST(suite, Test_bellman_pi_100);
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi_100); */
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d);; */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */

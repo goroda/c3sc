@@ -894,7 +894,6 @@ struct PIparam
     struct ValueF * vf_iteration;
     struct HTable * htable_iter; // store fiber evaluations for fixed iteration
 
-    struct ValueF * vf_iteration_node;
     struct HTable * htable_iter_node; // store node evaluations for fixed iteration
 
     struct ValueF * vf_policy;
@@ -1491,9 +1490,12 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     vi_param_add_value(vi,vf);
     vi->nstate_evals = 0;
     vi->nnode_evals = 0;
+    vi->time_in_loop = 0.0;
     struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,verbose);
     *nevals = vi->nnode_evals;
-    printf("time in interation = %G\n",vi->time_in_loop);
+    if (verbose > 0){
+        printf("time in iteration = %G\n",vi->time_in_loop);
+    }
     
     vi_param_destroy(vi); vi = NULL;
     control_params_destroy(cp); cp = NULL;
