@@ -61,8 +61,13 @@ valuef_eval_fiber_ind_nn(struct ValueF *, const size_t *,
                          double *);
 
 
+/* struct ValueF *  */
+/* valuef_interp(size_t,int (*)(size_t,const double *,double*,void*),void *, */
+/*               const size_t *, double **, double **, */
+/*               struct ApproxArgs *, int); */
+
 struct ValueF * 
 valuef_interp(size_t,int (*)(size_t,const double *,double*,void*),void *,
-              const size_t *, double **, double **,
+              const size_t *, double **, struct ValueF*,
               struct ApproxArgs *, int);
 #endif

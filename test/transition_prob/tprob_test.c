@@ -547,19 +547,20 @@ void Test_valuef_neighbor_eval(CuTest * tc)
     //initialize
     const size_t N[3] = {30, 43, 24};
     double * xgrid[3];
-    double * start[3];
+    /* double * start[3]; */
     for (size_t ii = 0; ii < 3; ii++){
         xgrid[ii] = linspace(-1.0,2.0,N[ii]);
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(N[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
+        /* start[ii] = calloc_double(start_rank); */
+        /* size_t stride = uniform_stride(N[ii],start_rank); */
+        /* for (size_t jj = 0; jj < start_rank; jj++){ */
+        /*     start[ii][jj] = xgrid[ii][stride*jj]; */
+        /* } */
         /* printf("start[%zu] = ",ii); dprint(start_rank,start[ii]); */
     }
 
     //interpolate
-    struct ValueF * vf = valuef_interp(3,quad,NULL,N,xgrid,start,aargs,0);
+    /* struct ValueF * vf = valuef_interp(3,quad,NULL,N,xgrid,start,aargs,0); */
+    struct ValueF * vf = valuef_interp(3,quad,NULL,N,xgrid,NULL,aargs,0);
 
     // check neighbor cost computation function
     size_t fixed_ind[3] = { 3, 5, 9};
@@ -906,7 +907,7 @@ void Test_valuef_neighbor_eval(CuTest * tc)
     valuef_destroy(vf); vf = NULL;
     for (size_t ii = 0; ii < dim; ii++){
         free(xgrid[ii]); xgrid[ii] = NULL;
-        free(start[ii]); start[ii] = NULL;
+        /* free(start[ii]); start[ii] = NULL; */
     }
     approx_args_free(aargs); aargs = NULL;
 
@@ -1427,7 +1428,6 @@ void Test_bellman_control1d(CuTest * tc)
     dp_param_add_boundcost(dp,boundcost);
     dp_param_add_obscost(dp,ocost);
 
-
     // cross approximation tolerances
     size_t start_rank = 10;
     struct ApproxArgs * aargs = approx_args_init();
@@ -1438,15 +1438,7 @@ void Test_bellman_control1d(CuTest * tc)
     approx_args_set_startrank(aargs,start_rank);
     approx_args_set_maxrank(aargs,start_rank);
 
-    double * start[2];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
-    struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,start,aargs,0);
+    struct ValueF * vf = valuef_interp(dx,quad2d,NULL,ngrid,xgrid,NULL,aargs,0);
 
 
     double lbu = -5.0;
@@ -1560,8 +1552,6 @@ void Test_bellman_control1d(CuTest * tc)
     mca_param_destroy(mca); mca = NULL;
     free(xgrid[0]); xgrid[0] = NULL;
     free(xgrid[1]); xgrid[1] = NULL;
-    free(start[0]); start[0] = NULL;
-    free(start[1]); start[1] = NULL;
     workspace_free(work); work = NULL;
     dp_param_destroy(dp); dp = NULL;
     valuef_destroy(vf); vf = NULL;
@@ -1630,15 +1620,7 @@ void Test_bellman_control3d(CuTest * tc)
     approx_args_set_startrank(aargs,start_rank);
     approx_args_set_maxrank(aargs,start_rank);
 
-    double * start[3];
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii],start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
-    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,start,aargs,0);
+    struct ValueF * vf = valuef_interp(dx,quad3d,NULL,ngrid,xgrid,NULL,aargs,0);
 
     double lbu = -5.0;
     double ubu = 5.0;
@@ -1803,9 +1785,6 @@ void Test_bellman_control3d(CuTest * tc)
     free(xgrid[0]); xgrid[0] = NULL;
     free(xgrid[1]); xgrid[1] = NULL;
     free(xgrid[2]); xgrid[2] = NULL;
-    free(start[0]); start[0] = NULL;
-    free(start[1]); start[1] = NULL;
-    free(start[2]); start[2] = NULL;
     workspace_free(work); work = NULL;
     dp_param_destroy(dp); dp = NULL;
     valuef_destroy(vf); vf = NULL;
@@ -1863,7 +1842,7 @@ void Test_bellman_vi(CuTest * tc)
     approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,5);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,2);
+    approx_args_set_startrank(aargs,5);
     approx_args_set_maxrank(aargs,30);
     
     // setup problem
@@ -1879,7 +1858,8 @@ void Test_bellman_vi(CuTest * tc)
     c3control_set_external_boundary(c3c,1,"reflect");        
     
     size_t maxiter_vi = 100;
-    int verbose = 2;
+    /* size_t maxiter_vi = 10; */
+    int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
     struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);

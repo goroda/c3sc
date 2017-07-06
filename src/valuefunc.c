@@ -532,48 +532,111 @@ int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
    \return Value function
 **************************************************************/
 struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,void*),void * args,
-                              const size_t * N, double ** grid, double ** start,
+                              const size_t * N, double ** grid, struct ValueF * vref,
                               struct ApproxArgs * aargs, int verbose)
 {
     struct ValueF * vf = valuef_create(d);
     memmove(vf->N,N,d * sizeof(size_t));
-
-    struct C3Approx * c3a = c3approx_create(CROSS,d);
-    struct LinElemExpAopts ** aopts = malloc(d * sizeof(struct LinElemExpAopts *));
-    struct OneApproxOpts ** qmopts = malloc(d * sizeof(struct OneApproxOpts *));
-
-    double cross_tol = approx_args_get_cross_tol(aargs);
-    double round_tol = approx_args_get_round_tol(aargs);
-    size_t kickrank  = approx_args_get_kickrank(aargs);
-    size_t maxrank   = approx_args_get_maxrank(aargs);
-    size_t startrank = approx_args_get_startrank(aargs);
-    for (size_t ii = 0; ii < d; ii++){
-        aopts[ii] = lin_elem_exp_aopts_alloc(N[ii],grid[ii]);
-        qmopts[ii] = one_approx_opts_alloc(LINELM,aopts[ii]);
-        c3approx_set_approx_opts_dim(c3a,ii,qmopts[ii]);
-    }
-    c3approx_init_cross(c3a,startrank,verbose,start);
-    c3approx_set_cross_tol(c3a,cross_tol);
-    c3approx_set_cross_maxiter(c3a,5);
-    /* c3approx_set_cross_maxiter(c3a,100); */
-    c3approx_set_round_tol(c3a,round_tol);
-    c3approx_set_adapt_kickrank(c3a,kickrank);
     size_t minN = N[0];
     for (size_t ii = 0; ii < d; ii++){
         if (N[ii] < minN){ minN = N[ii];}
     }
-    if (maxrank < minN){
-        c3approx_set_adapt_maxrank_all(c3a,maxrank);
-    }
-    else{
-        c3approx_set_adapt_maxrank_all(c3a,minN);
-    }
+
 
     struct Fwrap * fw = fwrap_create(d,"general-vec");
     fwrap_set_fvec(fw,f,args);
 
-    int adapt = approx_args_get_adapt(aargs);;
-    vf->cost = c3approx_do_cross(c3a,fw,adapt);
+
+    size_t base_rank = approx_args_get_startrank(aargs);
+
+    struct FtCrossArgs * fca = ft_cross_args_alloc(d,base_rank);
+    ft_cross_args_set_cross_tol(fca,approx_args_get_cross_tol(aargs));
+    ft_cross_args_set_round_tol(fca,approx_args_get_round_tol(aargs));
+    ft_cross_args_set_kickrank(fca,approx_args_get_kickrank(aargs));
+    size_t maxrank = approx_args_get_maxrank(aargs);
+    if (maxrank < minN){
+        ft_cross_args_set_maxrank_all(fca,maxrank);
+    }
+    else{
+        ft_cross_args_set_maxrank_all(fca,minN);
+    }
+    ft_cross_args_set_maxiter(fca,5);
+    ft_cross_args_set_verbose(fca,verbose);
+
+
+    if (vref != NULL){
+
+        size_t start_rank;
+        size_t * ranks = valuef_get_ranks(vref);
+        for (size_t ii = 1; ii < d; ii++){
+            start_rank = ranks[ii] > base_rank ? ranks[ii]+1 : base_rank;
+            ft_cross_args_set_rank(fca,ii,start_rank);
+        }
+    }
+
+
+    struct FiberOptArgs * fibopt = fiber_opt_args_init(d);
+
+    
+    /* struct C3Approx * c3a = c3approx_create(CROSS,d); */
+    struct LinElemExpAopts ** aopts = malloc(d * sizeof(struct LinElemExpAopts *));
+    struct OneApproxOpts ** qmopts = malloc(d * sizeof(struct OneApproxOpts *));
+    struct MultiApproxOpts * mopts = multi_approx_opts_alloc(d);
+
+    for (size_t ii = 0; ii < d; ii++){
+        aopts[ii] = lin_elem_exp_aopts_alloc(N[ii],grid[ii]);
+        qmopts[ii] = one_approx_opts_alloc(LINELM,aopts[ii]);
+        multi_approx_opts_set_dim(mopts,ii,qmopts[ii]);
+    }
+
+    // Setup fibers
+    struct CrossIndex ** isl = malloc(d *sizeof(struct CrossIndex * ));
+    if (isl == NULL){
+        fprintf(stderr,"Failure allocating memory for valuef_interp\n");
+    }
+    struct CrossIndex ** isr = malloc(d *sizeof(struct CrossIndex * ));
+    if (isr == NULL){
+        fprintf(stderr,"Failure allocating memory for valuef_interp\n");
+    }
+    size_t * ranks_use = ft_cross_args_get_ranks(fca);    
+    double ** start = malloc(d * sizeof(double *));
+    for (size_t ii = 0; ii < d-1; ii++){
+        start[ii] = calloc_double(ranks_use[ii+1]);
+        size_t stride = uniform_stride(N[ii], ranks_use[ii+1]);
+        for (size_t jj = 0; jj < ranks_use[ii+1]; jj++){
+            start[ii][jj] = grid[ii][stride*jj];
+        }
+    }
+    start[d-1] = calloc_double(ranks_use[d-1]);
+    size_t stride = uniform_stride(N[d-1], ranks_use[d-1]);
+    for (size_t jj = 0; jj < ranks_use[d-1]; jj++){
+        start[d-1][jj] = grid[d-1][stride*jj];
+    }
+    
+    cross_index_array_initialize(d,isr,0,1,ranks_use,(void**)start,sizeof(double));
+    cross_index_array_initialize(d,isl,0,0,ranks_use,(void**)start,sizeof(double));
+    
+
+    int adapt = approx_args_get_adapt(aargs);
+    struct FunctionTrain * ftref = NULL;
+    if (vref != NULL){
+        ftref = vref->cost;
+    }
+    else{
+        ftref = function_train_constant(1.0,mopts);
+    }
+
+    if (adapt == 1){
+        vf->cost = ftapprox_cross_rankadapt(fw,fca,isl,isr,mopts,fibopt,ftref);
+    }
+    else{
+        vf->cost = ftapprox_cross(fw,fca,isl,isr,mopts,fibopt,ftref);
+    }
+
+    if (vref == NULL){
+        function_train_free(ftref); ftref = NULL;
+    }
+    
     valuef_precompute_cores(vf);
     /* iprint_sz(4,vf->cost->ranks); */
     
@@ -583,8 +646,30 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
     }
     free(qmopts); qmopts = NULL;
     free(aopts); aopts = NULL;
-    c3approx_destroy(c3a); c3a = NULL;
-    fwrap_destroy(fw);
+    multi_approx_opts_free(mopts); mopts= NULL;
+    ft_cross_args_free(fca); fca = NULL;
+    fiber_opt_args_free(fibopt); fibopt = NULL;
+        
+    if (isl != NULL){
+        for (size_t ii = 0; ii < d; ii++){
+            cross_index_free(isl[ii]); isl[ii] = NULL;
+        }
+        free(isl); isl = NULL;
+    }
+    if (isr != NULL){
+        for (size_t ii = 0; ii < d; ii++){
+            cross_index_free(isr[ii]); isr[ii] = NULL;
+        }
+        free(isr); isr = NULL;
+    }        
+    fwrap_destroy(fw); fw = NULL;
+
+
+    for (size_t ii = 0; ii < d; ii++){
+        free(start[ii]); start[ii] = NULL;
+    }
+    free(start); start = NULL;
 
     return vf;
 }
+

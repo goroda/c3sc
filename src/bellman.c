@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+/* #define NDEBUG */
 #include <assert.h>
 #include <math.h>
 #include <time.h>
@@ -379,29 +380,28 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     double * grad_stage = workspace_get_grad_stage        (work, mem_node);
     double * workspace  = workspace_get_control_size_extra(work, mem_node);
     
-    //get drift and diffusion
-    int res;
-    if (grad_u != NULL){
-        for (size_t ii = 0; ii < du; ii++){
-            grad_u[ii] = 0.0;
-        }
-        res = drift_eval(dp->dyn_drift,time,x,u,drift,grad_drift);
-        assert (res == 0);
-        res = diff_eval(dp->dyn_diff,time,x,u,diff,grad_diff);
-
-    }
-    else{
-        /* printf("x = ");dprint(dx,x); */
-        res = drift_eval(dp->dyn_drift,time,x,u,drift,NULL);
-        assert (res == 0);
-        res = diff_eval(dp->dyn_diff,time,x,u,diff,NULL);
-
-
-    }
-    assert (res == 0);
-
 
     if (absorbed == 0){ // not absorbed
+
+        //get drift and diffusion
+        int res;
+        if (grad_u != NULL){
+            for (size_t ii = 0; ii < du; ii++){
+                grad_u[ii] = 0.0;
+            }
+            res = drift_eval(dp->dyn_drift,time,x,u,drift,grad_drift);
+            assert (res == 0);
+            res = diff_eval(dp->dyn_diff,time,x,u,diff,grad_diff);
+
+        }
+        else{
+            /* printf("x = ");dprint(dx,x); */
+            res = drift_eval(dp->dyn_drift,time,x,u,drift,NULL);
+            assert (res == 0);
+            res = diff_eval(dp->dyn_diff,time,x,u,diff,NULL);
+        }
+        assert (res == 0);
+        
         if (grad_u != NULL){
             res = dp->stagecost(time,x,u,&stage_cost,grad_stage);
             assert (res == 0);
@@ -427,11 +427,12 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
         }
     }
     else if (absorbed == 1){ // absorbed cost
-        res = dp->boundcost(time,x,&val);
+        int res = dp->boundcost(time,x,&val);
         assert (res == 0);
     }
     else if (absorbed == -1){
-        res = dp->obscost(x,&val);
+        int res = dp->obscost(x,&val);
+        assert (res == 0);
     }
     else{
         fprintf(stderr, "Unrecognized aborbed condition %d\n",absorbed);
@@ -519,6 +520,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
         u[ii] = (lbu[ii]+ubu[ii])/2;
     }
     int res = c3opt_minimize(opt,u,&valtemp);
+    (void)(res);
     /* if (res < 0){ */
     /*     fprintf(stderr,"Optimization result %d\n",res); */
     /*     fprintf(stderr,"\t in bellman_optimal\n"); */
@@ -1446,27 +1448,7 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     size_t dx = c3c->dx;
     size_t * ngrid = c3c->ngrid;
     double ** xgrid = c3c->xgrid;
-    size_t base_rank = approx_args_get_startrank(apargs);
-    size_t kick_rank = approx_args_get_kickrank(apargs);
-    size_t start_rank;
-    
-    /* size_t start_rank = approx_args_get_startrank(apargs); */
-    size_t *ranks = valuef_get_ranks(vf);
-    double ** start = malloc(dx * sizeof(double *));
-    for (size_t ii = 0; ii < dx; ii++){
 
-        start_rank = ranks[ii+1] > base_rank ? ranks[ii+1]+kick_rank : base_rank;
-        if (ii == dx-1){
-            start_rank = ranks[ii] > base_rank ? ranks[ii]+kick_rank : base_rank;
-        }
-        printf("start rank = %zu\n",start_rank);
-
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii], start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-    }
 
     struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,c3c->work,opt);
     struct VIparam * vi = vi_param_create(1e-10);
@@ -1476,7 +1458,9 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     vi->nstate_evals = 0;
     vi->nnode_evals = 0;
     vi->time_in_loop = 0.0;
-    struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,verbose);
+    
+    struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,vf,apargs,verbose);
+
     *nevals = vi->nnode_evals;
     if (verbose > 0){
         printf("time in iteration = %G\n",vi->time_in_loop);
@@ -1484,12 +1468,6 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     
     vi_param_destroy(vi); vi = NULL;
     control_params_destroy(cp); cp = NULL;
-    for (size_t ii = 0; ii < dx; ii++){
-        free(start[ii]); start[ii] = NULL;
-    }
-    free(start); start = NULL;
-
-
     
     return next;
 }
@@ -1514,17 +1492,7 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
     size_t dx = c3c->dx;
     size_t * ngrid = c3c->ngrid;
     double ** xgrid = c3c->xgrid;
-    size_t start_rank = approx_args_get_startrank(apargs);
-    double ** start = malloc(dx * sizeof(double *));
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii], start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][1+stride*jj];
-        }
-        /* printf("grid = "); dprint(ngrid[ii],xgrid[ii]); */
-        /* printf("\t start = "); dprint(start_rank,start[ii]); */
-    }
+ 
 
     struct ControlParams * cp = control_params_create(c3c->dx,c3c->dw,c3c->dp,c3c->mca,c3c->work,opt);
 
@@ -1536,26 +1504,20 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
     // in pi_solve
     workspace_increment_pi_subiter(c3c->work); 
     
-    
 
     /* printf("interp\n"); */
     poli->niter_evals = 0;
     poli->niter_node_evals = 0;
 
     /* printf("Begin interpolation for PI\n"); */
-    struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,
-                                         start,apargs,verbose);
+    /* struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid, */
+    /*                                      start,apargs,verbose); */
+    struct ValueF * next = valuef_interp(dx,bellman_pi,poli,ngrid,xgrid,vf,apargs,verbose);
 
     /* printf("Completed interpolation for PI\n"); */
     *niter_evals = poli->niter_node_evals;
 
     control_params_destroy(cp); cp = NULL;
-    for (size_t ii = 0; ii < dx; ii++){
-        free(start[ii]); start[ii] = NULL;
-    }
-    free(start); start = NULL;
-    /* printf("all freed\n"); */
-
 
     return next;
 }
@@ -1570,27 +1532,10 @@ c3control_init_value(struct C3Control * c3c,
     assert (c3c->ngrid != NULL);
     assert (c3c->xgrid != NULL);
     
-    size_t dx = c3c->dx;
-    size_t * ngrid = c3c->ngrid;
-    double ** xgrid = c3c->xgrid;
-    size_t start_rank = approx_args_get_startrank(aargs);
-    double ** start = malloc(dx * sizeof(double *));
-    for (size_t ii = 0; ii < dx; ii++){
-        start[ii] = calloc_double(start_rank);
-        size_t stride = uniform_stride(ngrid[ii], start_rank);
-        for (size_t jj = 0; jj < start_rank; jj++){
-            start[ii][jj] = xgrid[ii][stride*jj];
-        }
-        /* printf("ii = 0; start= "); dprint(start_rank,start[ii]); */
-    }
-
     struct ValueF * vf = valuef_interp(c3c->dx,f,args,c3c->ngrid,c3c->xgrid,
-                                       start, aargs,verbose);
+                                       NULL, aargs,verbose);
 
-    for (size_t ii = 0; ii < dx; ii++){
-        free(start[ii]); start[ii] = NULL;
-    }
-    free(start); start = NULL;
+
     return vf;
         
 }
