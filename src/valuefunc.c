@@ -566,10 +566,16 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
 
     if (vref != NULL){
 
+        
         size_t start_rank;
         size_t * ranks = valuef_get_ranks(vref);
+        if (verbose > 0){
+            printf("Reference ranks = "); iprint_sz(d+1,ranks);
+        }
         for (size_t ii = 1; ii < d; ii++){
-            start_rank = ranks[ii] > base_rank ? ranks[ii]+1 : base_rank;
+            /* start_rank = ranks[ii] > base_rank ? ranks[ii]+1 : base_rank; */
+            start_rank = ranks[ii]+1;
+            /* printf("start_rank = %zu\n",start_rank); */
             ft_cross_args_set_rank(fca,ii,start_rank);
         }
     }
@@ -598,7 +604,10 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
     if (isr == NULL){
         fprintf(stderr,"Failure allocating memory for valuef_interp\n");
     }
-    size_t * ranks_use = ft_cross_args_get_ranks(fca);    
+    size_t * ranks_use = ft_cross_args_get_ranks(fca);
+    if (verbose > 0){
+        printf("Starting Ranks: "); iprint_sz(d+1,ranks_use);
+    }
     double ** start = malloc(d * sizeof(double *));
     for (size_t ii = 0; ii < d-1; ii++){
         start[ii] = calloc_double(ranks_use[ii+1]);
@@ -635,6 +644,10 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
 
     if (vref == NULL){
         function_train_free(ftref); ftref = NULL;
+    }
+
+    if (verbose > 0){
+        printf("Final Ranks: "); iprint_sz(d+1,function_train_get_ranks(vf->cost));
     }
     
     valuef_precompute_cores(vf);
