@@ -83,8 +83,11 @@ double unpack(const struct dbl_packed *p)
     if (p->frac == 0)
         return 0.0;
 
-    xf = ((double)(llabs(p->frac) - 1) / (FRAC_MAX - 1)) / 2.0;
+    /* xf = ((double)(llabs(p->frac) - 1) / (FRAC_MAX - 1)) / 2.0; */
+    /* x = ldexp(xf + 0.5, p->exp); */
 
+    xf = ((double)(llabs(p->frac) - 1) / (FRAC_MAX - 1)) / 2.0 + 0.5;
+    /* x = xf * (1 << p->exp); */
     x = ldexp(xf + 0.5, p->exp);
 
     if (p->frac < 0)

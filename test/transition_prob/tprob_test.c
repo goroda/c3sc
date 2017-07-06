@@ -149,10 +149,12 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     (void)(u);
     (void)(args);
     /* printf("x in diffusion = "); dprint(2,x); */
-    out[0] = 1e-2;
+    /* out[0] = 1e-2; */
+    out[0] = 1.0;
     out[1] = 0.0;
     out[2] = 0.0;
-    out[3] = 1e-2;
+    out[3] = 1.0;
+    /* out[3] = 1e-2; */
     if (grad != NULL){
         grad[0] = 0.0;
         grad[1] = 0.0;
@@ -1381,6 +1383,7 @@ void Test_bellman_grad3d(CuTest * tc)
 int quad2d(size_t N, const double * x,double * out, void * arg)
 {
     (void)(arg);
+    (void)(x);
     for (size_t ii = 0; ii < N; ii++){
         /* out[ii] = x[2*ii+0]*x[2*ii+0] + x[2*ii+1]*x[2*ii+1]; */
         out[ii] = 0.2;
@@ -1838,7 +1841,7 @@ void Test_bellman_vi(CuTest * tc)
     double ub[2] = {2.0, 2.0 };
     double goal_center[2] = {0.0,0.0};
     double goal_width[2] = {0.4,0.4};
-    size_t ngrid[2] = {25, 25};
+    size_t ngrid[2] = {100, 100};
     double discount = 0.1;
 
     // optimization arguments
@@ -1850,8 +1853,9 @@ void Test_bellman_vi(CuTest * tc)
     c3opt_set_absxtol(opt,1e-8);
     c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-30);
-    c3opt_ls_set_maxiter(opt,50);
+    c3opt_ls_set_maxiter(opt,10);
     c3opt_set_verbose(opt,0);
+    c3opt_set_maxiter(opt,10);
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
@@ -1880,23 +1884,23 @@ void Test_bellman_vi(CuTest * tc)
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
     struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
     
-    c3control_add_policy_sim(c3c,cost,opt,NULL);
-    struct Integrator * ode_sys = NULL;
-    ode_sys = integrator_create_controlled(2,1,f1b,NULL,
-                                           c3control_controller,c3c);
-    struct Trajectory * traj = run_sim_2d_1d(ode_sys);
+    /* c3control_add_policy_sim(c3c,cost,opt,NULL); */
+    /* struct Integrator * ode_sys = NULL; */
+    /* ode_sys = integrator_create_controlled(2,1,f1b,NULL, */
+    /*                                        c3control_controller,c3c); */
+    /* struct Trajectory * traj = run_sim_2d_1d(ode_sys); */
 
-    trajectory_print(traj,stdout,5);
+    /* trajectory_print(traj,stdout,5); */
 
-    double * s = trajectory_get_last_state(traj);
-    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
-    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
-    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
-    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
+    /* double * s = trajectory_get_last_state(traj); */
+    /* CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2); */
+    /* CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2); */
+    /* CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2); */
+    /* CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2); */
 
-    // cleanup integrator stuff
-    integrator_destroy(ode_sys); ode_sys = NULL;
-    trajectory_free(traj); traj = NULL;
+    /* // cleanup integrator stuff */
+    /* integrator_destroy(ode_sys); ode_sys = NULL; */
+    /* trajectory_free(traj); traj = NULL; */
 
     valuef_destroy(vf); vf = NULL;
     valuef_destroy(cost); cost = NULL;
@@ -1905,31 +1909,108 @@ void Test_bellman_vi(CuTest * tc)
     approx_args_free(aargs); aargs = NULL;
 }
 
-void Test_bellman_pi(CuTest * tc)
+void Test_bellman_pi_25(CuTest * tc)
 {
-    printf("Testing Function: bellman_pi (1d control) \n");
+    printf("Testing Function: bellman_pi 25 x 25 (1d control) \n");
     size_t dx = 2;
     size_t du = 1;
     size_t dw = 2;
 
     double lb[2] = {-2.0, -2.0};
     double ub[2] = {2.0, 2.0 };
-    double goal_center[2] = {0.0,0.0};
-    double goal_width[2] = {0.4,0.4};
+    /* double goal_center[2] = {0.0,0.0}; */
+    /* double goal_width[2] = {0.4,0.4}; */
     size_t ngrid[2] = {25, 25};
     double discount = 0.1;
 
     // optimization arguments
-    double lbu = -3.0;
-    double ubu = 3.0;
+    double lbu = -1.0;
+    double ubu = 1.0;
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,&lbu);
     c3opt_add_ub(opt,&ubu);
-    c3opt_set_absxtol(opt,1e-8);
     c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-30);
+    c3opt_ls_set_maxiter(opt,10);
     c3opt_set_verbose(opt,0);
-    c3opt_ls_set_maxiter(opt,50);
+    c3opt_set_maxiter(opt,10);
+
+
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,5);
+    approx_args_set_adapt(aargs,1);
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,20);
+    
+    // setup problem
+    struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
+    c3control_add_drift(c3c,f1b,NULL);
+    c3control_add_diff(c3c,s1,NULL);
+    c3control_add_stagecost(c3c,stagecost2d);
+    c3control_add_boundcost(c3c,boundcost);
+    /* c3control_add_obstacle(c3c,goal_center,goal_width); */
+    c3control_add_obscost(c3c,ocost);
+    
+    c3control_set_external_boundary(c3c,0,"reflect");
+    c3control_set_external_boundary(c3c,1,"reflect");        
+
+
+    size_t maxiter_vi = 400;
+    size_t maxiter_pi = 10;
+    int verbose = 1;
+    double convergence = 1e-4;
+    struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,0);
+
+    for (size_t ii = 0; ii < maxiter_vi; ii++){
+        printf("Control update: %zu\n",ii);
+        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,
+                                                  convergence,
+                                                  cost,aargs,opt,
+                                                  verbose,NULL);
+        valuef_destroy(cost); cost = NULL;
+        cost = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        valuef_destroy(next); next = NULL;
+    }
+
+    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test
+    CuAssertDblEquals(tc,0.0,reldiff,0.1);
+
+
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
+    c3opt_free(opt); opt = NULL;
+    approx_args_free(aargs); aargs = NULL;
+}
+
+void Test_bellman_pi_50(CuTest * tc)
+{
+    printf("Testing Function: bellman_pi 50 x 50 (1d control) \n");
+    size_t dx = 2;
+    size_t du = 1;
+    size_t dw = 2;
+
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0 };
+    /* double goal_center[2] = {0.0,0.0}; */
+    /* double goal_width[2] = {0.4,0.4}; */
+    size_t ngrid[2] = {50, 50};
+    double discount = 0.1;
+
+    // optimization arguments
+    double lbu = -1.0;
+    double ubu = 1.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,&lbu);
+    c3opt_add_ub(opt,&ubu);
+    c3opt_set_relftol(opt,1e-8);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_ls_set_maxiter(opt,10);
+    c3opt_set_verbose(opt,0);
+    c3opt_set_maxiter(opt,10);
+
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
@@ -1970,29 +2051,92 @@ void Test_bellman_pi(CuTest * tc)
         valuef_destroy(next); next = NULL;
     }
 
-    c3control_add_policy_sim(c3c,cost,opt,NULL);
-    struct Integrator * ode_sys = NULL;
-    ode_sys = integrator_create_controlled(2,1,f1b,NULL,
-                                           c3control_controller,c3c);
-    struct Trajectory * traj = run_sim_2d_1d(ode_sys);
+    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test
+    CuAssertDblEquals(tc,0.0,reldiff,0.1);
 
-    trajectory_print(traj,stdout,5);
-
-    double * s = trajectory_get_last_state(traj);
-    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
-    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
-    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
-    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
-
-    // cleanup integrator stuff
-    integrator_destroy(ode_sys); ode_sys = NULL;
-    trajectory_free(traj); traj = NULL;
 
     valuef_destroy(cost); cost = NULL;
     c3control_destroy(c3c); c3c = NULL;
     c3opt_free(opt); opt = NULL;
     approx_args_free(aargs); aargs = NULL;
 }
+
+void Test_bellman_pi_100(CuTest * tc)
+{
+    printf("Testing Function: bellman_pi 100 x 100 (1d control) \n");
+    size_t dx = 2;
+    size_t du = 1;
+    size_t dw = 2;
+
+    double lb[2] = {-2.0, -2.0};
+    double ub[2] = {2.0, 2.0 };
+    /* double goal_center[2] = {0.0,0.0}; */
+    /* double goal_width[2] = {0.4,0.4}; */
+    size_t ngrid[2] = {50, 50};
+    double discount = 0.1;
+
+    // optimization arguments
+    double lbu = -1.0;
+    double ubu = 1.0;
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,&lbu);
+    c3opt_add_ub(opt,&ubu);
+    c3opt_set_relftol(opt,1e-8);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_ls_set_maxiter(opt,10);
+    c3opt_set_verbose(opt,0);
+    c3opt_set_maxiter(opt,10);
+
+
+    // cross approximation tolerances
+    struct ApproxArgs * aargs = approx_args_init();
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-7);
+    approx_args_set_kickrank(aargs,5);
+    approx_args_set_adapt(aargs,1);
+    approx_args_set_startrank(aargs,5);
+    approx_args_set_maxrank(aargs,20);
+    
+    // setup problem
+    struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,ngrid,discount);
+    c3control_add_drift(c3c,f1b,NULL);
+    c3control_add_diff(c3c,s1,NULL);
+    c3control_add_stagecost(c3c,stagecost2d);
+    c3control_add_boundcost(c3c,boundcost);
+    /* c3control_add_obstacle(c3c,goal_center,goal_width); */
+    c3control_add_obscost(c3c,ocost);
+    
+    c3control_set_external_boundary(c3c,0,"reflect");
+    c3control_set_external_boundary(c3c,1,"reflect");        
+
+    size_t maxiter_vi = 60000;
+    size_t maxiter_pi = 10;
+    int verbose = 1;
+    double convergence = 1e-4;
+    struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,0);
+
+    for (size_t ii = 0; ii < maxiter_vi; ii++){
+        printf("Control update: %zu\n",ii);
+        struct ValueF * next = c3control_pi_solve(c3c,maxiter_pi,
+                                                  convergence,
+                                                  cost,aargs,opt,
+                                                  verbose,NULL);
+        valuef_destroy(cost); cost = NULL;
+        cost = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        valuef_destroy(next); next = NULL;
+    }
+
+    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test
+    CuAssertDblEquals(tc,0.0,reldiff,0.1);
+
+
+    valuef_destroy(cost); cost = NULL;
+    c3control_destroy(c3c); c3c = NULL;
+    c3opt_free(opt); opt = NULL;
+    approx_args_free(aargs); aargs = NULL;
+}
+
+
 
 void Test_bellman_vi3d(CuTest * tc)
 {
@@ -2172,7 +2316,9 @@ CuSuite * DPAlgsGetSuite()
 
     CuSuite * suite = CuSuiteNew();
     SUITE_ADD_TEST(suite, Test_bellman_vi);
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi_25); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi_50); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi_100); */
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d);; */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */

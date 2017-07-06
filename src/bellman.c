@@ -440,6 +440,18 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     return val;
 }
 
+
+static void diagnose_opt_failure(struct ControlParams * param, double * u, size_t du)
+{
+
+    (void)(param);
+    fprintf(stderr,"u = ");
+    for (size_t ii = 0; ii < du; ii++){
+        fprintf(stderr,"%3.8G ",u[ii]);
+    }
+    fprintf(stderr,"\n");
+}
+
 /**********************************************************//**
     Find the optimal control
 
@@ -503,8 +515,29 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     /* c3opt_minimize(opt,ucurr,&valtemp); */
     /* minval = valtemp; */
     /* memmove(umin,ucurr,du*sizeof(double)); */
+    for (size_t ii = 0; ii < du; ii++){
+        u[ii] = (lbu[ii]+ubu[ii])/2;
+    }
+    int res = c3opt_minimize(opt,u,&valtemp);
+    /* if (res < 0){ */
+    /*     fprintf(stderr,"Optimization result %d\n",res); */
+    /*     fprintf(stderr,"\t in bellman_optimal\n"); */
+    /*     dprint(du,u); */
+    /*     fprintf(stderr,"\n\n\n Rerunning with full output\n"); */
 
-    c3opt_minimize(opt,u,&valtemp);
+    /*     for (size_t ii = 0; ii < du; ii++){ */
+    /*         u[ii] = (lbu[ii]+ubu[ii])/2; */
+    /*     } */
+        
+    /*     c3opt_set_verbose(opt,5); */
+    /*     int res2 = c3opt_minimize(opt,u,&valtemp); */
+    /*     fprintf(stderr,"New optimization result %d\n",res2); */
+
+        
+    /*     diagnose_opt_failure(param,u,du); */
+    /*     exit(1); */
+    /* } */
+    /* assert (res <= 0); */
     minval = valtemp;
     memmove(umin,u,du*sizeof(double));
     
@@ -535,7 +568,23 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             nrand = 0;
             double distx = (ubu[0]-lbu[0])/4.0;
             ucurr[0] = lbu[0] + distx;
-            c3opt_minimize(opt,ucurr,&valtemp);
+            res = c3opt_minimize(opt,ucurr,&valtemp);
+            /* if (res < 0){ */
+            /*     fprintf(stderr,"Optimization result %d\n",res); */
+            /*     fprintf(stderr,"\t in bellman_optimal, du=1,justran=-1\n"); */
+
+            /*     dprint(du,u); */
+            /*     fprintf(stderr,"\n\n\n Rerunning with full output\n"); */
+
+            /*     ucurr[0] = lbu[0] + distx; */
+        
+            /*     c3opt_set_verbose(opt,5); */
+            /*     int res2 = c3opt_minimize(opt,ucurr,&valtemp); */
+            /*     fprintf(stderr,"New optimization result %d\n",res2); */
+
+            /*     diagnose_opt_failure(param,u,du); */
+            /*     exit(1); */
+            /* } */
             /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
             if (valtemp < minval){
                 /* printf("\t updating current min!\n"); */
@@ -845,7 +894,6 @@ struct PIparam
     struct ValueF * vf_iteration;
     struct HTable * htable_iter; // store fiber evaluations for fixed iteration
 
-    struct ValueF * vf_iteration_node;
     struct HTable * htable_iter_node; // store node evaluations for fixed iteration
 
     struct ValueF * vf_policy;
@@ -1442,9 +1490,12 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     vi_param_add_value(vi,vf);
     vi->nstate_evals = 0;
     vi->nnode_evals = 0;
+    vi->time_in_loop = 0.0;
     struct ValueF * next = valuef_interp(dx,bellman_vi,vi,ngrid,xgrid,start,apargs,verbose);
     *nevals = vi->nnode_evals;
-    printf("time in interation = %G\n",vi->time_in_loop);
+    if (verbose > 0){
+        printf("time in iteration = %G\n",vi->time_in_loop);
+    }
     
     vi_param_destroy(vi); vi = NULL;
     control_params_destroy(cp); cp = NULL;
