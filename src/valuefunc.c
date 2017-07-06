@@ -573,8 +573,8 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
             printf("Reference ranks = "); iprint_sz(d+1,ranks);
         }
         for (size_t ii = 1; ii < d; ii++){
-            /* start_rank = ranks[ii] > base_rank ? ranks[ii]+1 : base_rank; */
-            start_rank = ranks[ii]+1;
+            start_rank = ranks[ii] >= maxrank ? maxrank : ranks[ii+1];
+            /* start_rank = ranks[ii]+1; */
             /* printf("start_rank = %zu\n",start_rank); */
             ft_cross_args_set_rank(fca,ii,start_rank);
         }

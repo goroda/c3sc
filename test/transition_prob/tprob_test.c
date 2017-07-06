@@ -1842,7 +1842,7 @@ void Test_bellman_vi(CuTest * tc)
     approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,5);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,5);
+    approx_args_set_startrank(aargs,2);
     approx_args_set_maxrank(aargs,30);
     
     // setup problem
@@ -1859,7 +1859,7 @@ void Test_bellman_vi(CuTest * tc)
     
     size_t maxiter_vi = 100;
     /* size_t maxiter_vi = 10; */
-    int verbose = 2;
+    int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
     struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
@@ -2142,16 +2142,22 @@ void Test_bellman_vi3d(CuTest * tc)
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbarr);
     c3opt_add_ub(opt,ubarr);
-    c3opt_set_absxtol(opt,1e-12);
-    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-30);
+    c3opt_ls_set_maxiter(opt,10);
     c3opt_set_verbose(opt,0);
+    c3opt_set_maxiter(opt,10);
+
+    /* c3opt_set_absxtol(opt,1e-12); */
+    /* c3opt_set_relftol(opt,1e-12); */
+    /* c3opt_set_gtol(opt,1e-30); */
+    /* c3opt_set_verbose(opt,0); */
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-8);
     approx_args_set_round_tol(aargs,1e-7);
-    approx_args_set_kickrank(aargs,10);
+    approx_args_set_kickrank(aargs,4);
     approx_args_set_adapt(aargs,0);
     approx_args_set_startrank(aargs,10);
     approx_args_set_maxrank(aargs,10);
@@ -2165,7 +2171,7 @@ void Test_bellman_vi3d(CuTest * tc)
     c3control_add_obstacle(c3c,goal_center,goal_width);
     c3control_add_obscost(c3c,ocost);
 
-    size_t maxiter_vi = 20;
+    size_t maxiter_vi = 100;
     int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad3d,NULL,aargs,0);
@@ -2223,10 +2229,12 @@ void Test_bellman_pi3d(CuTest * tc)
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbarr);
     c3opt_add_ub(opt,ubarr);
-    c3opt_set_absxtol(opt,1e-12);
-    c3opt_set_relftol(opt,1e-12);
+    c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-30);
+    c3opt_ls_set_maxiter(opt,10);
     c3opt_set_verbose(opt,0);
+    c3opt_set_maxiter(opt,10);
+
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
