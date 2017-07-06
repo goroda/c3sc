@@ -40,6 +40,7 @@
 /* #include "c3.h" */
 
 #include "c3/array.h"
+#include "hashgrid.h"
 
 struct ApproxArgs;
 struct ApproxArgs * approx_args_init(void);
@@ -78,6 +79,20 @@ size_t uniform_stride(size_t, size_t);
 struct Workspace;
 struct Workspace * workspace_alloc(size_t,size_t,size_t,size_t);
 void workspace_free(struct Workspace *);
+
+void workspace_increment_vi_iter(struct Workspace * w);
+size_t workspace_get_vi_iter(const struct Workspace * w);
+struct HTable * workspace_get_vi_htable(const struct Workspace * w);
+
+void workspace_increment_pi_iter(struct Workspace * w);
+size_t workspace_get_pi_iter(const struct Workspace * w);
+void workspace_increment_pi_subiter(struct Workspace * w);
+size_t workspace_get_pi_subiter(const struct Workspace * w);
+
+struct HTable * workspace_get_pi_htable(const struct Workspace *);
+struct HTable * workspace_get_pi_prob_htable(const struct Workspace * w);
+
+
 void workspace_set_active(struct Workspace * w, size_t active);
 size_t workspace_get_active(struct Workspace * w);
 double * workspace_get_drift(struct Workspace * w, size_t node);

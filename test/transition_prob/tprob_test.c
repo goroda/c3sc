@@ -1839,8 +1839,8 @@ void Test_bellman_vi(CuTest * tc)
 
     double lb[2] = {-2.0, -2.0};
     double ub[2] = {2.0, 2.0 };
-    double goal_center[2] = {0.0,0.0};
-    double goal_width[2] = {0.4,0.4};
+    /* double goal_center[2] = {0.0,0.0}; */
+    /* double goal_width[2] = {0.4,0.4}; */
     size_t ngrid[2] = {100, 100};
     double discount = 0.1;
 

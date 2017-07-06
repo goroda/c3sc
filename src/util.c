@@ -61,7 +61,6 @@ void pack(double x, struct dbl_packed *r)
 
     double xf = fabs(frexp(x, &(r->exp))) - 0.5;
 
-
     if (xf < 0.0)
     {
         r->frac = 0;
@@ -686,6 +685,17 @@ struct Workspace
     size_t * ind_to_serialize;
     size_t * absorbed_no;
     size_t * absorbed_yes;
+
+
+    // Hash tables for various things
+    struct HTable * vi_htable;
+    size_t vi_iter;
+
+    struct HTable * pi_htable;
+    struct HTable * pi_prob_htable;
+    size_t pi_iter;
+    size_t pi_subiter;
+    
 };
 
 struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
@@ -725,10 +735,18 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
 
     work->costs_pol = calloc_double(N*(2*dx+1));
     work->absorbed_pol = calloc_int(N);
-    work->ind_to_serialize = calloc_size_t(dx+1);
+    work->ind_to_serialize = calloc_size_t(dx+3);
     work->absorbed_no = calloc_size_t(N);
     work->absorbed_yes = calloc_size_t(N);
-        
+
+    work->vi_htable = htable_create(1000000);
+    work->vi_iter = 0;
+
+    work->pi_htable = htable_create(1000000);
+    work->pi_prob_htable = htable_create(1000000);
+    work->pi_iter = 0;
+    work->pi_subiter = 0;
+    
     return work;
 }
 
@@ -744,8 +762,58 @@ void workspace_free(struct Workspace * w)
         free(w->ind_to_serialize); w->ind_to_serialize = NULL;
         free(w->absorbed_no); w->absorbed_no = NULL;
         free(w->absorbed_yes); w->absorbed_yes = NULL;
+
+        htable_destroy(w->vi_htable); w->vi_htable = NULL;
+        htable_destroy(w->pi_htable); w->pi_htable = NULL;
+        htable_destroy(w->pi_prob_htable); w->pi_prob_htable = NULL;
         free(w); w = NULL;
     }
+}
+
+void workspace_increment_vi_iter(struct Workspace * w)
+{
+    w->vi_iter++;
+}
+
+size_t workspace_get_vi_iter(const struct Workspace * w)
+{
+    return w->vi_iter;
+}
+
+void workspace_increment_pi_iter(struct Workspace * w)
+{
+    w->pi_iter++;
+}
+
+size_t workspace_get_pi_iter(const struct Workspace * w)
+{
+    return w->pi_iter;
+}
+
+void workspace_increment_pi_subiter(struct Workspace * w)
+{
+    w->pi_subiter++;
+}
+
+size_t workspace_get_pi_subiter(const struct Workspace * w)
+{
+    return w->pi_subiter;
+}
+
+
+struct HTable * workspace_get_vi_htable(const struct Workspace * w)
+{
+    return w->vi_htable;
+}
+
+struct HTable * workspace_get_pi_htable(const struct Workspace * w)
+{
+    return w->pi_htable;
+}
+
+struct HTable * workspace_get_pi_prob_htable(const struct Workspace * w)
+{
+    return w->pi_prob_htable;
 }
 
 

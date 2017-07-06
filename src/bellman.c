@@ -441,16 +441,16 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
 }
 
 
-static void diagnose_opt_failure(struct ControlParams * param, double * u, size_t du)
-{
+/* static void diagnose_opt_failure(struct ControlParams * param, double * u, size_t du) */
+/* { */
 
-    (void)(param);
-    fprintf(stderr,"u = ");
-    for (size_t ii = 0; ii < du; ii++){
-        fprintf(stderr,"%3.8G ",u[ii]);
-    }
-    fprintf(stderr,"\n");
-}
+/*     (void)(param); */
+/*     fprintf(stderr,"u = "); */
+/*     for (size_t ii = 0; ii < du; ii++){ */
+/*         fprintf(stderr,"%3.8G ",u[ii]); */
+/*     } */
+/*     fprintf(stderr,"\n"); */
+/* } */
 
 /**********************************************************//**
     Find the optimal control
@@ -715,13 +715,13 @@ struct VIparam
 {
     struct ControlParams * cp;
     struct ValueF * vf;
-    struct HTable * htable;
-    struct HTable * htable_node;
 
     size_t nstate_evals;
     size_t nnode_evals;
     double convergence;
     double time_in_loop;
+
+    size_t oniter;
 };
 
 struct VIparam * vi_param_create(double convergence)
@@ -729,23 +729,19 @@ struct VIparam * vi_param_create(double convergence)
     struct VIparam * vi = malloc(sizeof(struct VIparam));
     assert (vi != NULL);
     vi->convergence = convergence;
-    vi->htable = htable_create(1000000);
+    
     vi->nstate_evals = 0; // counts in terms of fibers
-
-    vi->htable_node = htable_create(1000000); 
-    vi->nnode_evals = 0; // counts in terms of nodes (should be smaller)
+    vi->nnode_evals  = 0; // I think this is redundant
     vi->cp = NULL;
     vi->vf = NULL;
     vi->time_in_loop = 0;
-
+    
     return vi;
 }
 
 void vi_param_destroy(struct VIparam * vi)
 {
     if (vi != NULL){
-        htable_destroy(vi->htable); vi->htable = NULL;
-        htable_destroy(vi->htable_node); vi->htable_node = NULL;
         free(vi); vi = NULL;
     }
 }
@@ -761,13 +757,7 @@ void vi_param_add_value(struct VIparam * vi, struct ValueF * vf)
     assert (vi != NULL);
     vi->vf = vf;
 
-    // create a new htable for the new value function
-    htable_destroy(vi->htable); vi->htable = NULL;
-    vi->htable = htable_create(1000000);
     vi->nstate_evals = 0;
-
-    htable_destroy(vi->htable_node); vi->htable_node = NULL;
-    vi->htable_node = htable_create(1000000);
     vi->nnode_evals = 0;
 }
 
@@ -787,8 +777,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     double ** xgrid = mca->xgrid;
     
 
-    struct HTable * htable = param->htable;
-    /* struct HTable * htable_node = param->htable_node; */
+    struct HTable * htable = workspace_get_vi_htable(cp->work);
     struct Boundary * bound = dp->bound;
 
     int * absorbed = workspace_get_absorbed(cp->work,0);
@@ -809,8 +798,9 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         }
     }
     ind_to_serialize[dx] = dim_vary;
-
-    char * key = size_t_a_to_char(ind_to_serialize,dx+1);
+    ind_to_serialize[dx+1] = workspace_get_vi_iter(cp->work);
+    
+    char * key = size_t_a_to_char(ind_to_serialize,dx+2);
     size_t nbytes = 0;
     double * out_stored = htable_get_element(htable,key,&nbytes);
     if (out_stored == NULL){
@@ -892,12 +882,10 @@ struct PIparam
 {
     struct ControlParams * cp;
     struct ValueF * vf_iteration;
-    struct HTable * htable_iter; // store fiber evaluations for fixed iteration
-
-    struct HTable * htable_iter_node; // store node evaluations for fixed iteration
+    /* struct HTable * htable_iter; // store fiber evaluations for fixed iteration */
 
     struct ValueF * vf_policy;
-    struct HTable * htable; // store probability transitions, stage costs, etc associated with policy
+    /* struct HTable * htable; // store probability transitions, stage costs, etc associated with policy */
 
     size_t npol_evals; // evaluation of policies
     size_t niter_evals; // evaluation of fibers for one step of PI
@@ -913,14 +901,13 @@ struct PIparam * pi_param_create(double convergence, struct ValueF * policy)
     poli->cp = NULL;
     
     poli->vf_policy = policy;
-    poli->htable = htable_create(100000);
+    /* poli->htable = htable_create(100000); */
     poli->npol_evals = 0;
         
     poli->vf_iteration = NULL;
     
-    poli->htable_iter = NULL;
+    /* poli->htable_iter = NULL; */
     poli->niter_evals = 0;
-    poli->htable_iter_node = NULL;
     poli->niter_node_evals = 0;
 
     return poli;
@@ -930,9 +917,8 @@ void pi_param_destroy(struct PIparam * poli)
 {
     if (poli != NULL){
 
-        htable_destroy(poli->htable); poli->htable = NULL;
-        htable_destroy(poli->htable_iter); poli->htable_iter = NULL;
-        htable_destroy(poli->htable_iter_node); poli->htable_iter_node = NULL;
+        /* htable_destroy(poli->htable); poli->htable = NULL; */
+        /* htable_destroy(poli->htable_iter); poli->htable_iter = NULL; */
         free(poli); poli = NULL;
     }
 }
@@ -948,14 +934,10 @@ void pi_param_add_value(struct PIparam * poli, struct ValueF * vf)
     assert (poli != NULL);
     poli->vf_iteration = vf;
 
-    htable_destroy(poli->htable_iter); 
-    poli->htable_iter = NULL;
-    poli->htable_iter = htable_create(1000000);
+    /* htable_destroy(poli->htable_iter);  */
+    /* poli->htable_iter = NULL; */
+    /* poli->htable_iter = htable_create(1000000); */
     poli->niter_evals = 0;
-
-    htable_destroy(poli->htable_iter_node); 
-    poli->htable_iter_node = NULL;
-    poli->htable_iter_node = htable_create(1000000);
     poli->niter_node_evals = 0;
 }
 
@@ -982,9 +964,11 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     struct Boundary * bound = dp->bound;
     assert (bound != NULL);
 
-    struct HTable * htable = param->htable;
-    struct HTable * htable_iter = param->htable_iter;
-    struct HTable * htable_iter_node = param->htable_iter_node;
+    /* struct HTable * htable = param->htable; */
+    /* struct HTable * htable_iter = param->htable_iter; */
+
+    struct HTable * htable = workspace_get_pi_prob_htable(cp->work);
+    struct HTable * htable_iter = workspace_get_pi_htable(cp->work);
 
     assert (htable != NULL);
     assert (htable_iter != NULL);
@@ -997,7 +981,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     size_t * fi = calloc_size_t(dx);
     size_t dim_vary;
     int res = mca_get_neighbor_costs(dx,N,x,bound,vf_policy,ngrid,xgrid,
-                                     fi,&dim_vary, absorbed_pol,costs_pol);
+                                     fi,&dim_vary,absorbed_pol,costs_pol);
 
     assert (res == 0);
     assert (dim_vary < dx);
@@ -1010,10 +994,12 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         }
     }
     ind_to_serialize[dx] = dim_vary;
+    ind_to_serialize[dx+1] = workspace_get_pi_iter(cp->work); // stores values for probabilities for current policy
+    ind_to_serialize[dx+2] = workspace_get_pi_subiter(cp->work); // stores value for the current cost function (changes faster than policy)
     free(fi); fi = NULL;
-    char * key1 = size_t_a_to_char(ind_to_serialize,dx+1);
-    char * key2 = size_t_a_to_char(ind_to_serialize,dx+1);
-    char * key3 = size_t_a_to_char(ind_to_serialize,dx+1);
+    char * key1 = size_t_a_to_char(ind_to_serialize,dx+3);
+    char * key2 = size_t_a_to_char(ind_to_serialize,dx+2); // NOTE DIFFERENCE, only uses major iter not subiter
+    char * key3 = size_t_a_to_char(ind_to_serialize,dx+3);
 
     // see if already computed the output for this function
     size_t nbytes1 = 0;
@@ -1022,7 +1008,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
         /* printf("not stored\n"); */
         size_t nbytes = 0;
         // see if already computed transition probabilities for this fiber
-        double * probs = htable_get_element(htable,key1,&nbytes);
+        double * probs = htable_get_element(htable,key2,&nbytes);
         /* probs = NULL; */
         /* printf("got probs\n"); */
         int probs_alloc = 0;
@@ -1094,23 +1080,9 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
 
 
         param->niter_evals = param->niter_evals + N;
+        param->niter_node_evals = param->niter_node_evals + N;
         /* printf("N = %zu\n",N); */
         for (size_t ii = 0; ii < N; ii++){
-
-            //hack for computing how many individual nodes accessed
-            // for some reason table doesnt work yet
-            fi[dim_vary] = ii;
-            char * key1a = size_t_a_to_char(fi,dx);
-            size_t nb = 0;
-            double * val = htable_get_element(htable_iter_node,key1a,&nb);
-            if (val == NULL){
-                param->niter_node_evals++;
-                double vv = 2.0;
-                htable_add_element(htable_iter_node,key1a,&vv,sizeof(double));
-            }
-            else{
-                free(key1a); key1a = NULL;
-            }
 
             
             // get the optimal control
@@ -1488,6 +1460,7 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     struct VIparam * vi = vi_param_create(1e-10);
     vi_param_add_cp(vi,cp);
     vi_param_add_value(vi,vf);
+    workspace_increment_vi_iter(c3c->work);
     vi->nstate_evals = 0;
     vi->nnode_evals = 0;
     vi->time_in_loop = 0.0;
@@ -1504,6 +1477,8 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     }
     free(start); start = NULL;
 
+
+    
     return next;
 }
 
@@ -1543,6 +1518,13 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
 
     pi_param_add_cp(poli,cp);
     pi_param_add_value(poli,vf);
+    // note this denotes change of cost function and thus this increment
+    // changes much faster than pi_subiter.
+    // pi_iter is incremented only when a new policy is created
+    // in pi_solve
+    workspace_increment_pi_subiter(c3c->work); 
+    
+    
 
     /* printf("interp\n"); */
     poli->niter_evals = 0;
@@ -1561,6 +1543,8 @@ struct ValueF * c3control_step_pi(struct C3Control * c3c, struct ValueF * vf,
     }
     free(start); start = NULL;
     /* printf("all freed\n"); */
+
+
     return next;
 }
 
@@ -1663,6 +1647,8 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
 
     struct ValueF * start = valuef_copy(policy);
     struct PIparam * poli = pi_param_create(1e-10,policy);
+    workspace_increment_pi_iter(c3c->work);
+    
     /* double dd = valuef_norm2diff(start,policy); */
     /* printf("diff = %G\n",dd); */
     for (size_t ii = 0; ii < maxiter; ii++){
@@ -1723,16 +1709,15 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
         norm = valuef_norm(start); 
         /* printf("start norm = %G\n",norm); */
 
+        
         if (diff < abs_conv_tol){
             break;
         }
+
     }
     pi_param_destroy(poli); poli = NULL;
     return start;
 }
-
-
-
 
 struct Diag
 {
