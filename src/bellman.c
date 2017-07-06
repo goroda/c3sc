@@ -1446,9 +1446,21 @@ struct ValueF * c3control_step_vi(struct C3Control * c3c, struct ValueF * vf,
     size_t dx = c3c->dx;
     size_t * ngrid = c3c->ngrid;
     double ** xgrid = c3c->xgrid;
-    size_t start_rank = approx_args_get_startrank(apargs);
+    size_t base_rank = approx_args_get_startrank(apargs);
+    size_t kick_rank = approx_args_get_kickrank(apargs);
+    size_t start_rank;
+    
+    /* size_t start_rank = approx_args_get_startrank(apargs); */
+    size_t *ranks = valuef_get_ranks(vf);
     double ** start = malloc(dx * sizeof(double *));
     for (size_t ii = 0; ii < dx; ii++){
+
+        start_rank = ranks[ii+1] > base_rank ? ranks[ii+1]+kick_rank : base_rank;
+        if (ii == dx-1){
+            start_rank = ranks[ii] > base_rank ? ranks[ii]+kick_rank : base_rank;
+        }
+        printf("start rank = %zu\n",start_rank);
+
         start[ii] = calloc_double(start_rank);
         size_t stride = uniform_stride(ngrid[ii], start_rank);
         for (size_t jj = 0; jj < start_rank; jj++){

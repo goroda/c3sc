@@ -1863,7 +1863,7 @@ void Test_bellman_vi(CuTest * tc)
     approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,5);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,5);
+    approx_args_set_startrank(aargs,2);
     approx_args_set_maxrank(aargs,30);
     
     // setup problem
@@ -1879,7 +1879,7 @@ void Test_bellman_vi(CuTest * tc)
     c3control_set_external_boundary(c3c,1,"reflect");        
     
     size_t maxiter_vi = 100;
-    int verbose = 1;
+    int verbose = 2;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
     struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
