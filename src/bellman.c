@@ -1652,7 +1652,7 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
             }
             /* printf("nevals = %zu\n",niter_evals); */
             /* printf("ntot = %zu\n",stot); */
-            assert (niter_evals < stot);
+            /* assert (niter_evals < stot); */
             double frac = (double) niter_evals / (double) stot;
             /* printf("frac = %G\n",frac); */
             size_t * ranks = valuef_get_ranks(next);

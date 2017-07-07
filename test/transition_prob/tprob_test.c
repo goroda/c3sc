@@ -202,7 +202,8 @@ int s2(double t,const double * x,const double * u,double * out, double * grad,
         out[ii] = 0.0;
     }
     for (size_t jj = 0; jj < 3; jj++){
-        out[jj*3+jj] = 1e-2;
+        /* out[jj*3+jj] = 1e-2; */
+        out[jj*3+jj] = 1e-1;
     }
 
     if (grad != NULL){
@@ -2102,7 +2103,14 @@ void Test_bellman_pi_100(CuTest * tc)
                                                   cost,aargs,opt,
                                                   verbose,NULL);
         valuef_destroy(cost); cost = NULL;
-        cost = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        struct ValueF * temp = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        double diff = valuef_norm2diff(next,temp);
+        cost = valuef_copy(temp);
+        valuef_destroy(temp); temp = NULL;
+        if (diff < convergence){
+            break;
+        }
+            
         valuef_destroy(next); next = NULL;
     }
 
@@ -2218,8 +2226,8 @@ void Test_bellman_pi3d(CuTest * tc)
     double ub[3] = {2.0, 3.0,1.0 };
     double goal_center[3] = {0.0,0.0,0.0};
     double goal_width[3] = {0.8,0.8,0.8};
-    size_t ngrid[3] = {50, 50, 50};
-    double discount = 0.9;
+    size_t ngrid[3] = {25, 25, 25};
+    double discount = 0.1;
     
     // optimization arguments
     double lbu = -5.0;
@@ -2254,10 +2262,10 @@ void Test_bellman_pi3d(CuTest * tc)
     c3control_add_obstacle(c3c,goal_center,goal_width);
     c3control_add_obscost(c3c,ocost);
 
-    size_t maxiter_vi = 10;
+    size_t maxiter_vi = 400;
     size_t maxiter_pi = 20;
     int verbose = 1;
-    double convergence = 1e-4;
+    double convergence = 1e-3;
     struct ValueF * cost = c3control_init_value(c3c,quad3d,NULL,aargs,0);
 
     for (size_t ii = 0; ii < maxiter_vi; ii++){
@@ -2267,7 +2275,13 @@ void Test_bellman_pi3d(CuTest * tc)
                                                   cost,aargs,opt,
                                                   verbose,NULL);
         valuef_destroy(cost); cost = NULL;
-        cost = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        struct ValueF * temp = c3control_vi_solve(c3c,1,convergence,next,aargs,opt,verbose,NULL);
+        double diff = valuef_norm2diff(next,temp);
+        cost = valuef_copy(temp);
+        valuef_destroy(temp); temp = NULL;
+        if (diff < convergence){
+            break;
+        }
         valuef_destroy(next); next = NULL;
     }
 
@@ -2303,13 +2317,13 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, Test_bellman_vi);
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_25); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_50); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_100); */
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d);; */
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */
+    SUITE_ADD_TEST(suite, Test_bellman_pi3d);
 
     return suite;
 }

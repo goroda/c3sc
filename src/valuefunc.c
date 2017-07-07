@@ -525,7 +525,7 @@ int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
    \param[in] args    - function arguments
    \param[in] N       - number of nodes in each dimension of discretization
    \param[in] grid    - discretization nodes
-   \param[in] start   - starting nodes for cross 
+   \param[in] vref    - reference cost that can be used for an initial condition (could be NULL)
    \param[in] aargs   - interpolation arguments
    \param[in] verbose - verbosity level
 
@@ -542,10 +542,8 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
         if (N[ii] < minN){ minN = N[ii];}
     }
 
-
     struct Fwrap * fw = fwrap_create(d,"general-vec");
     fwrap_set_fvec(fw,f,args);
-
 
     size_t base_rank = approx_args_get_startrank(aargs);
 
@@ -573,7 +571,7 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
             printf("Reference ranks = "); iprint_sz(d+1,ranks);
         }
         for (size_t ii = 1; ii < d; ii++){
-            start_rank = ranks[ii] >= maxrank ? maxrank : ranks[ii+1];
+            start_rank = ranks[ii] >= maxrank ? maxrank : ranks[ii]+1;
             /* start_rank = ranks[ii]+1; */
             /* printf("start_rank = %zu\n",start_rank); */
             ft_cross_args_set_rank(fca,ii,start_rank);
