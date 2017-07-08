@@ -297,9 +297,12 @@ int main(int argc, char * argv[])
     approx_args_set_cross_tol(aargs,1e-5);
     approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,5);
-
     approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,35);
+    size_t maxrank = 35;
+    if (maxrank > N){
+        maxrank = N;
+    }
+    approx_args_set_maxrank(aargs,maxrank);
 
 
     // setup problem

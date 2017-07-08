@@ -267,6 +267,8 @@ int convert_fiber_to_ind(size_t d, size_t N, const double * x,
     for (size_t ii = 0; ii < d; ii++){
         fixed_ind[ii] = convert_x_to_ind(x[ii],Ngrid[ii],xgrid[ii]);
         if (fixed_ind[ii] == Ngrid[ii]){
+            fprintf(stderr,"Error: evaluation is not on the grid\n");
+            fprintf(stderr,"x[%zu] = %3.15E\n",ii,x[ii]);
             return 1;
         }
     }
@@ -487,6 +489,7 @@ int mca_get_neighbor_costs(size_t d,size_t N,const double * x,
     
     int res = convert_fiber_to_ind(d,N,x,ngrid,xgrid,fixed_ind,dim_vary);
     if (res != 0){
+    /* if (res = 0){ */
         printf("\n======================================\n");
         printf("Error calling convert fiber to _ind!!\n\n");
         printf("grid is \n");

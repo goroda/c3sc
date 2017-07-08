@@ -498,6 +498,7 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
 
     if (c3opt_is_bruteforce(opt) == 1){
         c3opt_minimize(opt,u,val);
+        c3opt_free(opt); opt = NULL;
         return 0;
     }
 

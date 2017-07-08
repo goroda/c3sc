@@ -563,15 +563,13 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
 
 
     if (vref != NULL){
-
-        
         size_t start_rank;
         size_t * ranks = valuef_get_ranks(vref);
         if (verbose > 0){
             printf("Reference ranks = "); iprint_sz(d+1,ranks);
         }
         for (size_t ii = 1; ii < d; ii++){
-            start_rank = ranks[ii] >= maxrank ? maxrank : ranks[ii]+1;
+            start_rank = (ranks[ii]+1) >= maxrank ? maxrank : ranks[ii]+1;
             /* start_rank = ranks[ii]+1; */
             /* printf("start_rank = %zu\n",start_rank); */
             ft_cross_args_set_rank(fca,ii,start_rank);
@@ -607,22 +605,28 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
         printf("Starting Ranks: "); iprint_sz(d+1,ranks_use);
     }
     double ** start = malloc(d * sizeof(double *));
-    for (size_t ii = 0; ii < d-1; ii++){
-        start[ii] = calloc_double(ranks_use[ii+1]);
-        size_t stride = uniform_stride(N[ii], ranks_use[ii+1]);
-        for (size_t jj = 0; jj < ranks_use[ii+1]; jj++){
+    size_t stride = uniform_stride(N[0], ranks_use[1]);
+    start[0] = calloc_double(ranks_use[1]);
+    for (size_t jj = 0; jj < ranks_use[1]; jj++){
+        start[0][jj] = grid[0][stride*jj];
+    }
+    /* printf("start[%d] = ",0); dprint(ranks_use[1],start[0]); */
+    for (size_t ii = 1; ii < d; ii++){
+        start[ii] = calloc_double(ranks_use[ii]);
+        size_t stride = uniform_stride(N[ii], ranks_use[ii]);
+        for (size_t jj = 0; jj < ranks_use[ii]; jj++){
             start[ii][jj] = grid[ii][stride*jj];
         }
-    }
-    start[d-1] = calloc_double(ranks_use[d-1]);
-    size_t stride = uniform_stride(N[d-1], ranks_use[d-1]);
-    for (size_t jj = 0; jj < ranks_use[d-1]; jj++){
-        start[d-1][jj] = grid[d-1][stride*jj];
+        /* printf("start[%zu] = ",ii); dprint(ranks_use[ii],start[ii]); */
     }
     
     cross_index_array_initialize(d,isr,0,1,ranks_use,(void**)start,sizeof(double));
-    cross_index_array_initialize(d,isl,0,0,ranks_use,(void**)start,sizeof(double));
-    
+    cross_index_array_initialize(d,isl,0,0,ranks_use+1,(void**)start,sizeof(double));
+    /* if (ranks_use[2] < ranks_use[1]){ */
+    /*     printf("Cross_index[0] = "); */
+    /*     print_cross_index(isr[0]); */
+    /*     exit(1); */
+    /* } */
 
     int adapt = approx_args_get_adapt(aargs);
     struct FunctionTrain * ftref = NULL;
