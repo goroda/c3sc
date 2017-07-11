@@ -544,7 +544,6 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     minval = valtemp;
     memmove(umin,u,du*sizeof(double));
     
-
     if (justrand == 1){
         // now compare with random samples
         /* double valtemp = 123456; */
@@ -625,8 +624,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             pts1 = NULL; pts2 = NULL;
         }
         else if (du == 3){
-            nrand = 2; // 2
-            npert = 2; // 1
+            nrand = 1; // 2
+            npert = 1; // 1
             /* nrand = 2; */
             /* npert = 1; */
             double ut[3];

@@ -690,12 +690,22 @@ struct ValueF * valuef_interp(size_t d,
     int adapt = approx_args_get_adapt(aargs);
     struct FunctionTrain * ftref = NULL;
     if (vref != NULL){
-        assert (vref->isl != NULL);
+        /* assert (vref->isl != NULL); */
         ftref = vref->cost;
-        //copy cross indices
-        for (size_t ii = 0; ii < d; ii++){
-            vf->isl[ii] = cross_index_copy(vref->isl[ii]);
-            vf->isr[ii] = cross_index_copy(vref->isr[ii]);
+
+        if (vref->isl != NULL){
+            //copy cross indices
+            for (size_t ii = 0; ii < d; ii++){
+                vf->isl[ii] = cross_index_copy(vref->isl[ii]);
+                vf->isr[ii] = cross_index_copy(vref->isr[ii]);
+            }
+        }
+        else{
+          // initialize cross indices
+            cross_index_array_initialize(d,vf->isr,0,1,
+                                         ranks_use,(void**)start,sizeof(double));
+            cross_index_array_initialize(d,vf->isl,0,0,
+                                         ranks_use+1,(void**)start,sizeof(double));  
         }
     }
     else{
