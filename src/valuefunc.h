@@ -44,6 +44,7 @@
 struct ValueF;
 void valuef_destroy(struct ValueF *);
 struct ValueF * valuef_copy(struct ValueF *);
+struct CrossIndex ** valuef_get_isl(const struct ValueF *);
 int valuef_save(struct ValueF *, char *);
 struct ValueF * valuef_load(char *, size_t *, double **);
 int valuef_savetxt(struct ValueF *, char *);

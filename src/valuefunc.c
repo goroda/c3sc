@@ -46,13 +46,15 @@
 
 #include "util.h"
 
+
+
+
 /** \struct ValueF
 \brief Value Function
 \var ValueF::d        dimension of state space
 \var ValueF::cost     function train cost
 \var ValueF::N        size of grid
 \var ValueF::cores    core evaluations at grid
-\var ValueF::grid     grid of values
 */
 struct ValueF
 {
@@ -60,13 +62,15 @@ struct ValueF
     struct FunctionTrain * cost;
     size_t * N;
 
-
     // private memory allocations for efficient doing of things
     double ** cores;
-    double ** center;
+    /* double ** center; */
     double ** fprod;
     double ** bprod;
     double * workspace;
+
+    struct CrossIndex ** isl;
+    struct CrossIndex ** isr;
 
 };
 
@@ -79,11 +83,14 @@ struct ValueF * valuef_create(size_t d)
     vf->N = calloc_size_t(d);
 
     vf->cores     = NULL;
-    vf->center    = NULL;
+    /* vf->center    = NULL; */
     vf->fprod     = NULL;
     vf->bprod     = NULL;
     vf->workspace = NULL;
 
+    vf->isl = NULL;
+    vf->isr = NULL;
+    
     return vf;
 }
 
@@ -112,7 +119,43 @@ void valuef_destroy(struct ValueF * vf)
 
         free(vf->workspace); vf->workspace = NULL;
 
+        if (vf->isl != NULL){
+            for (size_t ii = 0; ii < vf->d; ii++){
+                cross_index_free(vf->isl[ii]); vf->isl[ii] = NULL;
+            }
+            free(vf->isl); vf->isl = NULL;
+        }
+        if (vf->isr != NULL){
+            for (size_t ii = 0; ii < vf->d; ii++){
+                cross_index_free(vf->isr[ii]); vf->isr[ii] = NULL;
+            }
+            free(vf->isr); vf->isr = NULL;
+        }        
+        
         free(vf); vf = NULL;
+    }
+}
+
+static void init_cross_indices(struct ValueF * vf)
+{
+    if (vf->isl == NULL){
+        /* printf("setting up fibers\n"); */
+        
+        // Setup fibers
+        vf->isl = malloc(vf->d * sizeof(struct CrossIndex * ));
+        if (vf->isl == NULL){
+            fprintf(stderr,"Failure allocating memory for valuef_interp\n");
+        }
+        vf->isr = malloc(vf->d * sizeof(struct CrossIndex * ));
+        if (vf->isr == NULL){
+            fprintf(stderr,"Failure allocating memory for valuef_interp\n");
+        }
+        for (size_t ii = 0; ii < vf->d; ii++){
+            vf->isl[ii] = NULL;
+            vf->isr[ii] = NULL;
+        }
+
+        /* printf("vf->isl == NULL in intialization = %d\n",vf->isl == NULL); */
     }
 }
 
@@ -153,7 +196,25 @@ struct ValueF * valuef_copy(struct ValueF * vf)
     vf2->cost = function_train_copy(vf->cost);
     memmove(vf2->N,vf->N,vf->d * sizeof(size_t));
     valuef_precompute_cores(vf2);
+
+
+    if (vf->isl != NULL){
+        init_cross_indices(vf2);
+        for (size_t ii = 0; ii < vf->d; ii++){
+            vf2->isl[ii] = cross_index_copy(vf->isl[ii]);
+            vf2->isr[ii] = cross_index_copy(vf->isr[ii]);
+        }
+    }
+    
     return vf2;
+}
+
+/**********************************************************//**
+    Return isl
+**************************************************************/
+struct CrossIndex ** valuef_get_isl(const struct ValueF * vf)
+{
+    return vf->isl;
 }
 
 /**********************************************************//**
@@ -491,11 +552,14 @@ int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
             /* printf("here!\n"); */
             for (size_t jj = 0; jj < nvals; jj++){
                 /* printf("jj=%zu, neighbor=%zu\n",jj,neighbors[2*(ii-1)]); */
-                out[jj*stride + 2*ii] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)]*nrows,1,
-                                                   fprod[ii-1]+jj*nrows,1);
+                out[jj*stride + 2*ii] =
+                    cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)]*nrows,1,
+                               fprod[ii-1]+jj*nrows,1);
                 /* printf("\tgot first\n"); */
-                out[jj*stride + 2*ii+1] = cblas_ddot(nrows,vf->cores[ii]+neighbors[2*(ii-1)+1]*nrows,1,
-                                                     fprod[ii-1]+jj*nrows,1);
+                out[jj*stride + 2*ii+1] =
+                    cblas_ddot(nrows,
+                               vf->cores[ii]+neighbors[2*(ii-1)+1]*nrows,1,
+                               fprod[ii-1]+jj*nrows,1);
             }
         }
         else{
@@ -517,6 +581,8 @@ int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
     return 0;
 }
 
+
+
 /**********************************************************//**
    Create a value function through interpolation
 
@@ -531,7 +597,8 @@ int valuef_eval_fiber_ind_nn(struct ValueF * vf, const size_t * fixed_ind,
 
    \return Value function
 **************************************************************/
-struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,void*),void * args,
+struct ValueF * valuef_interp(size_t d,
+                              int (*f)(size_t,const double *,double*,void*),void * args,
                               const size_t * N, double ** grid, struct ValueF * vref,
                               struct ApproxArgs * aargs, int verbose)
 {
@@ -591,15 +658,6 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
         multi_approx_opts_set_dim(mopts,ii,qmopts[ii]);
     }
 
-    // Setup fibers
-    struct CrossIndex ** isl = malloc(d *sizeof(struct CrossIndex * ));
-    if (isl == NULL){
-        fprintf(stderr,"Failure allocating memory for valuef_interp\n");
-    }
-    struct CrossIndex ** isr = malloc(d *sizeof(struct CrossIndex * ));
-    if (isr == NULL){
-        fprintf(stderr,"Failure allocating memory for valuef_interp\n");
-    }
     size_t * ranks_use = ft_cross_args_get_ranks(fca);
     if (verbose > 0){
         printf("Starting Ranks: "); iprint_sz(d+1,ranks_use);
@@ -613,35 +671,46 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
     /* printf("start[%d] = ",0); dprint(ranks_use[1],start[0]); */
     for (size_t ii = 1; ii < d; ii++){
         start[ii] = calloc_double(ranks_use[ii]);
-        size_t stride = uniform_stride(N[ii], ranks_use[ii]);
+        stride = uniform_stride(N[ii], ranks_use[ii]);
         for (size_t jj = 0; jj < ranks_use[ii]; jj++){
             start[ii][jj] = grid[ii][stride*jj];
         }
         /* printf("start[%zu] = ",ii); dprint(ranks_use[ii],start[ii]); */
     }
-    
-    cross_index_array_initialize(d,isr,0,1,ranks_use,(void**)start,sizeof(double));
-    cross_index_array_initialize(d,isl,0,0,ranks_use+1,(void**)start,sizeof(double));
+
+
+
     /* if (ranks_use[2] < ranks_use[1]){ */
     /*     printf("Cross_index[0] = "); */
     /*     print_cross_index(isr[0]); */
     /*     exit(1); */
     /* } */
 
+    init_cross_indices(vf);
     int adapt = approx_args_get_adapt(aargs);
     struct FunctionTrain * ftref = NULL;
     if (vref != NULL){
+        assert (vref->isl != NULL);
         ftref = vref->cost;
+        //copy cross indices
+        for (size_t ii = 0; ii < d; ii++){
+            vf->isl[ii] = cross_index_copy(vref->isl[ii]);
+            vf->isr[ii] = cross_index_copy(vref->isr[ii]);
+        }
     }
     else{
         ftref = function_train_constant(1.0,mopts);
+
+        // initialize cross indices
+        cross_index_array_initialize(d,vf->isr,0,1,ranks_use,(void**)start,sizeof(double));
+        cross_index_array_initialize(d,vf->isl,0,0,ranks_use+1,(void**)start,sizeof(double));
     }
 
     if (adapt == 1){
-        vf->cost = ftapprox_cross_rankadapt(fw,fca,isl,isr,mopts,fibopt,ftref);
+        vf->cost = ftapprox_cross_rankadapt(fw,fca,vf->isl,vf->isr,mopts,fibopt,ftref);
     }
     else{
-        vf->cost = ftapprox_cross(fw,fca,isl,isr,mopts,fibopt,ftref);
+        vf->cost = ftapprox_cross(fw,fca,vf->isl,vf->isr,mopts,fibopt,ftref);
     }
 
     if (vref == NULL){
@@ -665,18 +734,7 @@ struct ValueF * valuef_interp(size_t d, int (*f)(size_t,const double *,double*,v
     ft_cross_args_free(fca); fca = NULL;
     fiber_opt_args_free(fibopt); fibopt = NULL;
         
-    if (isl != NULL){
-        for (size_t ii = 0; ii < d; ii++){
-            cross_index_free(isl[ii]); isl[ii] = NULL;
-        }
-        free(isl); isl = NULL;
-    }
-    if (isr != NULL){
-        for (size_t ii = 0; ii < d; ii++){
-            cross_index_free(isr[ii]); isr[ii] = NULL;
-        }
-        free(isr); isr = NULL;
-    }        
+
     fwrap_destroy(fw); fw = NULL;
 
 

@@ -1860,10 +1860,11 @@ void Test_bellman_vi(CuTest * tc)
     
     size_t maxiter_vi = 100;
     /* size_t maxiter_vi = 10; */
-    int verbose = 1;
+    int verbose = 2;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
-    struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,aargs,opt,verbose,NULL);
+    struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,
+                                              aargs,opt,verbose,NULL);
     
     /* c3control_add_policy_sim(c3c,cost,opt,NULL); */
     /* struct Integrator * ode_sys = NULL; */
