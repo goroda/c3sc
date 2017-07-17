@@ -76,7 +76,7 @@
      dfm/du1  ..... dfm/dun)
     
 **************************************************************/
-int transition_assemble(size_t dx, size_t du, size_t dw, double h,
+int transition_assemble_old(size_t dx, size_t du, size_t dw, double h,
                         const double * hvec,
                         const double * drift, const double * grad_drift,
                         const double * ddiff, const double * grad_ddiff,
@@ -176,6 +176,179 @@ int transition_assemble(size_t dx, size_t du, size_t dw, double h,
                             
             /* cblas_daxpy(du,1,grad_prob+(2*ii  )*du,1,space,1); */
             /* cblas_daxpy(du,1,grad_prob+(2*ii+1)*du,1,space,1); */
+            for (size_t jj = 0; jj < du; jj++){
+                space[jj] += (grad_prob[2*ii*du + jj]);
+            }
+            for (size_t jj = 0; jj < du; jj++){
+                space[jj] += grad_prob[(2*ii+1)*du + jj];
+            }
+
+        }
+    }
+
+    if (normalization < 1e-14){ // basically stationarry
+        return 1;
+    }
+    
+    *dt = h2 / normalization;
+
+    prob[2*dx] = 1.0;    
+    if (grad_prob != NULL){
+        double norm2 = normalization * normalization;
+        double h2_over_norm2 = h2 / norm2;
+        for (size_t jj = 0; jj < du; jj++){
+            grad_prob[2*dx*du+jj] = 0.0;            
+            grad_dt[jj] = -space[jj] * h2_over_norm2;
+        }
+
+        for (size_t ii = 0; ii < 2*dx; ii++){
+
+            for (size_t jj = 0; jj < du; jj++){
+                grad_prob[ii*du+jj] = (normalization * grad_prob[ii*du+jj] - 
+                                       space[jj]*prob[ii]) / norm2;
+            }
+            /* printf("\t (ii,g) = (%zu,%G)\n",ii,grad_prob[ii]); */
+            prob[ii] /= normalization;
+            prob[2*dx] -= prob[ii];
+            /* cblas_daxpy(du,-1.0,grad_prob+ii*du,1,grad_prob + 2*dx*du,1); */
+
+            for (size_t jj = 0; jj < du; jj++){
+                grad_prob[2*dx*du + jj] -= grad_prob[ii*du + jj];
+            }
+        }
+    }
+    else{
+        for (size_t ii = 0; ii < dx; ii++){
+            prob[2*ii]   /= normalization;
+            prob[2*ii+1] /= normalization;
+            prob[2*dx]   -= prob[2*ii];
+            prob[2*dx]   -= prob[2*ii+1];
+        }
+    }
+
+    return res;
+}
+
+
+
+/**********************************************************//**
+    Assemble transition probabilities
+
+    \param[in]     dx         - dimension of state space
+    \param[in]     du         - dimension of control space
+    \param[in]     dw         - dimension of stochastic space
+    \param[in]     h          - minimum step-size in each direction
+    \param[in]     hvec       - step-size in each direction
+    \param[in]     drift      - drift evaluation
+    \param[in]     grad_drift - gradient of drift
+    \param[in]     ddiff      - diagonal diffusion
+    \param[in]     grad_ddiff - gradient of diffusion
+    \param[in,out] prob       - vector of probabililities (2d+1)
+    \param[in,out] grad_prob  - gradient of probabilities (du*(2d+1))
+    \param[in,out] dt         - interpolation interval
+    \param[in,out] grad_dt    - gradient of interpolation interval
+    \param[in,out] space      - workspace needed if gradients requested (du,) array
+
+    \return 0 if everything is ok, 1 if computed dt is infinity, 2 if derivative ambiguous
+
+    \note
+    The probabilities are ordered as ("left", "right") for each dimension
+    followed by the transition probability to one-self
+
+    gradient of drift is dimension (dx,du) and stored as x varying first
+    (df1/du1 ..... df1/dun
+     .                .
+     dfm/du1  ..... dfm/dun)
+    
+**************************************************************/
+int transition_assemble(size_t dx, size_t du, size_t dw, double h,
+                        const double * hvec,
+                        const double * drift, const double * grad_drift,
+                        const double * ddiff, const double * grad_ddiff,
+                        double * prob, double * grad_prob,
+                        double * dt, double * grad_dt,
+                        double * space)
+{
+
+    if (space != NULL){
+        assert (grad_drift != NULL);
+        assert (grad_ddiff != NULL);
+        for (size_t ii = 0; ii < du; ii++){
+            space[ii] = 0.0;
+        }
+    }
+
+    double normalization = 0.0;
+    double h2 = h; 
+
+    double t2, diff, t, t2_grad;/* , temp; */
+    int res = 0;
+    for (size_t ii = 0; ii < dx; ii++){
+        /* printf("ii = %zu\n",ii); */
+        t = hvec[2*ii];
+        t2 = hvec[2*ii+1];
+
+        diff = ddiff[ii*dx+ii] * ddiff[ii*dx+ii];
+
+        double t2_diff_d2 = t2 * diff / 2.0;
+        
+        prob[2*ii] = t2_diff_d2;
+        prob[2*ii+1] = t2_diff_d2;
+        if (drift[ii] < -1e-14){ // add transition to the left
+            prob[2*ii] -= t * drift[ii];
+        }
+        else if (drift[ii] > 1e-14){ // add transition to the right
+            prob[2*ii+1] += t * drift[ii];
+        }
+
+        /* printf("ii=%zu (-,+) = (%G,%G)\n",ii,prob[2*ii],prob[2*ii+1]); */
+        normalization += prob[2*ii];
+        normalization += prob[2*ii+1];
+
+        if (grad_prob != NULL){
+            
+            for (size_t jj = 0; jj < du; jj++){
+                t2_grad = t2 * grad_ddiff[ii*dx+ii + jj * dx * dw];
+                grad_prob[2*ii*du + jj] = t2_grad;
+                grad_prob[(2*ii+1)*du + jj] = t2_grad;
+            }
+            
+            // now drifts
+            if (drift[ii] < -1e-14){
+
+                for (size_t jj = 0; jj < du; jj++){
+                    grad_prob[2*ii*du + jj] += -t * grad_drift[ii + jj * dx];
+                }
+            }
+            else if (drift[ii] > 1e-14){
+
+                for (size_t jj = 0; jj < du; jj++){
+                    grad_prob[(2*ii+1)*du + jj] += t * grad_drift[ii + jj * dx];
+                }
+            }
+            else{
+                /* printf("warning! not sure what to do here!\n"); */
+                for (size_t jj = 0; jj < du; jj++){
+                    /* printf("jj = %zu\n",jj); */
+                    if (grad_drift[jj*dx+ii] < 0){ // wants to go left with changing u
+                        for (size_t kk = 0; kk < du; kk++){
+                            grad_prob[2*ii*du + kk] -= (t* grad_drift[ii + kk*dx]);
+                        }
+                    }
+                    else if (grad_drift[jj*dx+ii] > 0){ // wants to go right with changing u
+                        for (size_t kk = 0; kk < du; kk++){
+                            grad_prob[(2*ii+1)*du + kk] += (t* grad_drift[ii + kk*dx]);
+                        }
+                    }
+                    else{ // do nothing because doesn't want to change!
+                        res = 2;
+                        /* printf("warning! not sure what to do here transition assemble!\n"); */
+                    }
+
+                }
+            }
+
+            // now the normalizations
             for (size_t jj = 0; jj < du; jj++){
                 space[jj] += (grad_prob[2*ii*du + jj]);
             }

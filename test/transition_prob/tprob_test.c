@@ -348,8 +348,8 @@ void Test_tprob_probsum(CuTest * tc)
 
     double prob[5];
     double dt;
-    res = transition_assemble(dx,du,dw,hmin,h,
-                              drift,NULL,diff,NULL,prob,NULL,&dt,NULL,NULL);
+    res = transition_assemble_old(dx,du,dw,hmin,h,
+                                  drift,NULL,diff,NULL,prob,NULL,&dt,NULL,NULL);
     CuAssertIntEquals(tc,0,res);
 
     double psum = 0.0;
@@ -398,8 +398,8 @@ void Test_tprob_grad(CuTest * tc)
         CuAssertIntEquals(tc,0,res);
         res = s1(t,pt,u,diff,grad_diff,NULL);
         CuAssertIntEquals(tc,0,res);
-        res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift,
-                                  diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
+        res = transition_assemble_old(dx,du,dw,hmin,h,drift,grad_drift,
+                                      diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
         CuAssertIntEquals(tc,0,res);
 
         /* printf("drift = (%G,%G)\n",drift[0],drift[1]); */
@@ -411,8 +411,8 @@ void Test_tprob_grad(CuTest * tc)
         res = s1(t,pt,u,diff,grad_diff,NULL);
         CuAssertIntEquals(tc,0,res);
         u[0] -= delta;
-        res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
-                                  &dt2,NULL,NULL);
+        res = transition_assemble_old(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
+                                      &dt2,NULL,NULL);
         CuAssertIntEquals(tc,0,res);
 
         /* printf("prob transitions = "); dprint(5,prob); */
@@ -472,9 +472,9 @@ void Test_tprob_grad2(CuTest * tc)
         CuAssertIntEquals(tc,0,res);
         res = s2(t,pt,u,diff,grad_diff,NULL);
         CuAssertIntEquals(tc,0,res);
-        res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift,
-                                  diff,grad_diff,prob,grad_prob,&dt,dt_grad,
-                                  space);
+        res = transition_assemble_old(dx,du,dw,hmin,h,drift,grad_drift,
+                                      diff,grad_diff,prob,grad_prob,&dt,dt_grad,
+                                      space);
         CuAssertIntEquals(tc,0,res);
 
         for (size_t jj = 0; jj < 2*dx+1; jj++){
@@ -489,9 +489,9 @@ void Test_tprob_grad2(CuTest * tc)
                 CuAssertIntEquals(tc,0,res);
                 u[ii] -= delta;
 
-                res = transition_assemble(dx,du,dw,hmin,h,
-                                          drift,NULL,diff,NULL,prob2,NULL,
-                                          &dt2,NULL,NULL);
+                res = transition_assemble_old(dx,du,dw,hmin,h,
+                                              drift,NULL,diff,NULL,prob2,NULL,
+                                              &dt2,NULL,NULL);
                 CuAssertIntEquals(tc,0,res);
                 /* printf("ii=(%zu/%zu)\n",ii,2*dx); */
                 double fdgrad = (prob2[jj] - prob[jj])/delta;
@@ -1209,8 +1209,8 @@ void Test_bellman_grad1(CuTest * tc)
         CuAssertIntEquals(tc,0,res);
         res = s1(t,pt,u,diff,grad_diff,NULL);
         CuAssertIntEquals(tc,0,res);
-        res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift,
-                                  diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
+        res = transition_assemble_old(dx,du,dw,hmin,h,drift,grad_drift,
+                                      diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
         CuAssertIntEquals(tc,0,res);
 
         double val = bellmanrhs(dx,du,stage_cost,grad_stage,
@@ -1226,7 +1226,7 @@ void Test_bellman_grad1(CuTest * tc)
         CuAssertIntEquals(tc,0,res);
         res = s1(t,pt,u,diff,grad_diff,NULL);
         CuAssertIntEquals(tc,0,res);
-        res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
+        res = transition_assemble_old(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
                                   &dt2,NULL,NULL);
 
         double stage_cost2;
@@ -1313,7 +1313,7 @@ void Test_bellman_grad3d(CuTest * tc)
         CuAssertIntEquals(tc,0,res);
         res = s2(t,pt,u,diff,grad_diff,NULL);
         CuAssertIntEquals(tc,0,res);
-        res = transition_assemble(dx,du,dw,hmin,h,drift,grad_drift,
+        res = transition_assemble_old(dx,du,dw,hmin,h,drift,grad_drift,
                                   diff,grad_diff,prob,grad_prob,&dt,dt_grad,space);
         CuAssertIntEquals(tc,0,res==1); // res should not be 1
 
@@ -1331,7 +1331,7 @@ void Test_bellman_grad3d(CuTest * tc)
             CuAssertIntEquals(tc,0,res);
             res = s2(t,pt,v,diff,grad_diff,NULL);
             CuAssertIntEquals(tc,0,res);
-            res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
+            res = transition_assemble_old(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob2,NULL,
                                       &dt2,NULL,NULL);
 
             double stage_cost2;
@@ -1346,7 +1346,7 @@ void Test_bellman_grad3d(CuTest * tc)
             CuAssertIntEquals(tc,0,res);
             res = s2(t,pt,v,diff,grad_diff,NULL);
             CuAssertIntEquals(tc,0,res);
-            res = transition_assemble(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob3,NULL,
+            res = transition_assemble_old(dx,du,dw,hmin,h,drift,NULL,diff,NULL,prob3,NULL,
                                       &dt2,NULL,NULL);
 
             double stage_cost3;
@@ -2139,8 +2139,8 @@ void Test_bellman_vi3d(CuTest * tc)
 
     double lb[3] = {-1.0, -2.0,-3.0};
     double ub[3] = {2.0, 3.0,1.0 };
-    double goal_center[3] = {0.0,0.0,0.0};
-    double goal_width[3] = {0.8,0.8,0.8};
+    /* double goal_center[3] = {0.0,0.0,0.0}; */
+    /* double goal_width[3] = {0.8,0.8,0.8}; */
     size_t ngrid[3] = {20, 20, 20};
     double discount = 0.1;
     

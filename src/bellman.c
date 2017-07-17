@@ -119,6 +119,11 @@ struct MCAparam{
     double ** xgrid;
     double hmin;
     double * hvec;
+
+
+    double h2;
+    double * t;
+    
 };
 
 /**********************************************************//**
@@ -142,6 +147,8 @@ struct MCAparam * mca_param_create(size_t dx, size_t du)
     mca->xgrid = NULL;
     mca->hvec = NULL;
     mca->hmin = 0;
+
+    mca->t = NULL;
     
     return mca;
 }
@@ -164,6 +171,15 @@ void mca_add_grid_refs(struct MCAparam * mca, size_t * ngrid, double ** xgrid,
     mca->xgrid = xgrid;
     mca->hmin = hmin;
     mca->hvec = hvec;
+
+
+    mca->h2 = mca->hmin * mca->hmin;
+    mca->t = calloc_double(2*mca->dx);
+    for (size_t ii = 0; ii < mca->dx; ii++){
+        mca->t[2*ii] = mca->h2 / mca->hvec[ii];
+        mca->t[2*ii+1] = mca->t[2*ii] / mca->hvec[ii];
+    }
+
 }
 
 /**********************************************************//**
@@ -174,6 +190,7 @@ void mca_add_grid_refs(struct MCAparam * mca, size_t * ngrid, double ** xgrid,
 void mca_param_destroy(struct MCAparam * mca)
 {
     if (mca != NULL){
+        free(mca->t);mca->t = NULL;
         free(mca); mca = NULL;
     }
 }
@@ -405,7 +422,10 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
         if (grad_u != NULL){
             res = dp->stagecost(time,x,u,&stage_cost,grad_stage);
             assert (res == 0);
-            res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec,
+            /* res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec, */
+            /*                           drift,grad_drift,diff,grad_diff,prob, */
+            /*                           grad_prob,dt,grad_dt,workspace); */
+            res = transition_assemble(dx,du,dw,mca->h2,mca->t,
                                       drift,grad_drift,diff,grad_diff,prob,
                                       grad_prob,dt,grad_dt,workspace);
 
@@ -418,7 +438,10 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
         else{
             res = dp->stagecost(time,x,u,&stage_cost,NULL);
             assert (res == 0);
-            res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec,
+            /* res = transition_assemble(dx,du,dw,mca->hmin,mca->hvec, */
+            /*                           drift,NULL,diff,NULL,prob, */
+            /*                           NULL,dt,NULL,NULL); */
+            res = transition_assemble(dx,du,dw,mca->h2,mca->t,
                                       drift,NULL,diff,NULL,prob,
                                       NULL,dt,NULL,NULL);
             assert (res == 0);
@@ -1047,7 +1070,12 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                 res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,drift,NULL);
                 assert (res2 == 0);
                 res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,diff,NULL);
-                res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec,
+                /* res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec, */
+                /*                           drift,NULL,diff,NULL, */
+                /*                           probs + ii*(2*dx+1), */
+                /*                           NULL,probs + N*(2*dx+1)+ii, // dt */
+                /*                           NULL,NULL); */
+                res = transition_assemble(dx,du,cp->dw,mca->h2,mca->t,
                                           drift,NULL,diff,NULL,
                                           probs + ii*(2*dx+1),
                                           NULL,probs + N*(2*dx+1)+ii, // dt
