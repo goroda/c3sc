@@ -348,13 +348,18 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-10);
-    approx_args_set_round_tol(aargs,1e-10);
+    approx_args_set_cross_tol(aargs,1e-8);
+    approx_args_set_round_tol(aargs,1e-8);
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
 
     approx_args_set_startrank(aargs,5);
-    approx_args_set_maxrank(aargs,10);
+    size_t maxrank = 30;
+    if (maxrank > N){
+        maxrank = N;
+    }
+    approx_args_set_maxrank(aargs,maxrank);
+    /* approx_args_set_maxrank(aargs,20); */
 
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,Narr,beta);
