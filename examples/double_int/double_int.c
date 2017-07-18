@@ -145,14 +145,19 @@ int boundcost(double t,const  double * x, double * out)
     (void)(t);
     (void)(x);
     *out = 0.0;
-    *out = 100.0;
+    *out = 1000.0;
     return 0;
 }
 
+static int obs = 0;
 int ocost(const double * x,double * out)
 {
     (void)(x);
     *out = 0.0;
+    if (obs == 0){
+        printf("Hit the obstacle!\n");
+        obs=1;
+    }
     return 0;
 }
 
@@ -162,7 +167,12 @@ int startcost(size_t N, const double * x, double * out, void * args)
     (void)(x);
     for (size_t ii = 0; ii < N; ii++){
         /* printf("ii = %zu, x = ",ii); dprint(2,x+ii); */
-        out[ii] = 0.2;
+        out[ii] = 0.0;
+        for (size_t jj = 0; jj < dim; jj++){
+            out[ii] += (x[dim*ii+jj]*x[dim*ii+jj]);
+        }
+        /* out[ii] = 3.0*x[2*ii+0]*x[2*ii+0] + 4.0*x[2*ii+1]*x[2*ii+1]; */
+        /* out[ii] = 0.2; */
     }
     /* printf("done\n"); */
     return 0;
@@ -264,7 +274,7 @@ int main(int argc, char * argv[])
     // optimization arguments
     struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
     size_t dopts = 3;
-    double uopts[3] = {-1.0,0.0,1.0};
+    double uopts[3] = {lbu[0],0.0,ubu[0]};
     c3opt_set_brute_force_vals(opt,dopts,uopts);
     /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
     /* c3opt_add_lb(opt,lbu); */
@@ -300,15 +310,15 @@ int main(int argc, char * argv[])
     double * center = calloc_double(dx);
     double * width = calloc_double(dx);
     for (size_t ii = 0; ii < dx; ii++){
-        width[ii] = 0.2;
+        width[ii] = 0.4;
     }
     c3control_add_obstacle(c3c,center,width);
     
     char filename[256];
-    sprintf(filename,"%s/dim%zu_%s.c3",dirout,dx,"cost");
-    /* double ** xgrid = c3control_get_xgrid(c3c); */
-    struct ValueF * cost = NULL;
-    /* struct ValueF * cost = valuef_load(filename,Narr,xgrid); */
+    sprintf(filename,"%s/%s_%d.c3",dirout,"costfunc",0);
+    double ** xgrid = c3control_get_xgrid(c3c);
+    /* struct ValueF * cost = NULL; */
+    struct ValueF * cost = valuef_load(filename,Narr,xgrid);
     if (cost == NULL){
         cost = c3control_init_value(c3c,startcost,NULL,aargs,0);
     }
@@ -354,6 +364,12 @@ int main(int argc, char * argv[])
 
         sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii+1);
         print_cost(filename,cost,Narr[0],Narr[1],lb,ub);
+
+
+        sprintf(filename,"%s/%s_%d.c3",dirout,"costfunc",0);
+        saved = valuef_save(cost,filename);
+        assert (saved == 0);
+
         /* } */
         if (err < abs_conv_vi){
             if (ii > 10){
@@ -387,7 +403,19 @@ int main(int argc, char * argv[])
     double time = 0.0;
     double * state = calloc_double(dx);
     for (size_t ii = 0; ii < dx; ii++){
-        state[ii] = 0.4;
+        if (ii % 2 == 0){
+            state[ii] = 0.1;
+        }
+        else{
+            state[ii] = -0.1;
+        }
+    }
+    if (dx >= 3){
+        state[dx-3] = 0.4;
+    }
+    if (dx >= 2){
+        state[dx-2] = -0.4;
+        state[dx-1] = 0.4;
     }
     /* double state[2] = {-0.5, -0.5}; */
     double con[1] = {0.0};

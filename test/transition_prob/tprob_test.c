@@ -2319,9 +2319,9 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, Test_bellman_vi);
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_25); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi_50); */
+    SUITE_ADD_TEST(suite, Test_bellman_pi_50);
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_100); */
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d); */
