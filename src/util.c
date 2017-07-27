@@ -107,6 +107,7 @@ struct ApproxArgs
     size_t startrank;
     size_t maxrank;
     int adapt;
+    enum function_class fc;
 };
 
 struct ApproxArgs * approx_args_init(void)
@@ -123,7 +124,7 @@ struct ApproxArgs * approx_args_init(void)
     aargs->startrank = 5;
     aargs->maxrank = 40;
     aargs->adapt = 1;
-
+    aargs->fc = LINELM;
     return aargs;
 }
 
@@ -132,6 +133,18 @@ void approx_args_free(struct ApproxArgs * aargs)
     if (aargs != NULL){
         free(aargs); aargs = NULL;
     }
+}
+
+void approx_args_set_function_class(struct ApproxArgs * aargs, enum function_class fc)
+{
+    assert (aargs != NULL);
+    aargs->fc = fc;
+}
+
+enum function_class approx_args_get_function_class(const struct ApproxArgs * aargs)
+{
+    assert (aargs != NULL);
+    return aargs->fc;
 }
 
 void approx_args_set_cross_tol(struct ApproxArgs * aargs, double cross_tol)

@@ -40,11 +40,15 @@
 /* #include "c3.h" */
 
 #include "c3/array.h"
+#include "c3/lib_funcs.h"
 #include "hashgrid.h"
 
 struct ApproxArgs;
 struct ApproxArgs * approx_args_init(void);
 void approx_args_free(struct ApproxArgs *);
+void approx_args_set_function_class(struct ApproxArgs *, enum function_class);
+enum function_class approx_args_get_function_class(const struct ApproxArgs *);
+
 void approx_args_set_cross_tol(struct ApproxArgs *, double);
 double approx_args_get_cross_tol(const struct ApproxArgs *);
 void approx_args_set_round_tol(struct ApproxArgs *, double);

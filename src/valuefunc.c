@@ -618,6 +618,7 @@ struct ValueF * valuef_interp(size_t d,
     ft_cross_args_set_cross_tol(fca,approx_args_get_cross_tol(aargs));
     ft_cross_args_set_round_tol(fca,approx_args_get_round_tol(aargs));
     ft_cross_args_set_kickrank(fca,approx_args_get_kickrank(aargs));
+    enum function_class fc = approx_args_get_function_class(aargs);
     size_t maxrank = approx_args_get_maxrank(aargs);
     if (maxrank < minN){
         ft_cross_args_set_maxrank_all(fca,maxrank);
@@ -629,7 +630,8 @@ struct ValueF * valuef_interp(size_t d,
     ft_cross_args_set_verbose(fca,verbose);
 
 
-    if (vref != NULL){
+    int adapt = approx_args_get_adapt(aargs);
+    if ((vref != NULL) && (adapt == 1)){
         size_t start_rank;
         size_t * ranks = valuef_get_ranks(vref);
         if (verbose > 0){
@@ -646,15 +648,21 @@ struct ValueF * valuef_interp(size_t d,
 
     struct FiberOptArgs * fibopt = fiber_opt_args_init(d);
 
-    
     /* struct C3Approx * c3a = c3approx_create(CROSS,d); */
     struct LinElemExpAopts ** aopts = malloc(d * sizeof(struct LinElemExpAopts *));
+    struct ConstElemExpAopts ** copts = malloc(d * sizeof(struct ConstElemExpAopts *));    
     struct OneApproxOpts ** qmopts = malloc(d * sizeof(struct OneApproxOpts *));
     struct MultiApproxOpts * mopts = multi_approx_opts_alloc(d);
 
     for (size_t ii = 0; ii < d; ii++){
-        aopts[ii] = lin_elem_exp_aopts_alloc(N[ii],grid[ii]);
-        qmopts[ii] = one_approx_opts_alloc(LINELM,aopts[ii]);
+        if (fc == LINELM){
+            aopts[ii] = lin_elem_exp_aopts_alloc(N[ii],grid[ii]);
+            qmopts[ii] = one_approx_opts_alloc(LINELM,aopts[ii]);            
+        }
+        else if (fc == CONSTELM){
+            copts[ii] = const_elem_exp_aopts_alloc(N[ii],grid[ii]);
+            qmopts[ii] = one_approx_opts_alloc(CONSTELM,copts[ii]);            
+        }
         multi_approx_opts_set_dim(mopts,ii,qmopts[ii]);
     }
 
@@ -678,8 +686,6 @@ struct ValueF * valuef_interp(size_t d,
         /* printf("start[%zu] = ",ii); dprint(ranks_use[ii],start[ii]); */
     }
 
-
-
     /* if (ranks_use[2] < ranks_use[1]){ */
     /*     printf("Cross_index[0] = "); */
     /*     print_cross_index(isr[0]); */
@@ -687,9 +693,9 @@ struct ValueF * valuef_interp(size_t d,
     /* } */
 
     init_cross_indices(vf);
-    int adapt = approx_args_get_adapt(aargs);
+
     struct FunctionTrain * ftref = NULL;
-    if (vref != NULL){
+    if ((vref != NULL) && (adapt == 1)){
         /* assert (vref->isl != NULL); */
         ftref = vref->cost;
 
@@ -740,6 +746,7 @@ struct ValueF * valuef_interp(size_t d,
     }
     free(qmopts); qmopts = NULL;
     free(aopts); aopts = NULL;
+    free(copts); copts = NULL;   
     multi_approx_opts_free(mopts); mopts= NULL;
     ft_cross_args_free(fca); fca = NULL;
     fiber_opt_args_free(fibopt); fibopt = NULL;
