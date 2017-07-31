@@ -152,16 +152,15 @@ int stagecost(double t,const double * x,const double * u, double * out,
     (void)(u);
     *out = 0.0;
     for (size_t ii = 0; ii < dim; ii++){
-        /* if (ii == 0){ */
-        /*     *out += (x[ii]*(x[ii] + x[ii+1])); */
-        /* } */
-        /* else if (ii == dim-1){ */
-        /*     *out += (x[ii] * (x[ii-1] + x[ii])); */
-        /* } */
-        /* else{ */
-        /*     *out += ( x[ii] * (x[ii-1] + x[ii] + x[ii+1])); */
-        /* } */
-        *out += x[ii]*x[ii];
+        if (ii == 0){
+            *out += (x[ii]*(x[ii] + x[ii+1]));
+        }
+        else if (ii == dim-1){
+            *out += (x[ii] * (x[ii-1] + x[ii]));
+        }
+        else{
+            *out += ( x[ii] * (x[ii-1] + x[ii] + x[ii+1]));
+        }
     }
     for (size_t ii = 0; ii < dim/2; ii++){
         *out += u[ii]*u[ii];
@@ -323,19 +322,17 @@ int main(int argc, char * argv[])
     c3opt_add_lb(opt,lbu_a);
     c3opt_add_ub(opt,ubu_a);
     c3opt_set_absxtol(opt,1e-8);
-    c3opt_set_relftol(opt,1e-7);
+    c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-25);
     c3opt_set_verbose(opt,0);
-    c3opt_ls_set_maxiter(opt,10);
-    c3opt_set_maxiter(opt,20);
     
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-10);
     approx_args_set_round_tol(aargs,roundtol);
-    approx_args_set_kickrank(aargs,10);
+    approx_args_set_kickrank(aargs,5);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,15);
+    approx_args_set_startrank(aargs,5);
     approx_args_set_maxrank(aargs,N);
 
     // setup problem
