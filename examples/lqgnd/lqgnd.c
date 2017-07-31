@@ -23,6 +23,7 @@ void print_code_usage (FILE * stream, int exit_code)
     fprintf(stream, "Usage: %s options \n", program_name);
     fprintf(stream,
             " -h --help      Display this usage information.\n"
+            " -x --xdim      Number of state dimensions\n"
             " -d --directory Output directory (defaults to .)\n"
             " -n --nodes     Number of nodes (defaults to 20)\n"
             " -a --lbu       Lower bound of control (default -1.0)\n"
@@ -39,51 +40,78 @@ void print_code_usage (FILE * stream, int exit_code)
     exit (exit_code);
 }
 
+static size_t dim;
 void print_cost(char * filename, struct ValueF * cost,
                 size_t N1, size_t N2, double * lb, double * ub)
 {
-    FILE * fp2 =  fopen(filename, "w");
-    if (fp2 == NULL){
-        fprintf(stderr, "cat: can't open %s\n", filename);
-        exit(0);
-    }
-
-    fprintf(fp2,"x y f\n");
-    double * xtest = linspace(lb[0],ub[0],N1);
-    double * ytest = linspace(lb[1],ub[1],N2);
-
-    double pt3[2];
-    double v2;
-    for (size_t zz = 0; zz < N1; zz++){
-        for (size_t jj = 0; jj < N2; jj++){
-            pt3[0] = xtest[zz]; pt3[1] = ytest[jj];
-            v2 = valuef_eval(cost,pt3);
-            fprintf(fp2, "%3.5f %3.5f %3.5f \n",
-                    xtest[zz],ytest[jj],v2);
+    /* if (dim == 2){ */
+        FILE * fp2 =  fopen(filename, "w");
+        if (fp2 == NULL){
+            fprintf(stderr, "cat: can't open %s\n", filename);
+            exit(0);
         }
-        fprintf(fp2,"\n");
-    }
-    free(xtest); xtest = NULL;
-    free(ytest); ytest = NULL;
 
-    fclose(fp2);
+        fprintf(fp2,"x y f\n");
+        double * xtest = linspace(lb[0],ub[0],N1);
+        double * ytest = linspace(lb[1],ub[1],N2);
+
+        double * pt = calloc_double(dim);
+        double v2;
+        for (size_t zz = 0; zz < N1; zz++){
+            for (size_t jj = 0; jj < N2; jj++){
+                pt[0] = xtest[zz]; pt[1] = ytest[jj];
+                v2 = valuef_eval(cost,pt);
+                fprintf(fp2, "%3.5f %3.5f %3.5f \n",
+                        xtest[zz],ytest[jj],v2);
+            }
+            fprintf(fp2,"\n");
+        }
+        free(xtest); xtest = NULL;
+        free(ytest); ytest = NULL;
+        free(pt);
+        fclose(fp2);
+    /* } */
+    /* else{ */
+    /*     fprintf(stdout,"Not printing cost function, it is not 2D dynamics\n"); */
+    /* } */
 }
+
 
 int f1(double t, const double * x, const double * u, double * out,
        double * jac, void * args)
 {
     (void)(t);
     (void)(args);
-    
-    out[0] = x[1];
-    out[1] = u[0];
 
-    if (jac != NULL){
-        //df1/du
-        jac[0] = 0.0;
-        jac[1] = 1.0;
+    size_t oncontrol = 0;
+    for (size_t ii = 0; ii < dim; ii++){
+        if ((ii % 2) == 0){
+            out[ii] = x[ii+1];
+        }
+        else{
+            out[ii] = u[oncontrol];
+            oncontrol += 1;
+        }
     }
+    
+    if (jac != NULL){
 
+        for (size_t ii = 0; ii < (dim * dim/2); ii++){
+            jac[ii] = 0.0;
+        }
+        for (size_t ii = 0; ii < dim/2; ii++){
+            jac[ii*dim + (2*ii+1)] = 1.0;
+        }
+    }
+    /* printf("\n\n\n"); */
+    /* printf("x = "); dprint(dim,x); */
+    /* printf("u = "); dprint(dim/2,u); */
+    /* printf("out = "); dprint(dim,out); */
+    /* if (jac != NULL){ */
+    /*     printf("jac = \n"); dprint2d_col(dim,dim/2,jac); */
+    /* } */
+
+    /* exit(1); */
     return 0;
 }
 
@@ -95,20 +123,23 @@ int s1(double t,const double * x,const double * u,double * out, double * grad,
     (void)(u);
 
     double * val = args;
-    
-    out[0] = val[0];
-    out[1] = 0.0;
-    out[2] = 0.0;
-    out[3] = val[1];
+
+    for (size_t ii = 0; ii < dim*dim; ii++){
+        out[ii] = 0.0;
+    }
+    for (size_t ii = 0; ii < dim; ii++){
+        if ((ii % 2) == 0){
+            out[ii*dim + ii] = val[0];
+        }
+        else{
+            out[ii*dim + ii] = val[1];
+        }
+    }
 
     if (grad != NULL){
-        /* for (size_t ii = 0; ii < 2*2*2;ii++){ */
-        /*     grad[ii] = 0.0; */
-        /* } */
-        grad[0] = 0.0;
-        grad[1] = 0.0;
-        grad[2] = 0.0;
-        grad[3] = 0.0;
+        for (size_t ii = 0; ii < dim*dim*dim/2; ii++){
+            grad[ii] = 0.0;
+        }
     }
     return 0;
 }
@@ -117,18 +148,28 @@ int stagecost(double t,const double * x,const double * u, double * out,
               double * grad)
 {
     (void)(t);
+    (void)(x);
+    (void)(u);
     *out = 0.0;
-
-    /* *out += pow(x[0],2) + 4.0*pow(x[1],2) + pow(u[0],2) + 2.0*pow(u[1],2); */
-
-    /* if (grad!= NULL){ */
-    /*     grad[0] = 2 * u[0]; */
-    /*     grad[1] = 4 * u[1]; */
-    /* } */
-
-    *out += pow(x[0],2) + pow(x[1],2) + pow(u[0],2);
+    for (size_t ii = 0; ii < dim; ii++){
+        if (ii == 0){
+            *out += (x[ii]*(x[ii] + x[ii+1]));
+        }
+        else if (ii == dim-1){
+            *out += (x[ii] * (x[ii-1] + x[ii]));
+        }
+        else{
+            *out += ( x[ii] * (x[ii-1] + x[ii] + x[ii+1]));
+        }
+    }
+    for (size_t ii = 0; ii < dim/2; ii++){
+        *out += u[ii]*u[ii];
+    }
+    
     if (grad!= NULL){
-        grad[0] = 2 * u[0];
+        for (size_t ii = 0; ii < dim/2; ii++){
+            grad[ii] = 2 * u[ii];
+        }
     }
     return 0;
 }
@@ -143,12 +184,15 @@ int boundcost(double t,const  double * x, double * out)
     return 0;
 }
 
+static int obs = 0;
 int ocost(const double * x,double * out)
 {
     (void)(x);
-    /* printf("got ocost!!\n"); */
-    /* dprint(2,x); */
     *out = 0.0;
+    if (obs == 0){
+        printf("Hit the obstacle!\n");
+        obs=1;
+    }
     return 0;
 }
 
@@ -158,7 +202,12 @@ int startcost(size_t N, const double * x, double * out, void * args)
     (void)(x);
     for (size_t ii = 0; ii < N; ii++){
         /* printf("ii = %zu, x = ",ii); dprint(2,x+ii); */
-        out[ii] = 0.2;
+        out[ii] = 0.0;
+        for (size_t jj = 0; jj < dim; jj++){
+            out[ii] += (x[dim*ii+jj]*x[dim*ii+jj]);
+        }
+        /* out[ii] = 3.0*x[2*ii+0]*x[2*ii+0] + 4.0*x[2*ii+1]*x[2*ii+1]; */
+        /* out[ii] = 0.2; */
     }
     /* printf("done\n"); */
     return 0;
@@ -167,10 +216,11 @@ int startcost(size_t N, const double * x, double * out, void * args)
 int main(int argc, char * argv[])
 {
     int next_option;
-    const char * const short_options = "hd:n:a:b:r:f:s:t:e:v:";
+    const char * const short_options = "hd:x:n:a:b:r:f:s:t:e:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
+        { "xdim"     , 1, NULL, 'x' },
         { "nodes"    , 1, NULL, 'n' },
         { "lbu"      , 1, NULL, 'a' },
         { "ubu"      , 1, NULL, 'b' },
@@ -188,10 +238,11 @@ int main(int argc, char * argv[])
     int verbose = 0;
     size_t N = 20;
     size_t niter = 100;
-    double lbu[1] = {-1.0};
-    double ubu[1] = {1.0};
+    double lbu = -1.0;
+    double ubu = 1.0;
     double ss[2] = {1.0,1.0};
     double roundtol = 1e-7;
+    dim = 2;
     int bctype = 0;
     do {
         next_option = getopt_long (argc, argv, short_options, long_options, NULL);
@@ -202,14 +253,17 @@ int main(int argc, char * argv[])
             case 'd':
                 dirout = optarg;
                 break;
+            case 'x':
+                dim = strtoul(optarg,NULL,10);
+                break;
             case 'n':
                 N = strtoul(optarg,NULL,10);
                 break;
             case 'a':
-                lbu[0] = strtod(optarg,NULL);
+                lbu = strtod(optarg,NULL);
                 break;
             case 'b':
-                ubu[0] = strtod(optarg,NULL);
+                ubu = strtod(optarg,NULL);
                 break;
             case 'r':
                 ss[0] = strtod(optarg,NULL);
@@ -238,18 +292,35 @@ int main(int argc, char * argv[])
         }
     } while (next_option != -1);
 
-    size_t dx = 2;
-    size_t dw = 2;
-    size_t du = 1;
-    double lb[2] = {-2.0, -2.0};
-    double ub[2] = {2.0, 2.0};
-    size_t Narr[2] = {N, N};
+    if (dim % 2 != 0){
+        fprintf(stderr, "Dimension must be a multiple of 2\n");
+        exit(1);
+    }
+    size_t dx = dim;
+    size_t dw = dim;
+    size_t du = dim/2;
+
+    double * lb = calloc_double(dx);
+    double * ub = calloc_double(dx);
+    size_t * Narr = calloc_size_t(dx);
+    for (size_t ii = 0; ii < dx; ii++){
+        lb[ii] = -2.0;
+        ub[ii] = 2.0;
+        Narr[ii] = N;
+    }
     double beta = 0.1;
 
+
     // optimization arguments
+    double * lbu_a = calloc_double(du);
+    double * ubu_a = calloc_double(du);
+    for (size_t ii = 0; ii < du; ii++){
+        lbu_a[ii] = lbu;
+        ubu_a[ii] = ubu;
+    }
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,lbu);
-    c3opt_add_ub(opt,ubu);
+    c3opt_add_lb(opt,lbu_a);
+    c3opt_add_ub(opt,ubu_a);
     c3opt_set_absxtol(opt,1e-8);
     c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-25);
@@ -273,8 +344,9 @@ int main(int argc, char * argv[])
     c3control_add_obscost(c3c,ocost);
     
     if (bctype == 1){
-        c3control_set_external_boundary(c3c,0,"reflect");
-        c3control_set_external_boundary(c3c,1,"reflect");        
+        for (size_t ii = 0; ii < dx; ii++){
+            c3control_set_external_boundary(c3c,ii,"reflect");
+        }
     }
 
     /* double center[2] = {0.0,0.0}; */
@@ -282,14 +354,13 @@ int main(int argc, char * argv[])
     /* c3control_add_obstacle(c3c,center,width); */
 
     char filename[256];
-    sprintf(filename,"%s/%s.c3",dirout,"cost");
+    sprintf(filename,"%s/dim%zu_%s_%d.c3",dirout,dx,"cost",0);
     double ** xgrid = c3control_get_xgrid(c3c);
     struct ValueF * cost = valuef_load(filename,Narr,xgrid);
     if (cost == NULL){
         cost = c3control_init_value(c3c,startcost,NULL,aargs,0);
     }
 
-    sprintf(filename,"%s/%s_%d.c3",dirout,"costfunc",0);
     int saved = valuef_save(cost,filename);
     assert (saved == 0);
     
@@ -299,7 +370,7 @@ int main(int argc, char * argv[])
     double abs_conv_pi = 1e-8;
     struct Diag * diag = NULL;
     char filename_diag[256];
-    sprintf(filename_diag,"%s/%s",dirout,"diagnostic.dat");
+    sprintf(filename_diag,"%s/dim%zu_%s",dirout,dx,"diagnostic.dat");
     printf("\n\n\nmaxiter_vi = %zu\n", maxiter_vi);
     for (size_t ii = 0; ii < maxiter_vi; ii++){
         printf("\n\n\n\n\n\n\n");
@@ -319,12 +390,12 @@ int main(int argc, char * argv[])
         /* sprintf(filename,"%s/%s_%zu.dat",dirout,"costfunc",ii+1); */
         /* print_cost(filename,cost,30,30,lb,ub); */
 
-        /* sprintf(filename,"%s/%s.c3",dirout,"cost"); */
-        /* saved = valuef_save(cost,filename); */
-        /* assert (saved == 0); */
+        sprintf(filename,"%s/dim%zu_%s_%d.c3",dirout,dx,"cost",0);
+        saved = valuef_save(cost,filename);
+        assert (saved == 0);
 
-        /* saved = diag_save(diag,filename_diag); */
-        /* assert (saved == 0); */
+        saved = diag_save(diag,filename_diag);
+        assert (saved == 0);
 
         if (verbose != 0){
             printf("ii=%zu ranks=",ii);
@@ -339,9 +410,9 @@ int main(int argc, char * argv[])
         iprint_sz(dx+1,ranks);
     }
 
-    sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat",
-            dirout,lbu[0],ubu[0],ss[0],ss[1],"cost");
-    print_cost(filename,cost,30,30,lb,ub);
+    /* sprintf(filename,"%s/absorb_ulb%3.2f_uub%3.2f_s1%3.2f_s2%3.2f_%s_final.dat", */
+    /*         dirout,lbu[0],ubu[0],ss[0],ss[1],"cost"); */
+    /* print_cost(filename,cost,30,30,lb,ub); */
 
     c3control_add_policy_sim(c3c,cost,opt,NULL);
     
@@ -349,7 +420,7 @@ int main(int argc, char * argv[])
     /* char odename[256] = "rk4"; */
     char odename[256] = "forward-euler";
     struct Integrator * ode_sys = NULL;
-    ode_sys = integrator_create_controlled(2,1,f1,NULL,
+    ode_sys = integrator_create_controlled(dx,du,f1,NULL,
                                            c3control_controller,c3c);
     integrator_set_type(ode_sys,odename);
     integrator_set_dt(ode_sys,1e-2);
@@ -357,11 +428,15 @@ int main(int argc, char * argv[])
 
     // Initialize trajectories for state
     double time = 0.0;
-    double state[2] = {-0.5, -0.5};
-    double con[1] = {0.0};
+    double * state = calloc_double(dx);
+    for (size_t ii = 0; ii < dx; ii++){
+        state[ii] = -0.5;
+    }
+    double * con = calloc_double(du);
+
     // Integrate
     struct Trajectory * traj = NULL;
-    trajectory_add(&traj,2,1,time,state,con);
+    trajectory_add(&traj,dx,du,time,state,con);
     double final_time = 1e1;
     double dt = 1e-2;
     int res;
@@ -379,10 +454,14 @@ int main(int argc, char * argv[])
     fclose(fp);
 
     // cleanup integrator stuff
+    free(state); state = NULL;
+    free(con); con = NULL;
     integrator_destroy(ode_sys); ode_sys = NULL;
     trajectory_free(traj); traj = NULL;
 
 
+    free(lbu_a); lbu_a = NULL;
+    free(ubu_a); ubu_a = NULL;    
     valuef_destroy(cost); cost = NULL;
     c3control_destroy(c3c); c3c = NULL;
     diag_destroy(&diag); diag = NULL;

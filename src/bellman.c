@@ -533,7 +533,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     size_t nrand = 10; // note this is changed if du = 1 or du = 3;
     size_t npert = 2;
     double valtemp;
-    int justrand = -1;
+    /* int justrand = -1; */
+    int justrand = 1;    
 
     // first do zero;
     /* valtemp = bellman_control(du,ucurr,NULL,arg); */
@@ -570,7 +571,8 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     if (justrand == 1){
         // now compare with random samples
         /* double valtemp = 123456; */
-        nrand = 10;
+        /* nrand = 10; */
+        nrand = 1;        
         for (size_t jj = 0; jj < nrand; jj++){
             for (size_t kk = 0; kk < du; kk++){
                 ucurr[kk] = randu()*(ubu[kk]-lbu[kk]) + lbu[kk];
