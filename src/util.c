@@ -708,7 +708,8 @@ struct Workspace
     struct HTable * pi_prob_htable;
     size_t pi_iter;
     size_t pi_subiter;
-    
+
+    char ** saved_keys;
 };
 
 struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
@@ -759,6 +760,12 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
     work->pi_prob_htable = htable_create(1000000);
     work->pi_iter = 0;
     work->pi_subiter = 0;
+
+    work->saved_keys = malloc(N * sizeof(char*));
+    for (size_t ii = 0; ii < N; ii++){
+        work->saved_keys[ii] = malloc(256*sizeof(char));
+    }
+    /* assert (work->saved_keys != NULL); */
     
     return work;
 }
@@ -779,6 +786,11 @@ void workspace_free(struct Workspace * w)
         htable_destroy(w->vi_htable); w->vi_htable = NULL;
         htable_destroy(w->pi_htable); w->pi_htable = NULL;
         htable_destroy(w->pi_prob_htable); w->pi_prob_htable = NULL;
+
+        for (size_t ii = 0; ii < w->N; ii++){
+            free(w->saved_keys[ii]); w->saved_keys[ii] = NULL;
+        }
+        free(w->saved_keys); w->saved_keys = NULL;
         free(w); w = NULL;
     }
 }
@@ -908,6 +920,11 @@ size_t * workspace_get_absorbed_no(struct Workspace * w)
 size_t * workspace_get_absorbed_yes(struct Workspace * w)
 {
     return w->absorbed_yes;
+}
+
+char ** workspace_get_saved_keys(struct Workspace * w)
+{
+    return w->saved_keys;
 }
     
 

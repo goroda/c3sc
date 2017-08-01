@@ -115,4 +115,6 @@ int *    workspace_get_absorbed(struct Workspace * w, size_t node);
 size_t * workspace_get_ind_to_serialize(struct Workspace * w);
 size_t * workspace_get_absorbed_no(struct Workspace *);
 size_t * workspace_get_absorbed_yes(struct Workspace *);
+char ** workspace_get_saved_keys(struct Workspace *);
+
 #endif

@@ -141,123 +141,123 @@ CuSuite * HashGridGetSuite()
 }
 
 
-void Test_htable(CuTest * tc)
-{
-    printf("Testing htable\n");
+/* void Test_htable(CuTest * tc) */
+/* { */
+/*     printf("Testing htable\n"); */
 
-    size_t size = 100000;
-    struct HTable * hg = htable_create(size);
-    CuAssertIntEquals(tc,0,hg==NULL);
+/*     size_t size = 100000; */
+/*     struct HTable * hg = htable_create(size); */
+/*     CuAssertIntEquals(tc,0,hg==NULL); */
     
-    size_t nvals = 600;
-    size_t sval = 10;
-    double ** x = malloc(nvals * sizeof(double *));
-    for (size_t ii = 0; ii < nvals; ii++){
-        /* printf("ii = %zu\n",ii); */
-        size_t val = ii+1;
-        char * blah = size_t_to_char(val);
-        x[ii] = calloc(sval,sizeof(double));
-        for (size_t jj = 0; jj < sval; jj++){
-            x[ii][jj] = randu()*10.0 - 5.0;
-        }
+/*     size_t nvals = 600; */
+/*     size_t sval = 10; */
+/*     double ** x = malloc(nvals * sizeof(double *)); */
+/*     for (size_t ii = 0; ii < nvals; ii++){ */
+/*         /\* printf("ii = %zu\n",ii); *\/ */
+/*         size_t val = ii+1; */
+/*         char * blah = size_t_to_char(val); */
+/*         x[ii] = calloc(sval,sizeof(double)); */
+/*         for (size_t jj = 0; jj < sval; jj++){ */
+/*             x[ii][jj] = randu()*10.0 - 5.0; */
+/*         } */
         
-        /* printf("key=%s\n",blah); */
-        int res = htable_add_element(hg,blah,x[ii],sval*sizeof(double));
-        CuAssertIntEquals(tc,0,res);
-        /* free(blah); blah = NULL; */
-    }
+/*         /\* printf("key=%s\n",blah); *\/ */
+/*         int res = htable_add_element(hg,blah,x[ii],sval*sizeof(double)); */
+/*         CuAssertIntEquals(tc,0,res); */
+/*         /\* free(blah); blah = NULL; *\/ */
+/*     } */
 
-    /* printf("\n\n\n\n"); */
-    for (size_t ii = 0; ii < nvals; ii++){
-        size_t val = ii+1;
-        char * blah = size_t_to_char(val);
-        double * data_get = NULL;
-        size_t nbytes;
+/*     /\* printf("\n\n\n\n"); *\/ */
+/*     for (size_t ii = 0; ii < nvals; ii++){ */
+/*         size_t val = ii+1; */
+/*         char * blah = size_t_to_char(val); */
+/*         double * data_get = NULL; */
+/*         size_t nbytes; */
 
-        data_get = htable_get_element(hg,blah,&nbytes);
-        CuAssertIntEquals(tc,sval*sizeof(double),nbytes);
-        CuAssertIntEquals(tc,0,data_get==NULL);
+/*         data_get = htable_get_element(hg,blah,&nbytes); */
+/*         CuAssertIntEquals(tc,sval*sizeof(double),nbytes); */
+/*         CuAssertIntEquals(tc,0,data_get==NULL); */
 
-        for (size_t jj = 0; jj < sval; jj++){
-            /* printf("data[%zu]=(%G,%G)\n ",jj,data_get[jj],x[ii][jj]); */
-            CuAssertDblEquals(tc,x[ii][jj],data_get[jj],1e-15);
-        }
-        free(blah);
-    }
+/*         for (size_t jj = 0; jj < sval; jj++){ */
+/*             /\* printf("data[%zu]=(%G,%G)\n ",jj,data_get[jj],x[ii][jj]); *\/ */
+/*             CuAssertDblEquals(tc,x[ii][jj],data_get[jj],1e-15); */
+/*         } */
+/*         free(blah); */
+/*     } */
 
-    for (size_t ii = 0; ii < nvals; ii++){
-        free(x[ii]); x[ii] = NULL;
-    }
-    free(x); x = NULL;
+/*     for (size_t ii = 0; ii < nvals; ii++){ */
+/*         free(x[ii]); x[ii] = NULL; */
+/*     } */
+/*     free(x); x = NULL; */
     
-    htable_destroy(hg); hg = NULL;
+/*     htable_destroy(hg); hg = NULL; */
 
-}
+/* } */
 
-void Test_htable2(CuTest * tc)
-{
-    printf("Testing htable2 - with size_t array keys \n");
+/* void Test_htable2(CuTest * tc) */
+/* { */
+/*     printf("Testing htable2 - with size_t array keys \n"); */
 
-    size_t size = 10000;
-    struct HTable * hg = htable_create(size);
-    CuAssertIntEquals(tc,0,hg==NULL);
+/*     size_t size = 10000; */
+/*     struct HTable * hg = htable_create(size); */
+/*     CuAssertIntEquals(tc,0,hg==NULL); */
     
-    size_t nvals = 8000;
-    size_t sval = 10;
-    double ** x = malloc(nvals * sizeof(double *));
-    for (size_t ii = 0; ii < nvals; ii++){
-        /* printf("ii = %zu\n",ii); */
-        size_t val[5] = {ii+1,ii+2,ii+3,ii+4,ii+5};
-        char * blah = size_t_a_to_char(val,5);
-
-        
-        x[ii] = calloc(sval,sizeof(double));
-        for (size_t jj = 0; jj < sval; jj++){
-            x[ii][jj] = randu()*10.0 - 5.0;
-        }
-        
-        /* printf("key=%s\n",blah); */
-        int res = htable_add_element(hg,blah,x[ii],sval*sizeof(double));
-        CuAssertIntEquals(tc,0,res);
-        /* free(blah); blah = NULL; */
-    }
-
-    /* printf("\n\n\n\n"); */
-    for (size_t ii = 0; ii < nvals; ii++){
+/*     size_t nvals = 8000; */
+/*     size_t sval = 10; */
+/*     double ** x = malloc(nvals * sizeof(double *)); */
+/*     for (size_t ii = 0; ii < nvals; ii++){ */
+/*         /\* printf("ii = %zu\n",ii); *\/ */
+/*         size_t val[5] = {ii+1,ii+2,ii+3,ii+4,ii+5}; */
+/*         char * blah = size_t_a_to_char(val,5); */
 
         
-        size_t val[5] = {ii+1,ii+2,ii+3,ii+4,ii+5};
-        char * blah = size_t_a_to_char(val,5);
-        double * data_get = NULL;
-        size_t nbytes;
+/*         x[ii] = calloc(sval,sizeof(double)); */
+/*         for (size_t jj = 0; jj < sval; jj++){ */
+/*             x[ii][jj] = randu()*10.0 - 5.0; */
+/*         } */
+        
+/*         /\* printf("key=%s\n",blah); *\/ */
+/*         int res = htable_add_element(hg,blah,x[ii],sval*sizeof(double)); */
+/*         CuAssertIntEquals(tc,0,res); */
+/*         /\* free(blah); blah = NULL; *\/ */
+/*     } */
 
-        data_get = htable_get_element(hg,blah,&nbytes);
-        CuAssertIntEquals(tc,sval*sizeof(double),nbytes);
-        CuAssertIntEquals(tc,0,data_get==NULL);
+/*     /\* printf("\n\n\n\n"); *\/ */
+/*     for (size_t ii = 0; ii < nvals; ii++){ */
 
-        for (size_t jj = 0; jj < sval; jj++){
-            /* printf("data[%zu]=(%G,%G)\n ",jj,data_get[jj],x[ii][jj]); */
-            CuAssertDblEquals(tc,x[ii][jj],data_get[jj],1e-15);
-        }
-        free(blah);
-    }
+        
+/*         size_t val[5] = {ii+1,ii+2,ii+3,ii+4,ii+5}; */
+/*         char * blah = size_t_a_to_char(val,5); */
+/*         double * data_get = NULL; */
+/*         size_t nbytes; */
 
-    for (size_t ii = 0; ii < nvals; ii++){
-        free(x[ii]); x[ii] = NULL;
-    }
-    free(x); x = NULL;
+/*         data_get = htable_get_element(hg,blah,&nbytes); */
+/*         CuAssertIntEquals(tc,sval*sizeof(double),nbytes); */
+/*         CuAssertIntEquals(tc,0,data_get==NULL); */
+
+/*         for (size_t jj = 0; jj < sval; jj++){ */
+/*             /\* printf("data[%zu]=(%G,%G)\n ",jj,data_get[jj],x[ii][jj]); *\/ */
+/*             CuAssertDblEquals(tc,x[ii][jj],data_get[jj],1e-15); */
+/*         } */
+/*         free(blah); */
+/*     } */
+
+/*     for (size_t ii = 0; ii < nvals; ii++){ */
+/*         free(x[ii]); x[ii] = NULL; */
+/*     } */
+/*     free(x); x = NULL; */
     
-    htable_destroy(hg); hg = NULL;
+/*     htable_destroy(hg); hg = NULL; */
 
-}
+/* } */
 
 CuSuite * HTableGetSuite()
 {
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, Test_htable);
-    SUITE_ADD_TEST(suite, Test_htable2);
+    /* SUITE_ADD_TEST(suite, Test_htable); */
+    /* SUITE_ADD_TEST(suite, Test_htable2); */
 
     return suite;
 }
