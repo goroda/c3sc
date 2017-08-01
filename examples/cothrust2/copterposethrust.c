@@ -340,21 +340,22 @@ int main(int argc, char * argv[])
     struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-10); //-14
-    c3opt_set_relftol(opt,1e-10); //-14
+    c3opt_set_absxtol(opt,1e-7); //-14
+    c3opt_set_relftol(opt,1e-7); //-14
     c3opt_set_gtol(opt,1e-30); //-30
     
-    c3opt_ls_set_maxiter(opt,200);
-    c3opt_ls_set_alpha(opt,0.1);
-    c3opt_ls_set_beta(opt,0.2);
+    c3opt_ls_set_maxiter(opt,10);
+    c3opt_set_maxiter(opt,30);
+    /* c3opt_ls_set_alpha(opt,0.1); */
+    /* c3opt_ls_set_beta(opt,0.2); */
 
     c3opt_set_verbose(opt,0);
 
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-5); //decreased to e-7 at some point
-    approx_args_set_round_tol(aargs,1e-5); //decrtease to e-6 at some point
+    approx_args_set_cross_tol(aargs,1e-4); //decreased to e-7 at some point
+    approx_args_set_round_tol(aargs,1e-4); //decrtease to e-6 at some point
     approx_args_set_kickrank(aargs,5);
 
     // for thesis!!
@@ -416,7 +417,7 @@ int main(int argc, char * argv[])
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256];
-    sprintf(filename_diag,"%s/%s.dat",dirout,"diagnostic");
+    sprintf(filename_diag,"%s/n%zu_%s.dat",dirout,N,"diagnostic");
     if (niter!=0)
     {
     for (size_t ii = 0; ii < maxiter_vi; ii++){

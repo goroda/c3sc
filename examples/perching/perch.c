@@ -327,21 +327,23 @@ int main(int argc, char * argv[])
 
     double lbu[1] = {-2.0*M_PI};
     double ubu[1] = {2.0*M_PI};
-    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
+    /* struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du); */
+    /* c3opt_add_lb(opt,lbu); */
+    /* c3opt_add_ub(opt,ubu); */
+
+    /* size_t nopts = 40; */
+    /* /\* size_t nopts = 20; *\/ */
+    /* double * uopts = linspace(lbu[0],ubu[0],nopts); */
+    /* c3opt_set_brute_force_vals(opt,nopts,uopts); */
+
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
     c3opt_add_lb(opt,lbu);
     c3opt_add_ub(opt,ubu);
-
-    size_t nopts = 40;
-    double * uopts = linspace(lbu[0],ubu[0],nopts);
-    c3opt_set_brute_force_vals(opt,nopts,uopts);
-
-    /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
-
-    /* c3opt_set_absxtol(opt,1e-10); */
-    /* c3opt_set_relftol(opt,1e-10); */
-    /* c3opt_set_gtol(opt,1e-30); */
-    
-    /* c3opt_ls_set_maxiter(opt,10); */
+    c3opt_set_absxtol(opt,1e-6);
+    c3opt_set_relftol(opt,1e-6);
+    c3opt_set_gtol(opt,1e-30);
+    c3opt_ls_set_maxiter(opt,10);
+    c3opt_set_maxiter(opt,10);
     /* c3opt_ls_set_alpha(opt,0.3); */
     /* c3opt_ls_set_beta(opt,0.2); */
     c3opt_set_verbose(opt,0);
@@ -353,8 +355,8 @@ int main(int argc, char * argv[])
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
 
-    approx_args_set_startrank(aargs,10);
-    size_t maxrank = 10;
+    approx_args_set_startrank(aargs,5);
+    size_t maxrank = 15;
     if (maxrank > N){
         maxrank = N;
     }
@@ -372,8 +374,10 @@ int main(int argc, char * argv[])
     // x y aoa phi dx dy daoa
     double center[7];
     double width[7];
-    center[0] = 0.0; width[0] = 0.085;
-    center[1] = 0.0; width[1] = 0.085;
+    /* center[0] = 0.0; width[0] = 0.085; */
+    /* center[1] = 0.0; width[1] = 0.085; */
+    center[0] = 0.0; width[0] = 0.1;
+    center[1] = 0.0; width[1] = 0.1;    
     center[2] = 0.0; width[2] = ub[2]-lb[2];
     center[3] = 0.0; width[3] = ub[3]-lb[3];
     center[4] = 0.0; width[4] = 0.5;

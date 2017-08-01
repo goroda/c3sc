@@ -707,7 +707,7 @@ struct ValueF * valuef_interp(size_t d,
             }
         }
         else{
-          // initialize cross indices
+            // initialize cross indices
             cross_index_array_initialize(d,vf->isr,0,1,
                                          ranks_use,(void**)start,sizeof(double));
             cross_index_array_initialize(d,vf->isl,0,0,
