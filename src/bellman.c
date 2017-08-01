@@ -503,8 +503,10 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
     struct ControlParams * param = mem->shared;
     
     size_t mem_node = mem->private;
-    int absorbed = *(workspace_get_absorbed(param->work, mem_node));    
+    int absorbed = *(workspace_get_absorbed(param->work, mem_node));
+    /* printf("asborbed = %d\n",absorbed); */
     if (absorbed == 1){ // absorbed cost
+        /* printf("asborbed on boundary!\n"); */
         double time = param->time;
         struct DPparam * dp = param->dp;
         const double * x = param->x + mem_node * param->dx;
@@ -962,6 +964,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         
         size_t_a_to_char(ind_to_serialize,dx+2,saved_keys[ii]);
         /* printf("serializing: "); iprint_sz(dx+2,ind_to_serialize); */
+        /* printf("x = "); dprint(dx,x+ii*dx); */
         /* printf("key = %s\n",saved_keys[ii]); */
         size_t nbytes = 0;
         double * out_stored = htable_get_element(htable,saved_keys[ii],&nbytes);
@@ -970,22 +973,23 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         if (out_stored != NULL){
             out[ii] = out_stored[0];
 
-            struct Memory mem; 
-            mem.shared = cp;
-            mem.private = ii;
-            double val;
-            double * u = workspace_get_u(cp->work,ii);
-            bellman_optimal(du,u,&val,&mem);
-            double diff = val - out[ii];
-            if (fabs(diff) > 1e-14){
-                printf("out = %3.15G\n",out[ii]);
-                printf("diff = %G\n",val-out[ii]);
-                printf("ii = %zu\n",ii);
-                dprint(dx,x + ii * dx);
-                exit(1);
-            }
+            /* struct Memory mem;  */
+            /* mem.shared = cp; */
+            /* mem.private = ii; */
+            /* double val; */
+            /* double * u = workspace_get_u(cp->work,ii); */
+            /* bellman_optimal(du,u,&val,&mem); */
+            /* double diff = val - out[ii]; */
+            /* if (fabs(diff) > 1e-14){ */
+            /*     printf("out = %3.15G\n",out[ii]); */
+            /*     printf("val = %3.15G\n",val); */
+            /*     printf("diff = %G\n",val-out[ii]); */
+            /*     printf("ii = %zu\n",ii); */
+            /*     dprint(dx,x + ii * dx); */
+            /*     exit(1); */
+            /* } */
         }
-        else if (absorbed[ii] == 0){ // absorbed
+        else if (absorbed[ii] == 0){ // not absorbed
             ind_run[nrun] = ii;
             nrun++;
             param->nstate_evals++; // these are the ones which I will run below
@@ -998,6 +1002,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
             double * u = workspace_get_u(cp->work,ii);
             bellman_optimal(du,u,out+ii,&mem);
             htable_add_element(htable,saved_keys[ii],out+ii,1);
+            /* printf("out[%zu] = %G\n",ii,out[ii]); */
             param->nstate_evals++; // ran it
             param->nnode_evals++;
         }
@@ -1023,6 +1028,7 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     // doing this not in parallel because not thread safe
     for (size_t ii = 0; ii < nrun; ii++){
         char * key = saved_keys[ind_run[ii]];
+        /* printf("key = %s, out = %3.5G\n",key,out[ind_run[ii]]); */
         htable_add_element(htable,key,&out[ind_run[ii]],1);
     }
 
@@ -1100,6 +1106,215 @@ void pi_param_add_value(struct PIparam * poli, struct ValueF * vf)
     poli->niter_node_evals = 0;
 }
 
+/* int bellman_pi(size_t N, const double * x, double * out, void * arg) */
+/* { */
+
+/*     /\* printf("started pi\n"); *\/ */
+/*     struct PIparam * param = arg; */
+/*     assert (param->cp != NULL); */
+/*     struct ControlParams * cp = param->cp; */
+/*     struct MCAparam * mca = cp->mca; */
+/*     assert (mca != NULL); */
+/*     struct DPparam * dp = cp->dp; */
+/*     assert (dp != NULL); */
+/*     size_t dx = mca->dx; */
+/*     size_t du = mca->du; */
+/*     size_t * ngrid = mca->ngrid; */
+/*     double ** xgrid = mca->xgrid; */
+    
+/*     struct ValueF * vf_policy    = param->vf_policy; */
+/*     struct ValueF * vf_iteration = param->vf_iteration; */
+/*     assert (vf_policy != NULL); */
+/*     assert (vf_iteration != NULL); */
+/*     struct Boundary * bound = dp->bound; */
+/*     assert (bound != NULL); */
+
+/*     /\* struct HTable * htable = param->htable; *\/ */
+/*     /\* struct HTable * htable_iter = param->htable_iter; *\/ */
+
+/*     struct HTable * htable = workspace_get_pi_prob_htable(cp->work); */
+/*     struct HTable * htable_iter = workspace_get_pi_htable(cp->work); */
+
+/*     assert (htable != NULL); */
+/*     assert (htable_iter != NULL); */
+/*     // handle the policy */
+
+/*     double time = 0.0; */
+/*     int * absorbed_pol = workspace_get_absorbed(cp->work,0); */
+/*     double * costs_pol = workspace_get_costs(cp->work,0); */
+
+/*     size_t * fi = calloc_size_t(dx); */
+/*     size_t dim_vary; */
+/*     int res = mca_get_neighbor_costs(dx,N,x,bound,vf_policy,ngrid,xgrid, */
+/*                                      fi,&dim_vary,absorbed_pol,costs_pol); */
+
+/*     assert (res == 0); */
+/*     assert (dim_vary < dx); */
+
+/*     size_t * ind_to_serialize = workspace_get_ind_to_serialize(cp->work); */
+/*     for (size_t ii = 0; ii < dx; ii++){ */
+/*         assert (fi[ii] < ngrid[ii]); */
+/*         if (ii != dim_vary){ */
+/*             ind_to_serialize[ii] = fi[ii]; */
+/*         } */
+/*     } */
+/*     ind_to_serialize[dx] = dim_vary; */
+/*     ind_to_serialize[dx+1] = workspace_get_pi_iter(cp->work); // stores values for probabilities for current policy */
+/*     ind_to_serialize[dx+2] = workspace_get_pi_subiter(cp->work); // stores value for the current cost function (changes faster than policy) */
+/*     free(fi); fi = NULL; */
+/*     char * key1 = size_t_a_to_char(ind_to_serialize,dx+3); */
+/*     char * key2 = size_t_a_to_char(ind_to_serialize,dx+2); // NOTE DIFFERENCE, only uses major iter not subiter */
+/*     char * key3 = size_t_a_to_char(ind_to_serialize,dx+3); */
+
+/*     // see if already computed the output for this function */
+/*     size_t nbytes1 = 0; */
+/*     double * out_stored = htable_get_element(htable_iter,key1,&nbytes1); */
+/*     if (out_stored == NULL){ */
+/*         /\* printf("not stored\n"); *\/ */
+/*         size_t nbytes = 0; */
+/*         // see if already computed transition probabilities for this fiber */
+/*         double * probs = htable_get_element(htable,key2,&nbytes); */
+/*         /\* probs = NULL; *\/ */
+/*         /\* printf("got probs\n"); *\/ */
+/*         int probs_alloc = 0; */
+/*         /\* probs = NULL; *\/ */
+/*         if (probs == NULL){ */
+/*             /\* printf("probs is null\n");; *\/ */
+/*             size_t nprobs = N*(2*dx+1) + 2*N; // last N are stage costs and N before that are dts */
+/*             probs = calloc_double(nprobs); // last N are dts */
+/*             probs_alloc = 1; */
+
+/*             control_params_add_time_and_states(cp,time,N,x); */
+
+/*             #pragma omp parallel for schedule(guided) */
+/*             /\* #pragma omp parallel for schedule(static) *\/ */
+/*             for (size_t ii = 0; ii < N; ii++){ */
+
+/*                 struct Memory mem; */
+/*                 mem.shared = cp; */
+/*                 mem.private = ii; */
+                
+
+/*                 double * u = workspace_get_u(cp->work,ii); */
+
+/*                 double val; */
+/*                 int res2 = bellman_optimal(du,u,&val,&mem); */
+
+                
+/*                 double * drift = workspace_get_drift(cp->work, ii); */
+/*                 double * diff  = workspace_get_diff (cp->work, ii); */
+
+
+/*                 // build transition probabilities at optimal */
+/*                 assert (res2 == 0); */
+/*                 res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,drift,NULL); */
+/*                 assert (res2 == 0); */
+/*                 res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,diff,NULL); */
+/*                 /\* res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec, *\/ */
+/*                 /\*                           drift,NULL,diff,NULL, *\/ */
+/*                 /\*                           probs + ii*(2*dx+1), *\/ */
+/*                 /\*                           NULL,probs + N*(2*dx+1)+ii, // dt *\/ */
+/*                 /\*                           NULL,NULL); *\/ */
+/*                 res = transition_assemble(dx,du,cp->dw,mca->h2,mca->t, */
+/*                                           drift,NULL,diff,NULL, */
+/*                                           probs + ii*(2*dx+1), */
+/*                                           NULL,probs + N*(2*dx+1)+ii, // dt */
+/*                                           NULL,NULL); */
+
+/*                 res2 = dp->stagecost(time,x+ii*dx,u,probs + N*(2*dx+1)+N+ii,NULL); */
+/*                 assert (res2 == 0); */
+
+
+/*             } */
+/*             param->npol_evals += N; */
+/*             htable_add_element(htable,key2,probs,nprobs * sizeof(double)); */
+
+/*         } */
+/*         else{ */
+/*             /\* printf("probs is null"); *\/ */
+/*             free(key2); key2 = NULL; */
+/*         } */
+
+/*         // need to compute the control somewhere */
+/*         int * absorbed = calloc_int(N); */
+/*         double * costs = calloc_double(N*(2*dx+1)); */
+/*         fi = calloc_size_t(dx); */
+/*         /\* printf("get other mca\n"); *\/ */
+/*         res = mca_get_neighbor_costs(dx,N,x, */
+/*                                      bound,vf_iteration,ngrid,xgrid, */
+/*                                      fi,&dim_vary, */
+/*                                      absorbed,costs); */
+/*         /\* printf("got other \n"); iprint(N,absorbed); *\/ */
+        
+/*         assert (res == 0); */
+
+
+/*         param->niter_evals = param->niter_evals + N; */
+/*         param->niter_node_evals = param->niter_node_evals + N; */
+/*         /\* printf("N = %zu\n",N); *\/ */
+/*         for (size_t ii = 0; ii < N; ii++){ */
+
+            
+/*             // get the optimal control */
+/*             // iterate with the optimal control */
+/*             if (absorbed[ii] == 0){ */
+/*                 out[ii] = bellmanrhs(dx,du, */
+/*                                      *(probs + N*(2*dx+1)+N+ii), // stagecost */
+/*                                      NULL, */
+/*                                      dp->discount, */
+/*                                      probs+ii*(2*dx+1),NULL, */
+/*                                      *(probs+N*(2*dx+1)+ii),NULL, // dt */
+/*                                      costs+ii*(2*dx+1),NULL); */
+/*                 /\* printf("out[%zu] = %G\n",ii,out[ii]); *\/ */
+             
+/*             } */
+/*             else if (absorbed[ii] == 1){ // absorbed cost */
+/*                 /\* printf("boundary[%zu]\n",ii); *\/ */
+/*                 /\* printf("\t"); dprint(dx,x+ii*dx); *\/ */
+/*                 res = dp->boundcost(time,x+ii*dx,out+ii); */
+/*                 assert (res == 0); */
+/*             } */
+/*             else if (absorbed[ii] == -1){ */
+/*                 /\* printf("weird [%zu]\n",ii); *\/ */
+/*                 /\* printf("\t"); dprint(dx,x+ii*dx); *\/ */
+/*                 /\* assert (1 == 0); *\/ */
+/*                 res = dp->obscost(x+ii*dx,out+ii); */
+/*             } */
+/*             else{ */
+/*                 printf("ii = %zu, N = %zu, dx = %zu\n",ii,N,dx); */
+/*                 printf("x = "); dprint(dx,x+ii*dx); */
+/*                 printf("absorbed = "); iprint(N,absorbed); */
+/*                 fprintf(stderr, "Unrecognized aborbed condition %d\n",absorbed[ii]); */
+/*                 exit(1); */
+/*             } */
+
+/*         } */
+
+/*         /\* printf("free stuff\n"); *\/ */
+/*         if (probs_alloc == 1){ */
+/*             free(probs); probs = NULL; */
+/*         } */
+/*         free(fi); fi = NULL; */
+
+/*         htable_add_element(htable_iter,key3,out,N * sizeof(double)); */
+/*     } */
+/*     else{ */
+/*         /\* printf("got saved\n"); *\/ */
+/*         for (size_t ii = 0; ii < N; ii++){ */
+/*             out[ii] = out_stored[ii]; */
+/*         } */
+/*         /\* dprint(N,out); *\/ */
+/*         free(key3); key3 = NULL; */
+/*         free(key2); key2 = NULL; */
+/*     } */
+
+/*     free(key1); key1 = NULL; */
+/*     /\* free(key2); key2 = NULL; *\/ */
+
+/*     return 0; */
+    
+/* } */
+
 int bellman_pi(size_t N, const double * x, double * out, void * arg)
 {
 
@@ -1134,6 +1349,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     // handle the policy
 
     double time = 0.0;
+    control_params_add_time_and_states(cp,time,N,x);
     int * absorbed_pol = workspace_get_absorbed(cp->work,0);
     double * costs_pol = workspace_get_costs(cp->work,0);
 
@@ -1145,169 +1361,144 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     assert (res == 0);
     assert (dim_vary < dx);
 
+    char ** keys1 = workspace_get_saved_keys(cp->work);
+    char ** keys2 = workspace_get_saved_keys2(cp->work);
     size_t * ind_to_serialize = workspace_get_ind_to_serialize(cp->work);
+
+    size_t nprob_run = 0;
+    double ** probs = malloc_dd(N);
+    size_t * ind_prob_run = calloc_size_t(N);
+    
     for (size_t ii = 0; ii < dx; ii++){
-        assert (fi[ii] < ngrid[ii]);
-        if (ii != dim_vary){
-            ind_to_serialize[ii] = fi[ii];
+        ind_to_serialize[ii] = fi[ii];
+    }
+    free(fi); fi = NULL;
+    ind_to_serialize[dx] = workspace_get_pi_iter(cp->work);
+    ind_to_serialize[dx+1] = workspace_get_pi_subiter(cp->work);
+
+
+    // For the value
+    int * absorbed = calloc_int(N);
+    double * costs = calloc_double(N*(2*dx+1));
+    fi = calloc_size_t(dx);
+    res = mca_get_neighbor_costs(dx,N,x,
+                                 bound,vf_iteration,ngrid,xgrid,
+                                 fi,&dim_vary,
+                                 absorbed,costs);
+
+    
+    for (size_t ii = 0; ii < N; ii++){
+        ind_to_serialize[dim_vary] = ii;
+        /* printf("serializing: "); iprint_sz(dx+2,ind_to_serialize); */
+        size_t_a_to_char(ind_to_serialize,dx+2,keys1[ii]);
+        size_t_a_to_char(ind_to_serialize,dx+1,keys2[ii]);
+        
+        /* printf("key = %s\n",keys1[ii]); */
+        /* printf("key = %s\n",keys2[ii]);         */
+
+        size_t nbytes = 0;
+        double * out_stored = htable_get_element(htable_iter,keys1[ii],&nbytes);
+        if (out_stored != NULL){
+            out[ii] = out_stored[0];            
+        }
+        else if (absorbed_pol[ii] == 1){ // absorbed cost
+            res = dp->boundcost(time,x+ii*dx,out+ii);            
+            assert (res == 0);
+            htable_add_element(htable,keys1[ii],out+ii,1);
+            param->niter_evals++; // ran it
+            param->niter_node_evals++;
+        }
+        else if (absorbed[ii] == -1){
+            res = dp->obscost(x+ii*dx,out+ii);
+            assert (res == 0);
+
+            htable_add_element(htable,keys1[ii],out+ii,1);
+            param->niter_evals++; // ran it
+            param->niter_node_evals++;
+        }
+        else{
+            param->niter_evals++; // ran it
+            param->niter_node_evals++;
+            
+            probs[ii] = htable_get_element(htable,keys2[ii],&nbytes);
+            if (probs[ii] == NULL){
+                param->npol_evals++;
+                probs[ii] = calloc_double(2*dx+1 + 2);
+                ind_prob_run[nprob_run] = ii;
+                nprob_run++;
+            }
+            else{
+                out[ii] = bellmanrhs(dx,du,
+                                     probs[ii][2*dx+2], // stagecost
+                                     NULL,
+                                     dp->discount,
+                                     probs[ii],
+                                     NULL,
+                                     probs[ii][2*dx+1]
+                                     ,NULL, // dt
+                                     costs+ii*(2*dx+1),NULL);
+
+                htable_add_element(htable,keys1[ii],out+ii,1);
+            }                
         }
     }
-    ind_to_serialize[dx] = dim_vary;
-    ind_to_serialize[dx+1] = workspace_get_pi_iter(cp->work); // stores values for probabilities for current policy
-    ind_to_serialize[dx+2] = workspace_get_pi_subiter(cp->work); // stores value for the current cost function (changes faster than policy)
-    free(fi); fi = NULL;
-    /* char * key1 = size_t_a_to_char(ind_to_serialize,dx+3); */
-    /* char * key2 = size_t_a_to_char(ind_to_serialize,dx+2); // NOTE DIFFERENCE, only uses major iter not subiter */
-    /* char * key3 = size_t_a_to_char(ind_to_serialize,dx+3); */
 
-    /* // see if already computed the output for this function */
-    /* size_t nbytes1 = 0; */
-    /* double * out_stored = htable_get_element(htable_iter,key1,&nbytes1); */
-    /* if (out_stored == NULL){ */
-    /*     /\* printf("not stored\n"); *\/ */
-    /*     size_t nbytes = 0; */
-    /*     // see if already computed transition probabilities for this fiber */
-    /*     double * probs = htable_get_element(htable,key2,&nbytes); */
-    /*     /\* probs = NULL; *\/ */
-    /*     /\* printf("got probs\n"); *\/ */
-    /*     int probs_alloc = 0; */
-    /*     /\* probs = NULL; *\/ */
-    /*     if (probs == NULL){ */
-    /*         /\* printf("probs is null\n");; *\/ */
-    /*         size_t nprobs = N*(2*dx+1) + 2*N; // last N are stage costs and N before that are dts */
-    /*         probs = calloc_double(nprobs); // last N are dts */
-    /*         probs_alloc = 1; */
 
-    /*         control_params_add_time_and_states(cp,time,N,x); */
+    #pragma omp parallel for schedule(guided)
+    for (size_t ii = 0; ii < nprob_run; ii++){
 
-    /*         #pragma omp parallel for schedule(guided) */
-    /*         /\* #pragma omp parallel for schedule(static) *\/ */
-    /*         for (size_t ii = 0; ii < N; ii++){ */
-
-    /*             struct Memory mem; */
-    /*             mem.shared = cp; */
-    /*             mem.private = ii; */
+        struct Memory mem;
+        mem.shared = cp;
+        mem.private = ind_prob_run[ii];
                 
 
-    /*             double * u = workspace_get_u(cp->work,ii); */
+        double * u = workspace_get_u(cp->work,ii);
 
-    /*             double val; */
-    /*             int res2 = bellman_optimal(du,u,&val,&mem); */
+        double val;
+        int res2 = bellman_optimal(du,u,&val,&mem);
 
                 
-    /*             double * drift = workspace_get_drift(cp->work, ii); */
-    /*             double * diff  = workspace_get_diff (cp->work, ii); */
+        double * drift = workspace_get_drift(cp->work, ind_prob_run[ii]);
+        double * diff  = workspace_get_diff (cp->work, ind_prob_run[ii]);
 
+        // build transition probabilities at optimal
+        res2 = drift_eval(dp->dyn_drift,time,x+ind_prob_run[ii]*dx,u,drift,NULL);
+        res2 = diff_eval (dp->dyn_diff,time,x+ind_prob_run[ii]*dx,u,diff,NULL);
+        res = transition_assemble(dx,du,cp->dw,mca->h2,mca->t,
+                                  drift,NULL,diff,NULL,
+                                  probs[ind_prob_run[ii]],
+                                  NULL,probs[ind_prob_run[ii]] + 2*dx+1, // dt
+                                  NULL,NULL);
 
-    /*             // build transition probabilities at optimal */
-    /*             assert (res2 == 0); */
-    /*             res2 = drift_eval(dp->dyn_drift,time,x+ii*dx,u,drift,NULL); */
-    /*             assert (res2 == 0); */
-    /*             res2 = diff_eval(dp->dyn_diff,time,x+ii*dx,u,diff,NULL); */
-    /*             /\* res = transition_assemble(dx,du,cp->dw,mca->hmin,mca->hvec, *\/ */
-    /*             /\*                           drift,NULL,diff,NULL, *\/ */
-    /*             /\*                           probs + ii*(2*dx+1), *\/ */
-    /*             /\*                           NULL,probs + N*(2*dx+1)+ii, // dt *\/ */
-    /*             /\*                           NULL,NULL); *\/ */
-    /*             res = transition_assemble(dx,du,cp->dw,mca->h2,mca->t, */
-    /*                                       drift,NULL,diff,NULL, */
-    /*                                       probs + ii*(2*dx+1), */
-    /*                                       NULL,probs + N*(2*dx+1)+ii, // dt */
-    /*                                       NULL,NULL); */
+        res2 = dp->stagecost(time,x+ind_prob_run[ii]*dx,u,
+                             probs[ind_prob_run[ii]] + 2*dx+2, NULL);
 
-    /*             res2 = dp->stagecost(time,x+ii*dx,u,probs + N*(2*dx+1)+N+ii,NULL); */
-    /*             assert (res2 == 0); */
+        assert (res2 == 0);
+        out[ind_prob_run[ii]] = bellmanrhs(dx,du,
+                                           probs[ind_prob_run[ii]][2*dx+2], // stagecost
+                                           NULL,
+                                           dp->discount,
+                                           probs[ind_prob_run[ii]],
+                                           NULL,
+                                           probs[ind_prob_run[ii]][2*dx+1]
+                                           ,NULL, // dt
+                                           costs+ind_prob_run[ii]*(2*dx+1),NULL);
+     
 
-
-    /*         } */
-    /*         param->npol_evals += N; */
-    /*         htable_add_element(htable,key2,probs,nprobs * sizeof(double)); */
-
-    /*     } */
-    /*     else{ */
-    /*         /\* printf("probs is null"); *\/ */
-    /*         free(key2); key2 = NULL; */
-    /*     } */
-
-    /*     // need to compute the control somewhere */
-    /*     int * absorbed = calloc_int(N); */
-    /*     double * costs = calloc_double(N*(2*dx+1)); */
-    /*     fi = calloc_size_t(dx); */
-    /*     /\* printf("get other mca\n"); *\/ */
-    /*     res = mca_get_neighbor_costs(dx,N,x, */
-    /*                                  bound,vf_iteration,ngrid,xgrid, */
-    /*                                  fi,&dim_vary, */
-    /*                                  absorbed,costs); */
-    /*     /\* printf("got other \n"); iprint(N,absorbed); *\/ */
-        
-    /*     assert (res == 0); */
-
-
-    /*     param->niter_evals = param->niter_evals + N; */
-    /*     param->niter_node_evals = param->niter_node_evals + N; */
-    /*     /\* printf("N = %zu\n",N); *\/ */
-    /*     for (size_t ii = 0; ii < N; ii++){ */
-
-            
-    /*         // get the optimal control */
-    /*         // iterate with the optimal control */
-    /*         if (absorbed[ii] == 0){ */
-    /*             out[ii] = bellmanrhs(dx,du, */
-    /*                                  *(probs + N*(2*dx+1)+N+ii), // stagecost */
-    /*                                  NULL, */
-    /*                                  dp->discount,  */
-    /*                                  probs+ii*(2*dx+1),NULL, */
-    /*                                  *(probs+N*(2*dx+1)+ii),NULL, // dt */
-    /*                                  costs+ii*(2*dx+1),NULL); */
-    /*             /\* printf("out[%zu] = %G\n",ii,out[ii]); *\/ */
-             
-    /*         } */
-    /*         else if (absorbed[ii] == 1){ // absorbed cost */
-    /*             /\* printf("boundary[%zu]\n",ii); *\/ */
-    /*             /\* printf("\t"); dprint(dx,x+ii*dx); *\/ */
-    /*             res = dp->boundcost(time,x+ii*dx,out+ii); */
-    /*             assert (res == 0); */
-    /*         } */
-    /*         else if (absorbed[ii] == -1){ */
-    /*             /\* printf("weird [%zu]\n",ii); *\/ */
-    /*             /\* printf("\t"); dprint(dx,x+ii*dx); *\/ */
-    /*             /\* assert (1 == 0); *\/ */
-    /*             res = dp->obscost(x+ii*dx,out+ii); */
-    /*         } */
-    /*         else{ */
-    /*             printf("ii = %zu, N = %zu, dx = %zu\n",ii,N,dx); */
-    /*             printf("x = "); dprint(dx,x+ii*dx); */
-    /*             printf("absorbed = "); iprint(N,absorbed); */
-    /*             fprintf(stderr, "Unrecognized aborbed condition %d\n",absorbed[ii]); */
-    /*             exit(1); */
-    /*         } */
-
-    /*     } */
-
-    /*     /\* printf("free stuff\n"); *\/ */
-    /*     if (probs_alloc == 1){ */
-    /*         free(probs); probs = NULL; */
-    /*     } */
-    /*     free(fi); fi = NULL; */
-
-    /*     htable_add_element(htable_iter,key3,out,N * sizeof(double)); */
-    /* } */
-    /* else{ */
-    /*     /\* printf("got saved\n"); *\/ */
-    /*     for (size_t ii = 0; ii < N; ii++){ */
-    /*         out[ii] = out_stored[ii]; */
-    /*     } */
-    /*     /\* dprint(N,out); *\/ */
-    /*     free(key3); key3 = NULL; */
-    /*     free(key2); key2 = NULL; */
-    /* } */
-
-    /* free(key1); key1 = NULL; */
-    /* /\* free(key2); key2 = NULL; *\/ */
-
-    return 0;
+    }
     
+    for (size_t ii = 0; ii < nprob_run; ii++){
+        htable_add_element(htable,keys2[ind_prob_run[ii]],probs[ind_prob_run[ii]],2*dx+1+2);
+        htable_add_element(htable,keys1[ii],out+ind_prob_run[ii],1);
+        free(probs[ind_prob_run[ii]]); probs[ind_prob_run[ii]] = NULL;
+    }
+    free(ind_prob_run); ind_prob_run = NULL;
+    free(probs); probs = NULL;
+    free(absorbed); absorbed = NULL;
+    free(costs); costs = NULL;
+    return 0;
 }
+
 
 //////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////
@@ -1780,42 +1971,24 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
         /* printf("stepped\n"); */
         double diff = valuef_norm2diff(start,next);
         double norm = valuef_norm(next);
+        size_t stot = 1;
+        for (size_t jj = 0; jj < c3c->dx; jj++){
+            stot *= c3c->ngrid[jj];
+        }
+        double frac = (double) niter_evals / (double) stot;
+
         if (verbose > 0){
             if ((ii+1) % 1 == 0){
                 printf("\t POLICY ITERATION (%zu\\%zu):\n",ii+1,maxiter);
                 printf("\t \t L2 Difference between iterates    = %3.5E\n ",diff);
                 printf("\t \t L2 Norm of current value function = %3.5E\n", norm);
                 printf("\t \t Relative L2 Cauchy difference     = %3.5E\n", diff/norm);
+                printf("\t \t Fraction of states evaluated      = %3.5E\n", frac);
                 /* printf("\t \t Ratio: L2 Norm Prev / L2 Norm Cur = %G\n",rat); */
             }
-
-            /* double pt[3]; */
-            /* double * lb = c3opt_get_lb(opt); */
-            /* double * ub = c3opt_get_ub(opt); */
-            /* double sumdiff = 0.0; */
-            /* double sumnorm = 0.0; */
-            /* for (size_t kk = 0; kk < 1000; kk++){ */
-            /*     pt[0] = randu()*(ub[0]-lb[0])+lb[0]; */
-            /*     pt[1] = randu()*(ub[1]-lb[1])+lb[1]; */
-            /*     pt[2] = randu()*(ub[2]-lb[2])+lb[2]; */
-            /*     double v1 = valuef_eval(next,pt); */
-            /*     double v2 = valuef_eval(start,pt); */
-            /*     sumdiff += pow(v2-v1,2); */
-            /*     sumnorm += pow(v1,2); */
-            /* } */
-            /* sumdiff /= sumnorm; */
-            /* printf("relative norm diff sampled = %G\n",sqrt(sumdiff)); */
         }
         
         if (diag != NULL){
-            size_t stot = 1;
-            for (size_t jj = 0; jj < c3c->dx; jj++){
-                stot *= c3c->ngrid[jj];
-            }
-            /* printf("nevals = %zu\n",niter_evals); */
-            /* printf("ntot = %zu\n",stot); */
-            /* assert (niter_evals < stot); */
-            double frac = (double) niter_evals / (double) stot;
             /* printf("frac = %G\n",frac); */
             size_t * ranks = valuef_get_ranks(next);
             diag_append(diag,ii,0,norm,diff,c3c->dx,ranks,frac);

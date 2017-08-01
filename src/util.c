@@ -710,6 +710,7 @@ struct Workspace
     size_t pi_subiter;
 
     char ** saved_keys;
+    char ** saved_keys2;
 };
 
 struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
@@ -762,8 +763,10 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
     work->pi_subiter = 0;
 
     work->saved_keys = malloc(N * sizeof(char*));
+    work->saved_keys2 = malloc(N * sizeof(char*));
     for (size_t ii = 0; ii < N; ii++){
         work->saved_keys[ii] = malloc(256*sizeof(char));
+        work->saved_keys2[ii] = malloc(256*sizeof(char));
     }
     /* assert (work->saved_keys != NULL); */
     
@@ -789,8 +792,10 @@ void workspace_free(struct Workspace * w)
 
         for (size_t ii = 0; ii < w->N; ii++){
             free(w->saved_keys[ii]); w->saved_keys[ii] = NULL;
+            free(w->saved_keys2[ii]); w->saved_keys2[ii] = NULL;
         }
         free(w->saved_keys); w->saved_keys = NULL;
+        free(w->saved_keys2); w->saved_keys2 = NULL;
         free(w); w = NULL;
     }
 }
@@ -925,6 +930,11 @@ size_t * workspace_get_absorbed_yes(struct Workspace * w)
 char ** workspace_get_saved_keys(struct Workspace * w)
 {
     return w->saved_keys;
+}
+
+char ** workspace_get_saved_keys2(struct Workspace * w)
+{
+    return w->saved_keys2;
 }
     
 
