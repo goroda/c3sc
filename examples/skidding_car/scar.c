@@ -285,8 +285,8 @@ int main(int argc, char * argv[])
     c3opt_set_relftol(opt,1e-8);
     c3opt_set_gtol(opt,1e-13);
     c3opt_ls_set_maxiter(opt,10);
-    c3opt_ls_set_alpha(opt,0.1);
-    c3opt_ls_set_beta(opt,0.2);
+    /* c3opt_ls_set_alpha(opt,0.1); */
+    /* c3opt_ls_set_beta(opt,0.2); */
     c3opt_set_verbose(opt,0);
 
     // cross approximation tolerances

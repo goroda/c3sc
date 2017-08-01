@@ -639,26 +639,56 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
             }
         }
         else if (du == 2){
-            nrand = 0;
-            size_t npts = 10;
-            double * pts1 = linspace(lbu[0],ubu[0],npts);
-            double * pts2  = linspace(lbu[1],ubu[1],npts);
-            double pt[2];
-            for (size_t ii = 0; ii < npts; ii++){
-                for (size_t jj = 0; jj < npts; jj++){
-                    pt[0] = pts1[ii];
-                    pt[1] = pts2[jj];
-                    valtemp = bellman_control(du,pt,NULL,mem);
-                    /* c3opt_minimize(opt,pt,&valtemp); */
-                    if (valtemp < minval){
+            nrand = 1; // 2
+            npert = 1; // 1
+            /* nrand = 2; */
+            /* npert = 1; */
+            double ut[2];
+            for (size_t ii = 0; ii < 2; ii++){
+                double distx = (ubu[0]-lbu[0])/4.0;
+                for (size_t jj = 0; jj < 2; jj++){
+                    double disty = (ubu[1]-lbu[1])/4.0;
+                    if (ii == 0){
+                        ucurr[0] = lbu[0]+distx;
+                    }
+                    else{
+                        ucurr[0] = ubu[0]-distx;
+                    }
+                    if (jj == 0){
+                        ucurr[1] = lbu[1]+disty;
+                    }
+                    else{
+                        ucurr[1] = ubu[1]-disty;
+                    }
+
+                    c3opt_minimize(opt,ucurr,&valtemp);
+                    /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+                    double dd = 0.0; // sufficient decrease
+                    if (valtemp < (minval-dd)){
+                        /* printf("\t updating current min!\n"); */
                         minval = valtemp;
-                        memmove(umin,pt,du*sizeof(double));
+                        memmove(umin,ucurr,du*sizeof(double));
+                    }
+                    for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                        ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                        ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                        for (size_t zz = 0; zz < du; zz++){
+                            if (ut[zz] > ubu[zz]){
+                                ut[zz] = ubu[zz];
+                            }
+                            else if (ut[zz] < lbu[zz]){
+                                ut[zz] = lbu[zz];
+                            }
+                        }
+                        c3opt_minimize(opt,ut,&valtemp);
+                        if (valtemp < (minval-dd)){
+                            /* printf("\t updating current min!\n"); */
+                            minval = valtemp;
+                            memmove(umin,ut,du*sizeof(double));
+                        }
                     }
                 }
             }
-            
-            free(pts1); free(pts2);
-            pts1 = NULL; pts2 = NULL;
         }
         else if (du == 3){
             nrand = 1; // 2
