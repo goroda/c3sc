@@ -127,7 +127,8 @@ void hlist_push(struct HList ** head, char * string, void * data, size_t nbytes)
     // create data
     newNode->nbytes = nbytes;
     newNode->data = malloc(nbytes);
-    memmove((char *)(newNode->data), (char *) data, nbytes);
+    /* memmove((char *)(newNode->data), (char *) data, nbytes); */
+    memmove(newNode->data, data, nbytes);
     
     *head = newNode;
 }

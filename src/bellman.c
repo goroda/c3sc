@@ -451,10 +451,20 @@ double bellman_control(size_t du, const double * u, double * grad_u, void * args
     }
     else if (absorbed == 1){ // absorbed cost
         int res = dp->boundcost(time,x,&val);
+        if (grad_u != NULL){
+            for (size_t ii = 0; ii < du; ii++){
+                grad_u[ii] = 0.0;
+            }
+        }
         assert (res == 0);
     }
     else if (absorbed == -1){
         int res = dp->obscost(x,&val);
+        if (grad_u != NULL){
+            for (size_t ii = 0; ii < du; ii++){
+                grad_u[ii] = 0.0;
+            }
+        }
         assert (res == 0);
     }
     else{
@@ -788,6 +798,119 @@ void vi_param_add_value(struct VIparam * vi, struct ValueF * vf)
     vi->nnode_evals = 0;
 }
 
+/* int bellman_vi(size_t N, const double * x, double * out, void * arg) */
+/* { */
+/*     struct VIparam * param = arg; */
+/*     struct ControlParams * cp = param->cp; */
+/*     struct ValueF * vf = param->vf; */
+/*     assert (cp != NULL); */
+/*     assert (vf != NULL); */
+/*     struct MCAparam * mca = cp->mca; */
+/*     struct DPparam * dp = cp->dp; */
+
+/*     size_t dx = mca->dx; */
+/*     size_t du = mca->du; */
+/*     size_t * ngrid = mca->ngrid; */
+/*     double ** xgrid = mca->xgrid; */
+    
+
+/*     struct HTable * htable = workspace_get_vi_htable(cp->work); */
+/*     struct Boundary * bound = dp->bound; */
+
+/*     int * absorbed = workspace_get_absorbed(cp->work,0); */
+/*     double * costs = workspace_get_costs(cp->work,0); */
+
+/*     /\* printf("get neighbor cost\n"); *\/ */
+/*     size_t * fi = calloc_size_t(dx); */
+
+/*     size_t dim_vary; */
+/*     int res = mca_get_neighbor_costs(dx,N,x, bound,vf,ngrid,xgrid, */
+/*                                      fi,&dim_vary, absorbed,costs); */
+
+/*     assert (res == 0); */
+/*     size_t * ind_to_serialize = workspace_get_ind_to_serialize(cp->work); */
+/*     for (size_t ii = 0; ii < dx; ii++){ */
+/*         if (ii != dim_vary){ */
+/*             ind_to_serialize[ii] = fi[ii]; */
+/*         } */
+/*     } */
+/*     ind_to_serialize[dx] = dim_vary; */
+/*     ind_to_serialize[dx+1] = workspace_get_vi_iter(cp->work); */
+    
+/*     char * key = size_t_a_to_char(ind_to_serialize,dx+2); */
+/*     size_t nbytes = 0; */
+/*     double * out_stored = htable_get_element(htable,key,&nbytes); */
+/*     if (out_stored == NULL){ */
+/*         double time = 0.0; */
+/*         control_params_add_time_and_states(cp,time,N,x); */
+/*         param->nstate_evals = param->nstate_evals + N; */
+
+/*         size_t * absorbed_no = workspace_get_absorbed_no(cp->work); */
+/*         size_t * absorbed_yes = workspace_get_absorbed_yes(cp->work); */
+/*         size_t ano_ind = 0; */
+/*         size_t ayes_ind = 0; */
+/*         for (size_t ii = 0; ii < N; ii++){ */
+/*             if (absorbed[ii] == 0){ */
+/*                 absorbed_no[ano_ind] = ii; */
+/*                 ano_ind++; */
+/*             } */
+/*             else{ */
+/*                 absorbed_yes[ayes_ind] = ii; */
+/*                 ayes_ind++;; */
+/*             } */
+/*         } */
+
+/*         // this loop is very fast because only deals with absorbed things */
+/*         for (size_t ii = 0; ii < ayes_ind; ii++){ */
+/*             struct Memory mem; */
+/*             mem.shared = cp; */
+/*             mem.private = absorbed_yes[ii]; */
+/*             double * u = workspace_get_u(cp->work,absorbed_yes[ii]); */
+/*             bellman_optimal(du,u,out+absorbed_yes[ii],&mem); */
+/*         } */
+        
+/*         /\* printf("\n\n\n\n"); *\/ */
+/*         double t_start = omp_get_wtime(); */
+/*         #pragma omp parallel for schedule(guided) */
+/*         for (size_t ii = 0; ii < ano_ind; ii++){ */
+/*             /\* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); *\/ */
+/*             struct Memory mem; */
+/*             mem.shared = cp; */
+/*             mem.private = absorbed_no[ii]; */
+            
+/*             double * u = workspace_get_u(cp->work,absorbed_no[ii]); */
+/*             double val; */
+/*             /\* double t_start_2 = omp_get_wtime(); *\/ */
+/*             int res2 = bellman_optimal(du,u,&val,&mem); */
+/*             /\* double t_end_2 = omp_get_wtime(); *\/ */
+/*             /\* printf("Timing: %zu ,%d, %G\n",absorbed_no[ii],absorbed[absorbed_no[ii]],t_end_2-t_start_2); *\/ */
+/*             /\* printf("\t x = (%G,%G)\n\n\n",x[ absorbed_no[ii]*dx], x[absorbed_no[ii]*dx + 1] ); *\/ */
+/*             assert (res2 == 0); */
+/*             out[absorbed_no[ii]] = val; */
+/*         } */
+/*         double t_end = omp_get_wtime(); */
+/*         double run_time = (double)(t_end - t_start); /\* / CLOCKS_PER_SEC; *\/ */
+/*         param->time_in_loop += run_time; */
+/*         /\* printf("%G\n",run_time); *\/ */
+
+/*         param->nnode_evals += N; */
+/*         htable_add_element(htable,key,out,N * sizeof(double)); */
+/*     } */
+/*     else{ */
+/*         for (size_t ii = 0; ii < N; ii++){ */
+/*             out[ii] = out_stored[ii]; */
+/*         } */
+/*         free(key); key = NULL; */
+/*     } */
+
+/*     free(fi); fi = NULL; */
+
+
+/*     return 0; */
+    
+/* } */
+
+
 int bellman_vi(size_t N, const double * x, double * out, void * arg)
 {
     struct VIparam * param = arg;
@@ -817,86 +940,157 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
     int res = mca_get_neighbor_costs(dx,N,x, bound,vf,ngrid,xgrid,
                                      fi,&dim_vary, absorbed,costs);
 
+    double time = 0.0;
+    control_params_add_time_and_states(cp,time,N,x);
+    
+    size_t nrun = 0;
+    size_t * ind_run = calloc_size_t(N);
+    char ** saved_keys = malloc(N * sizeof(char*));
+    assert (saved_keys != NULL);
+
     assert (res == 0);
     size_t * ind_to_serialize = workspace_get_ind_to_serialize(cp->work);
     for (size_t ii = 0; ii < dx; ii++){
-        if (ii != dim_vary){
-            ind_to_serialize[ii] = fi[ii];
+        ind_to_serialize[ii] = fi[ii];
+    }
+    ind_to_serialize[dx] = workspace_get_vi_iter(cp->work);
+
+    for (size_t ii = 0; ii < N; ii++){
+        ind_to_serialize[dim_vary] = ii;
+        saved_keys[ii] = size_t_a_to_char(ind_to_serialize,dx+1);
+        size_t nbytes = 0;
+        double * out_stored = htable_get_element(htable,saved_keys[ii],&nbytes);
+        /* printf("nbytes = %zu,%zu\n",nbytes,sizeof(double)); */
+        if (out_stored != NULL){
+            /* printf("%G\n",out_stored[0]); */
+            out[ii] = out_stored[0];
+            free(saved_keys[ii]); saved_keys[ii] = NULL;
+        }
+        else if (absorbed[ii] != 0){ // absorbed
+            struct Memory mem; 
+            mem.shared = cp;
+            mem.private = ii;
+            double * u = workspace_get_u(cp->work,ii);
+            bellman_optimal(du,u,out+ii,&mem);
+            htable_add_element(htable,saved_keys[ii],out+ii,sizeof(double));
+            param->nstate_evals++; // ran it
+            param->nnode_evals++;
+        }
+        else{
+            ind_run[nrun] = ii;
+            printf("%s ",saved_keys[ii]);
+            nrun++;
+            param->nstate_evals++; // these are the ones which I will run below
+            param->nnode_evals++;
         }
     }
-    ind_to_serialize[dx] = dim_vary;
-    ind_to_serialize[dx+1] = workspace_get_vi_iter(cp->work);
-    
-    char * key = size_t_a_to_char(ind_to_serialize,dx+2);
-    size_t nbytes = 0;
-    double * out_stored = htable_get_element(htable,key,&nbytes);
-    if (out_stored == NULL){
-        double time = 0.0;
-        control_params_add_time_and_states(cp,time,N,x);
-        param->nstate_evals = param->nstate_evals + N;
 
-        size_t * absorbed_no = workspace_get_absorbed_no(cp->work);
-        size_t * absorbed_yes = workspace_get_absorbed_yes(cp->work);
-        size_t ano_ind = 0;
-        size_t ayes_ind = 0;
-        for (size_t ii = 0; ii < N; ii++){
-            if (absorbed[ii] == 0){
-                absorbed_no[ano_ind] = ii;
-                ano_ind++;
-            }
-            else{
-                absorbed_yes[ayes_ind] = ii;
-                ayes_ind++;;
-            }
-        }
 
-        // this loop is very fast because only deals with absorbed things
-        for (size_t ii = 0; ii < ayes_ind; ii++){
-            struct Memory mem;
-            mem.shared = cp;
-            mem.private = absorbed_yes[ii];
-            double * u = workspace_get_u(cp->work,absorbed_yes[ii]);
-            bellman_optimal(du,u,out+absorbed_yes[ii],&mem);
-        }
-        
-        /* printf("\n\n\n\n"); */
-        double t_start = omp_get_wtime();
-        #pragma omp parallel for schedule(guided)
-        for (size_t ii = 0; ii < ano_ind; ii++){
-            /* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); */
-            struct Memory mem;
-            mem.shared = cp;
-            mem.private = absorbed_no[ii];
+    double t_start = omp_get_wtime();
+    #pragma omp parallel for schedule(guided)
+    for (size_t ii = 0; ii < nrun; ii++){
+        struct Memory mem;
+        mem.shared = cp;
+        mem.private = ind_run[ii];
             
-            double * u = workspace_get_u(cp->work,absorbed_no[ii]);
-            double val;
-            /* double t_start_2 = omp_get_wtime(); */
-            int res2 = bellman_optimal(du,u,&val,&mem);
-            /* double t_end_2 = omp_get_wtime(); */
-            /* printf("Timing: %zu ,%d, %G\n",absorbed_no[ii],absorbed[absorbed_no[ii]],t_end_2-t_start_2); */
-            /* printf("\t x = (%G,%G)\n\n\n",x[ absorbed_no[ii]*dx], x[absorbed_no[ii]*dx + 1] ); */
-            assert (res2 == 0);
-            out[absorbed_no[ii]] = val;
-        }
-        double t_end = omp_get_wtime();
-        double run_time = (double)(t_end - t_start); /* / CLOCKS_PER_SEC; */
-        param->time_in_loop += run_time;
-        /* printf("%G\n",run_time); */
-
-        param->nnode_evals += N;
-        htable_add_element(htable,key,out,N * sizeof(double));
+        double * u = workspace_get_u(cp->work,ii);
+        double val;
+        int res2 = bellman_optimal(du,u,&val,&mem);
+        assert (res2 == 0);
+        out[ind_run[ii]] = val;
+        /* htable_add_element(htable,saved_keys[ind_run[ii]],&out[ind_run[ii]],sizeof(double)); */
     }
-    else{
-        for (size_t ii = 0; ii < N; ii++){
-            out[ii] = out_stored[ii];
-        }
-        free(key); key = NULL;
+    double t_end = omp_get_wtime();
+    double run_time = (double)(t_end - t_start); /* / CLOCKS_PER_SEC; */
+    param->time_in_loop += run_time;
+
+    printf("\n\n");
+    /* // doing this not in parallel because not thread safe */
+    for (size_t ii = 0; ii < nrun; ii++){
+        ind_to_serialize[dim_vary] = ind_run[ii];
+        /* saved_keys[ind_run[ii]] = size_t_a_to_char(ind_to_serialize,dx+1); */
+        char * key = size_t_a_to_char(ind_to_serialize,dx+1);
+        printf("%s ",key);
+        htable_add_element(htable,key,&out[ind_run[ii]],2*sizeof(double));
     }
 
+    exit(1);
     free(fi); fi = NULL;
-
-
+    free(ind_run); ind_run = NULL;
+    free(saved_keys); saved_keys = NULL;
     return 0;
+    /* ind_to_serialize[dx] = dim_vary; */
+    /* ind_to_serialize[dx+1] = workspace_get_vi_iter(cp->work); */
+    
+    /* char * key = size_t_a_to_char(ind_to_serialize,dx+2); */
+    /* size_t nbytes = 0; */
+    /* double * out_stored = htable_get_element(htable,key,&nbytes); */
+    /* if (out_stored == NULL){ */
+
+    /*     param->nstate_evals = param->nstate_evals + N; */
+
+    /*     size_t * absorbed_no = workspace_get_absorbed_no(cp->work); */
+    /*     size_t * absorbed_yes = workspace_get_absorbed_yes(cp->work); */
+    /*     size_t ano_ind = 0; */
+    /*     size_t ayes_ind = 0; */
+    /*     for (size_t ii = 0; ii < N; ii++){ */
+    /*         if (absorbed[ii] == 0){ */
+    /*             absorbed_no[ano_ind] = ii; */
+    /*             ano_ind++; */
+    /*         } */
+    /*         else{ */
+    /*             absorbed_yes[ayes_ind] = ii; */
+    /*             ayes_ind++;; */
+    /*         } */
+    /*     } */
+
+    /*     // this loop is very fast because only deals with absorbed things */
+    /*     for (size_t ii = 0; ii < ayes_ind; ii++){ */
+    /*         struct Memory mem; */
+    /*         mem.shared = cp; */
+    /*         mem.private = absorbed_yes[ii]; */
+    /*         double * u = workspace_get_u(cp->work,absorbed_yes[ii]); */
+    /*         bellman_optimal(du,u,out+absorbed_yes[ii],&mem); */
+    /*     } */
+        
+    /*     /\* printf("\n\n\n\n"); *\/ */
+    /*     double t_start = omp_get_wtime(); */
+    /*     #pragma omp parallel for schedule(guided) */
+    /*     for (size_t ii = 0; ii < ano_ind; ii++){ */
+    /*         /\* printf("Hello from thread %d/%d\n",omp_get_thread_num(),omp_get_num_threads()); *\/ */
+    /*         struct Memory mem; */
+    /*         mem.shared = cp; */
+    /*         mem.private = absorbed_no[ii]; */
+            
+    /*         double * u = workspace_get_u(cp->work,absorbed_no[ii]); */
+    /*         double val; */
+    /*         /\* double t_start_2 = omp_get_wtime(); *\/ */
+    /*         int res2 = bellman_optimal(du,u,&val,&mem); */
+    /*         /\* double t_end_2 = omp_get_wtime(); *\/ */
+    /*         /\* printf("Timing: %zu ,%d, %G\n",absorbed_no[ii],absorbed[absorbed_no[ii]],t_end_2-t_start_2); *\/ */
+    /*         /\* printf("\t x = (%G,%G)\n\n\n",x[ absorbed_no[ii]*dx], x[absorbed_no[ii]*dx + 1] ); *\/ */
+    /*         assert (res2 == 0); */
+    /*         out[absorbed_no[ii]] = val; */
+    /*     } */
+    /*     double t_end = omp_get_wtime(); */
+    /*     double run_time = (double)(t_end - t_start); /\* / CLOCKS_PER_SEC; *\/ */
+    /*     param->time_in_loop += run_time; */
+    /*     /\* printf("%G\n",run_time); *\/ */
+
+    /*     param->nnode_evals += N; */
+    /*     htable_add_element(htable,key,out,N * sizeof(double)); */
+    /* } */
+    /* else{ */
+    /*     for (size_t ii = 0; ii < N; ii++){ */
+    /*         out[ii] = out_stored[ii]; */
+    /*     } */
+    /*     free(key); key = NULL; */
+    /* } */
+
+    /* free(fi); fi = NULL; */
+
+
+    /* return 0; */
     
 }
 
@@ -1590,23 +1784,23 @@ struct ValueF * c3control_vi_solve(struct C3Control * c3c,
         /* printf("stepped\n"); */
         double diff = valuef_norm2diff(start,next);
         double norm = valuef_norm(next);
+        size_t stot = 1;
+        for (size_t jj = 0; jj < c3c->dx; jj++){
+            stot *= c3c->ngrid[jj];
+        }
+        double frac = (double) niter_evals / (double) stot;
         if (verbose > 0){
             if ((ii+1) % 1 == 0){
                 printf("\t Value Iteration (%zu\\%zu):\n",ii+1,maxiter);
                 printf("\t \t L2 Difference between iterates    = %3.5E\n ",diff);
                 printf("\t \t L2 Norm of current value function = %3.5E\n", norm);
                 printf("\t \t Relative L2 Cauchy difference     = %3.5E\n", diff/norm);
+                printf("\t \t Fraction of states evaluated      = %3.5E\n", frac);
                 /* printf("\t \t Ratio: L2 Norm Prev / L2 Norm Cur = %G\n",rat); */
             }
         }
         
         if (diag != NULL){
-            size_t stot = 1;
-            for (size_t jj = 0; jj < c3c->dx; jj++){
-                stot *= c3c->ngrid[jj];
-            }
-            double frac = (double) niter_evals / (double) stot;
-            /* assert (frac < 1.0); */
             size_t * ranks = valuef_get_ranks(next);
             diag_append(diag,ii,1,norm,diff,c3c->dx,ranks,frac);
         }
