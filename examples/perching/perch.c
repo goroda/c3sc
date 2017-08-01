@@ -348,13 +348,13 @@ int main(int argc, char * argv[])
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
-    approx_args_set_cross_tol(aargs,1e-8);
-    approx_args_set_round_tol(aargs,1e-8);
+    approx_args_set_cross_tol(aargs,1e-5);
+    approx_args_set_round_tol(aargs,1e-5);
     approx_args_set_kickrank(aargs,10);
     approx_args_set_adapt(aargs,1);
 
-    approx_args_set_startrank(aargs,5);
-    size_t maxrank = 30;
+    approx_args_set_startrank(aargs,10);
+    size_t maxrank = 10;
     if (maxrank > N){
         maxrank = N;
     }
@@ -372,8 +372,8 @@ int main(int argc, char * argv[])
     // x y aoa phi dx dy daoa
     double center[7];
     double width[7];
-    center[0] = 0.0; width[0] = 0.1;
-    center[1] = 0.0; width[1] = 0.1;
+    center[0] = 0.0; width[0] = 0.085;
+    center[1] = 0.0; width[1] = 0.085;
     center[2] = 0.0; width[2] = ub[2]-lb[2];
     center[3] = 0.0; width[3] = ub[3]-lb[3];
     center[4] = 0.0; width[4] = 0.5;
@@ -407,7 +407,7 @@ int main(int argc, char * argv[])
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256];
-    sprintf(filename_diag,"%s/%s.dat",dirout,"diagnostic");
+    sprintf(filename_diag,"%s/n%zu_%s.dat",dirout,N,"diagnostic");
     printf("filename = %s\n",filename_diag);
 
     for (size_t ii = 0; ii < maxiter_vi; ii++){

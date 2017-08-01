@@ -278,16 +278,37 @@ int main(int argc, char * argv[])
 
     double lbu[2] = {-15.0*M_PI/180.0, -1.0};
     double ubu[2] = {15.0*M_PI/180.0, 1.0};
-    struct c3Opt * opt = c3opt_alloc(BFGS,du);
-    c3opt_add_lb(opt,lbu);
-    c3opt_add_ub(opt,ubu);
-    c3opt_set_absxtol(opt,1e-8);
-    c3opt_set_relftol(opt,1e-8);
-    c3opt_set_gtol(opt,1e-13);
-    c3opt_ls_set_maxiter(opt,10);
-    /* c3opt_ls_set_alpha(opt,0.1); */
-    /* c3opt_ls_set_beta(opt,0.2); */
-    c3opt_set_verbose(opt,0);
+
+    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
+
+    size_t dopts = 3;
+    double * opts_x = linspace(lbu[0],ubu[0],dopts);
+    double * opts_y = linspace(lbu[1],ubu[1],dopts);
+
+    double * uopts = calloc_double(dopts*dopts*2);
+    size_t onopt = 0;
+    for (size_t ii = 0; ii < dopts; ii++){
+        for (size_t jj = 0; jj < dopts; jj++){
+            uopts[onopt] = opts_x[ii];
+            onopt++;
+            uopts[onopt] = opts_y[jj];
+            onopt++;
+        }
+    }
+    c3opt_set_brute_force_vals(opt,dopts*dopts,uopts);
+
+    
+    /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
+    /* c3opt_add_lb(opt,lbu); */
+    /* c3opt_add_ub(opt,ubu); */
+    /* c3opt_set_absxtol(opt,1e-8); */
+    /* c3opt_set_relftol(opt,1e-7); */
+    /* c3opt_set_gtol(opt,1e-13); */
+    /* c3opt_ls_set_maxiter(opt,10); */
+    /* c3opt_set_maxiter(opt,10); */
+    /* /\* c3opt_ls_set_alpha(opt,0.1); *\/ */
+    /* /\* c3opt_ls_set_beta(opt,0.2); *\/ */
+    /* c3opt_set_verbose(opt,0); */
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
@@ -299,13 +320,13 @@ int main(int argc, char * argv[])
     /* approx_args_set_maxrank(aargs,40); */
 
     approx_args_set_startrank(aargs,20);
-    /* approx_args_set_maxrank(aargs,20); */
+    approx_args_set_maxrank(aargs,20);
 
-    size_t maxrank = 35;
-    if (maxrank > N){
-        maxrank = N;
-    }
-    approx_args_set_maxrank(aargs,maxrank);
+    /* size_t maxrank = 35; */
+    /* if (maxrank > N){ */
+    /*     maxrank = N; */
+    /* } */
+    /* approx_args_set_maxrank(aargs,maxrank); */
     
 
     // setup problem
