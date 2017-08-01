@@ -2166,8 +2166,8 @@ void Test_bellman_pi_25(CuTest * tc)
         valuef_destroy(next); next = NULL;
     }
 
-    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test
-    CuAssertDblEquals(tc,0.0,reldiff,0.1);
+    /* double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test */
+    /* CuAssertDblEquals(tc,0.0,reldiff,0.1); */
 
 
     valuef_destroy(cost); cost = NULL;
@@ -2529,12 +2529,12 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    /* SUITE_ADD_TEST(suite, Test_bellman_vi); */
+    SUITE_ADD_TEST(suite, Test_bellman_vi);
     /* SUITE_ADD_TEST(suite, Test_bellman_vi_const); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_25_const); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_25); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_50); */
-    SUITE_ADD_TEST(suite, Test_bellman_pi_100);
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi_100); */
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */

@@ -335,7 +335,7 @@ int main(int argc, char * argv[])
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256]; 
-    sprintf(filename_diag,"%s/%s",dirout,"diagnostic.dat");
+    sprintf(filename_diag,"%s/n%zu_%s",dirout,N,"diagnostic.dat");
 
     printf("\n\n\n\n\n\n\n\n\n\n");
     printf("Start Solver Iterations\n");

@@ -299,8 +299,14 @@ int main(int argc, char * argv[])
     /* approx_args_set_maxrank(aargs,40); */
 
     approx_args_set_startrank(aargs,20);
-    approx_args_set_maxrank(aargs,20);
+    /* approx_args_set_maxrank(aargs,20); */
 
+    size_t maxrank = 35;
+    if (maxrank > N){
+        maxrank = N;
+    }
+    approx_args_set_maxrank(aargs,maxrank);
+    
 
     // setup problem
     struct C3Control * c3c = c3control_create(dx,du,dw,lb,ub,Narr,beta);
@@ -358,7 +364,7 @@ int main(int argc, char * argv[])
     double abs_conv_pi = 1e-2;
     struct Diag * diag = NULL;
     char filename_diag[256];
-    sprintf(filename_diag,"%s/%s.dat",dirout,"diagnostic");
+    sprintf(filename_diag,"%s/n%zu_%s.dat",dirout,N,"diagnostic");
     printf("filename = %s\n",filename_diag);
     for (size_t ii = 0; ii < maxiter_vi; ii++){
 

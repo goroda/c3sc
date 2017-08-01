@@ -1385,7 +1385,7 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
                                  bound,vf_iteration,ngrid,xgrid,
                                  fi,&dim_vary,
                                  absorbed,costs);
-
+    free(fi); fi = NULL;
     
     for (size_t ii = 0; ii < N; ii++){
         ind_to_serialize[dim_vary] = ii;
