@@ -281,7 +281,8 @@ int main(int argc, char * argv[])
     size_t dw = 6;
     size_t du = 3;
     double lbs[6] = {-3.5, -3.5, -2, -5, -5, -5};
-    double ubs[6] = {3.5, 3.5, 2, 5, 5, 5};
+    /* double ubs[6] = {3.5, 3.5, 2, 5, 5, 5}; */
+    double ubs[6] = {0.2, 3.5, 2, 5, 5, 5};
     size_t Narr[6] = {N, N, N, N, N, N};
 
     double lb[6];
@@ -385,11 +386,12 @@ int main(int argc, char * argv[])
         c3control_set_external_boundary(c3c,ii,"reflect");
         printf("(%3.14G,%3.14G)\n",lb[ii],ub[ii]);
     }
-    /* double center[6] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0}; */
+    double center[6] = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
     //double width[6] = {2,2,1,ub[3]-lb[3],ub[4]-lb[4],1};
     double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.4, 0.4};
     /* double width[6] =  {0.4, 0.4, 0.4, 0.5 , 0.3, 0.3}; */
-
+    c3control_add_obstacle(c3c,center,width);
+    
     /* double c[6]; */
     /* double w[6]; */
     /* for (size_t ii = 0; ii < 6; ii++){ */
@@ -398,7 +400,7 @@ int main(int argc, char * argv[])
     /* } */
 
     /* dprint(6,width); */
-    /* c3control_add_obstacle(c3c,c,w); */
+
     
 
     char filename[256];
@@ -477,13 +479,15 @@ int main(int argc, char * argv[])
         //double state[6] = {-2.0, 0.005, 0.005, -0.005, -0.02, -0.0005};
 	//double state[6] = {-1.0, 0.1, 1.0, 0.0, 0.0, 0.0};
 
+    double state[6] = {-1.9574, 1.2542, -1.200, -0.0903, 0.1073,0.0231}; // experiment
+    
 	/* double state[6] = {-3.0,0.5,-1.0,-0.1,0.5,0.5}; */
 	/* double state[6] = {-3.0, -1.0, -0.5, 0.0, -0.1, 0.1}; */
 	/* double state[6] = {-3.5, -0.8, -0.5, 0.0, -1.0, 0.0}; */
 
 	/* double state[6] = {-3.5, 1.5, -0.5, 0.0, -1.0, 0.0} */
 	/* double state[6] = {-2.0, -1.5, -0.5, 0.0, -0.8, 0.0}; */
-	double state[6] = {-2.5, -1.0, 0.7, 0.3, 0.4, 0.0};
+	/* double state[6] = {-2.5, -1.0, 0.7, 0.3, 0.4, 0.0}; */
         
     // these three work
     

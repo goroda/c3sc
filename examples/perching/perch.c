@@ -343,10 +343,10 @@ int main(int argc, char * argv[])
     c3opt_set_relftol(opt,1e-6);
     c3opt_set_gtol(opt,1e-30);
     c3opt_ls_set_maxiter(opt,10);
-    c3opt_set_maxiter(opt,10);
+    c3opt_set_maxiter(opt,30);
     /* c3opt_ls_set_alpha(opt,0.3); */
     /* c3opt_ls_set_beta(opt,0.2); */
-    c3opt_set_verbose(opt,0);
+    c3opt_set_verbose(opt,0.0);
 
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
@@ -452,9 +452,12 @@ int main(int argc, char * argv[])
     integrator_set_verbose(ode_sys,0);
 
     double time = 0.0;
-    /* double state[7] = {-3.5, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0}; */
-    /* double state[7] = {-3.0, 0.2, 0.0, 0.0, 4.5, 0.0, 0.0}; */
-    double state[7] = {-3.5, 0.0, 0.0, 0.0, 6.5, 0.0, 0.0};
+    double state[7] = {-3.0, 0.2, 0.0, 0.0, 5.3, 0.0, 0.0}; // works beautifully n=160
+    /* double state[7] = {-3.5, 0.0, 0.0, 0.0, 5.78, 0.0, 0.0}; //works n = 20 */
+    /* double state[7] = {-3.5, -0.3, 0.0, 0.0, 6.15, 0.0, 0.0}; // works n = 20 */
+
+    /* double state[7] = {-3.5, 0.0, 0.0, 0.0, 6.6, 0.0, 0.0}; */
+
     double con[1] = {0.0};
     struct Trajectory * traj = NULL;
     printf("add trajectory\n");
