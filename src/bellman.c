@@ -751,6 +751,350 @@ int bellman_optimal(size_t du, double * u, double * val, void * arg)
                 }
             }
         }
+        else if (du == 4){
+            nrand = 1; // 2
+            npert = 1; // 1
+            /* nrand = 2; */
+            /* npert = 1; */
+            double ut[4];
+            for (size_t ii = 0; ii < 2; ii++){
+                double distx = (ubu[0]-lbu[0])/4.0;
+                for (size_t jj = 0; jj < 2; jj++){
+                    double disty = (ubu[1]-lbu[1])/4.0;
+                    for (size_t kk = 0; kk < 2; kk++){
+                        double distz = (ubu[2]-lbu[2])/4.0;
+                        for (size_t aa = 0; aa < 2; aa++){
+                            double dista = (ubu[3]-lbu[3])/4.0;
+                            if (ii == 0){
+                                ucurr[0] = lbu[0]+distx;
+                            }
+                            else{
+                                ucurr[0] = ubu[0]-distx;
+                            }
+                            if (jj == 0){
+                                ucurr[1] = lbu[1]+disty;
+                            }
+                            else{
+                                ucurr[1] = ubu[1]-disty;
+                            }
+                            if (kk == 0){
+                                ucurr[2] = lbu[2]+distz;
+                            }
+                            else{
+                                ucurr[2] = ubu[2]-distz;
+                            }
+                            if (aa == 0){
+                                ucurr[3] = lbu[3]+dista;
+                            }
+                            else{
+                                ucurr[3] = ubu[3]-dista;
+                            }
+                            c3opt_minimize(opt,ucurr,&valtemp);
+                            /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+                            double dd = 0.0; // sufficient decrease
+                            if (valtemp < (minval-dd)){
+                                /* printf("\t updating current min!\n"); */
+                                minval = valtemp;
+                                memmove(umin,ucurr,du*sizeof(double));
+                            }
+                            for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                                ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                                ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                                ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
+                                ut[3] = ucurr[3] + randu()*(dista*2.0) - dista;
+                                for (size_t zz = 0; zz < du; zz++){
+                                    if (ut[zz] > ubu[zz]){
+                                        ut[zz] = ubu[zz];
+                                    }
+                                    else if (ut[zz] < lbu[zz]){
+                                        ut[zz] = lbu[zz];
+                                    }
+                                }
+                                c3opt_minimize(opt,ut,&valtemp);
+                                if (valtemp < (minval-dd)){
+                                    /* printf("\t updating current min!\n"); */
+                                    minval = valtemp;
+                                    memmove(umin,ut,du*sizeof(double));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else if (du == 5){
+            nrand = 1; // 2
+            npert = 1; // 1
+            /* nrand = 2; */
+            /* npert = 1; */
+            double ut[5];
+            for (size_t ii = 0; ii < 2; ii++){
+                double distx = (ubu[0]-lbu[0])/4.0;
+                for (size_t jj = 0; jj < 2; jj++){
+                    double disty = (ubu[1]-lbu[1])/4.0;
+                    for (size_t kk = 0; kk < 2; kk++){
+                        double distz = (ubu[2]-lbu[2])/4.0;
+                        for (size_t aa = 0; aa < 2; aa++){
+                            double dista = (ubu[3]-lbu[3])/4.0;
+                            for (size_t bb = 0; bb < 2; bb++){
+                                double distb = (ubu[4]-lbu[4])/4.0;
+                                if (ii == 0){
+                                    ucurr[0] = lbu[0]+distx;
+                                }
+                                else{
+                                    ucurr[0] = ubu[0]-distx;
+                                }
+                                if (jj == 0){
+                                    ucurr[1] = lbu[1]+disty;
+                                }
+                                else{
+                                    ucurr[1] = ubu[1]-disty;
+                                }
+                                if (kk == 0){
+                                    ucurr[2] = lbu[2]+distz;
+                                }
+                                else{
+                                    ucurr[2] = ubu[2]-distz;
+                                }
+                                if (aa == 0){
+                                    ucurr[3] = lbu[3]+dista;
+                                }
+                                else{
+                                    ucurr[3] = ubu[3]-dista;
+                                }
+                                if (bb == 0){
+                                    ucurr[4] = lbu[4]+distb;
+                                }
+                                else{
+                                    ucurr[4] = ubu[4]-distb;
+                                }
+                                c3opt_minimize(opt,ucurr,&valtemp);
+                                /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+                                double dd = 0.0; // sufficient decrease
+                                if (valtemp < (minval-dd)){
+                                    /* printf("\t updating current min!\n"); */
+                                    minval = valtemp;
+                                    memmove(umin,ucurr,du*sizeof(double));
+                                }
+                                for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                                    ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                                    ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                                    ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
+                                    ut[3] = ucurr[3] + randu()*(dista*2.0) - dista;
+                                    ut[4] = ucurr[4] + randu()*(distb*2.0) - distb;
+                                    for (size_t zz = 0; zz < du; zz++){
+                                        if (ut[zz] > ubu[zz]){
+                                            ut[zz] = ubu[zz];
+                                        }
+                                        else if (ut[zz] < lbu[zz]){
+                                            ut[zz] = lbu[zz];
+                                        }
+                                    }
+                                    c3opt_minimize(opt,ut,&valtemp);
+                                    if (valtemp < (minval-dd)){
+                                        /* printf("\t updating current min!\n"); */
+                                        minval = valtemp;
+                                        memmove(umin,ut,du*sizeof(double));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else if (du == 6){
+            nrand = 1; // 2
+            npert = 1; // 1
+            /* nrand = 2; */
+            /* npert = 1; */
+            double ut[6];
+            for (size_t ii = 0; ii < 2; ii++){
+                double distx = (ubu[0]-lbu[0])/4.0;
+                for (size_t jj = 0; jj < 2; jj++){
+                    double disty = (ubu[1]-lbu[1])/4.0;
+                    for (size_t kk = 0; kk < 2; kk++){
+                        double distz = (ubu[2]-lbu[2])/4.0;
+                        for (size_t aa = 0; aa < 2; aa++){
+                            double dista = (ubu[3]-lbu[3])/4.0;
+                            for (size_t bb = 0; bb < 2; bb++){
+                                double distb = (ubu[4]-lbu[4])/4.0;
+                                for (size_t cc = 0; cc < 2; cc++){
+                                    double distc = (ubu[5]-lbu[5])/4.0;
+                                    if (ii == 0){
+                                        ucurr[0] = lbu[0]+distx;
+                                    }
+                                    else{
+                                        ucurr[0] = ubu[0]-distx;
+                                    }
+                                    if (jj == 0){
+                                        ucurr[1] = lbu[1]+disty;
+                                    }
+                                    else{
+                                        ucurr[1] = ubu[1]-disty;
+                                    }
+                                    if (kk == 0){
+                                        ucurr[2] = lbu[2]+distz;
+                                    }
+                                    else{
+                                        ucurr[2] = ubu[2]-distz;
+                                    }
+                                    if (aa == 0){
+                                        ucurr[3] = lbu[3]+dista;
+                                    }
+                                    else{
+                                        ucurr[3] = ubu[3]-dista;
+                                    }
+                                    if (bb == 0){
+                                        ucurr[4] = lbu[4]+distb;
+                                    }
+                                    else{
+                                        ucurr[4] = ubu[4]-distb;
+                                    }
+                                    if (cc == 0){
+                                        ucurr[5] = lbu[5]+distc;
+                                    }
+                                    else{
+                                        ucurr[5] = ubu[5]-distc;
+                                    }
+                                    c3opt_minimize(opt,ucurr,&valtemp);
+                                    /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+                                    double dd = 0.0; // sufficient decrease
+                                    if (valtemp < (minval-dd)){
+                                        /* printf("\t updating current min!\n"); */
+                                        minval = valtemp;
+                                        memmove(umin,ucurr,du*sizeof(double));
+                                    }
+                                    for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                                        ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                                        ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                                        ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
+                                        ut[3] = ucurr[3] + randu()*(dista*2.0) - dista;
+                                        ut[4] = ucurr[4] + randu()*(distb*2.0) - distb;
+                                        ut[5] = ucurr[5] + randu()*(distc*2.0) - distc;
+                                        for (size_t zz = 0; zz < du; zz++){
+                                            if (ut[zz] > ubu[zz]){
+                                                ut[zz] = ubu[zz];
+                                            }
+                                            else if (ut[zz] < lbu[zz]){
+                                                ut[zz] = lbu[zz];
+                                            }
+                                        }
+                                        c3opt_minimize(opt,ut,&valtemp);
+                                        if (valtemp < (minval-dd)){
+                                            /* printf("\t updating current min!\n"); */
+                                            minval = valtemp;
+                                            memmove(umin,ut,du*sizeof(double));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else if (du == 7){
+            nrand = 1; // 2
+            npert = 1; // 1
+            /* nrand = 2; */
+            /* npert = 1; */
+            double ut[7];
+            for (size_t ii = 0; ii < 2; ii++){
+                double distx = (ubu[0]-lbu[0])/4.0;
+                for (size_t jj = 0; jj < 2; jj++){
+                    double disty = (ubu[1]-lbu[1])/4.0;
+                    for (size_t kk = 0; kk < 2; kk++){
+                        double distz = (ubu[2]-lbu[2])/4.0;
+                        for (size_t aa = 0; aa < 2; aa++){
+                            double dista = (ubu[3]-lbu[3])/4.0;
+                            for (size_t bb = 0; bb < 2; bb++){
+                                double distb = (ubu[4]-lbu[4])/4.0;
+                                for (size_t cc = 0; cc < 2; cc++){
+                                    double distc = (ubu[5]-lbu[5])/4.0;
+                                    for (size_t dd = 0; dd < 2; dd++){
+                                        double distd = (ubu[6]-lbu[6])/4.0;
+                                        if (ii == 0){
+                                            ucurr[0] = lbu[0]+distx;
+                                        }
+                                        else{
+                                            ucurr[0] = ubu[0]-distx;
+                                        }
+                                        if (jj == 0){
+                                            ucurr[1] = lbu[1]+disty;
+                                        }
+                                        else{
+                                            ucurr[1] = ubu[1]-disty;
+                                        }
+                                        if (kk == 0){
+                                            ucurr[2] = lbu[2]+distz;
+                                        }
+                                        else{
+                                            ucurr[2] = ubu[2]-distz;
+                                        }
+                                        if (aa == 0){
+                                            ucurr[3] = lbu[3]+dista;
+                                        }
+                                        else{
+                                            ucurr[3] = ubu[3]-dista;
+                                        }
+                                        if (bb == 0){
+                                            ucurr[4] = lbu[4]+distb;
+                                        }
+                                        else{
+                                            ucurr[4] = ubu[4]-distb;
+                                        }
+                                        if (cc == 0){
+                                            ucurr[5] = lbu[5]+distc;
+                                        }
+                                        else{
+                                            ucurr[5] = ubu[5]-distc;
+                                        }
+                                        if (dd == 0){
+                                            ucurr[6] = lbu[6]+distc;
+                                        }
+                                        else{
+                                            ucurr[6] = ubu[6]-distc;
+                                        }
+                                        c3opt_minimize(opt,ucurr,&valtemp);
+                                        /* printf("val = %G, pt = ",valtemp);dprint(du,ucurr); */
+                                        double dec = 0.0; // sufficient decrease
+                                        if (valtemp < (minval-dec)){
+                                            /* printf("\t updating current min!\n"); */
+                                            minval = valtemp;
+                                            memmove(umin,ucurr,du*sizeof(double));
+                                        }
+                                        for (size_t ll = 0; ll < npert; ll++){ // randomly perturb minimum
+                                            ut[0] = ucurr[0] + randu()*(distx*2.0) - distx;
+                                            ut[1] = ucurr[1] + randu()*(disty*2.0) - disty;
+                                            ut[2] = ucurr[2] + randu()*(distz*2.0) - distz;
+                                            ut[3] = ucurr[3] + randu()*(dista*2.0) - dista;
+                                            ut[4] = ucurr[4] + randu()*(distb*2.0) - distb;
+                                            ut[5] = ucurr[5] + randu()*(distc*2.0) - distc;
+                                            ut[6] = ucurr[6] + randu()*(distd*2.0) - distd;
+                                            for (size_t zz = 0; zz < du; zz++){
+                                                if (ut[zz] > ubu[zz]){
+                                                    ut[zz] = ubu[zz];
+                                                }
+                                                else if (ut[zz] < lbu[zz]){
+                                                    ut[zz] = lbu[zz];
+                                                }
+                                            }
+                                            c3opt_minimize(opt,ut,&valtemp);
+                                            if (valtemp < (minval-dec)){
+                                                /* printf("\t updating current min!\n"); */
+                                                minval = valtemp;
+                                                memmove(umin,ut,du*sizeof(double));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     
         for (size_t jj = 0; jj < nrand; jj++){
             for (size_t kk = 0; kk < du; kk++){
