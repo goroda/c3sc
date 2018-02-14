@@ -2,8 +2,8 @@
 Perform stochastic optimal control using the function-train decomposition from the C3 package
 
 ## Prerequisites
-  * [c3](https://github.com/goroda/Compressed-Continuous-Computation) 
-  * [cdyn](https://github.com/goroda/c3sc)
+  * [Compressed Continuous Computation (C3)](https://github.com/goroda/Compressed-Continuous-Computation) 
+  * [Dynamical Systems in C (cdyn)](https://github.com/goroda/c3sc)
 
 This library is used for these papers
 
