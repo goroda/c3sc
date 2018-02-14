@@ -5,7 +5,6 @@ Perform stochastic optimal control using the function-train decomposition from t
   * [c3](https://github.com/goroda/Compressed-Continuous-Computation) 
   * [cdyn](https://github.com/goroda/c3sc)
 
-
 This library is used for these papers
 
 1. Alex Gorodetsky, Sertac Karaman, Youssef Marzouk: [High-Dimensional Stochastic Optimal Control using Continuous Tensor Decompositions](https://alexgorodetsky.com/wp-content/uploads/2018/02/1611.04706.pdf). In: International Journal of Robotics Research, Accepted 2018.
@@ -14,8 +13,8 @@ This library is used for these papers
 
 <!-- http://www.alexgorodetsky.com/c3/html/ -->
 
-Author: Alex A. Gorodetsky
-Contact: goroda@umich.edu
-Copyright (c) 2015-2016, Massachusetts Institute of Technology
-Copyright (c) 2018, University of Michigan
+Author: Alex A. Gorodetsky  
+Contact: goroda@umich.edu  
+Copyright (c) 2015-2016, Massachusetts Institute of Technology  
+Copyright (c) 2018, University of Michigan  
 License: BSD
