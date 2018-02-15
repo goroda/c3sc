@@ -2289,12 +2289,12 @@ struct ValueF * c3control_vi_solve(struct C3Control * c3c,
 {
 
     struct ValueF * start = valuef_copy(vo);
-    workspace_reset_vi_htable(c3c->work);    
+    workspace_reset_vi_htable(c3c->work);
     for (size_t ii = 0; ii < maxiter; ii++){
 
         // memory
         if (ii % 1000 == 0){ // precaution against too much growth in memory usage
-            workspace_reset_vi_htable(c3c->work); 
+            workspace_reset_vi_htable(c3c->work);
         }
         
         /* printf("ii = %zu\n",ii); */
