@@ -40,14 +40,16 @@ else ()
 
 endif()
 
-if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
-   # using GCC
+option(USE_OPEN_MP "Use OPEN_MP for parallelization" ON)
+if (USE_OPEN_MP)
+  if ("${CMAKE_C_COMPILER_ID}" STREQUAL "GNU")
+    # using GCC
     find_package(OpenMP)
     if (OPENMP_FOUND)
-       set(compiler_flags "${compiler_flags} ${OpenMP_C_FLAGS}" )
+      set(compiler_flags "${compiler_flags} ${OpenMP_C_FLAGS}" )
     endif()
+  endif()
 endif()
-
 
 
 include_directories(${BLAS_INCLUDE_DIR}, ${LAPACK_INCLUDE_DIR})

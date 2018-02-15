@@ -754,11 +754,13 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
     work->absorbed_no = calloc_size_t(N);
     work->absorbed_yes = calloc_size_t(N);
 
-    work->vi_htable = htable_create(1000000);
+    size_t ncreate = 1000000; // original
+    /* size_t ncreate = 10000; // original     */
+    work->vi_htable = htable_create(ncreate);
     work->vi_iter = 0;
 
-    work->pi_htable = htable_create(1000000);
-    work->pi_prob_htable = htable_create(1000000);
+    work->pi_htable = htable_create(ncreate);
+    work->pi_prob_htable = htable_create(ncreate);
     work->pi_iter = 0;
     work->pi_subiter = 0;
 
@@ -771,6 +773,27 @@ struct Workspace * workspace_alloc(size_t dx,size_t du,size_t dw, size_t N)
     /* assert (work->saved_keys != NULL); */
     
     return work;
+}
+
+void workspace_reset_pi_prob_htable(struct Workspace * w)
+{
+    size_t ncreate = 1000000; // original
+    htable_destroy(w->pi_prob_htable);
+    w->pi_prob_htable = htable_create(ncreate);
+}
+
+void workspace_reset_pi_htable(struct Workspace * w)
+{
+    size_t ncreate = 1000000; // original
+    htable_destroy(w->pi_htable);
+    w->pi_htable = htable_create(ncreate);
+}
+
+void workspace_reset_vi_htable(struct Workspace * w)
+{
+    size_t ncreate = 1000000; // original
+    htable_destroy(w->vi_htable);
+    w->vi_htable = htable_create(ncreate);
 }
 
 void workspace_free(struct Workspace * w)

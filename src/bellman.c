@@ -1382,8 +1382,10 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         }
     }
 
+    #ifdef _OPENMP
     double t_start = omp_get_wtime();
     #pragma omp parallel for schedule(guided)
+    #endif
     for (size_t ii = 0; ii < nrun; ii++){
         struct Memory mem;
         mem.shared = cp;
@@ -1395,9 +1397,12 @@ int bellman_vi(size_t N, const double * x, double * out, void * arg)
         assert (res2 == 0);
         /* out[ind_run[ii]] = val; */
     }
+    #ifdef _OPENMP
     double t_end = omp_get_wtime();
     double run_time = (double)(t_end - t_start); /* / CLOCKS_PER_SEC; */
     param->time_in_loop += run_time;
+    #endif
+
 
     // doing this not in parallel because not thread safe
     for (size_t ii = 0; ii < nrun; ii++){
@@ -1818,7 +1823,9 @@ int bellman_pi(size_t N, const double * x, double * out, void * arg)
     }
 
 
+    #ifdef _OPENMP
     #pragma omp parallel for schedule(guided)
+    #endif
     for (size_t ii = 0; ii < nprob_run; ii++){
 
         struct Memory mem;
@@ -2277,7 +2284,14 @@ struct ValueF * c3control_vi_solve(struct C3Control * c3c,
 {
 
     struct ValueF * start = valuef_copy(vo);
+    workspace_reset_vi_htable(c3c->work);    
     for (size_t ii = 0; ii < maxiter; ii++){
+
+        // memory
+        if (ii % 1000 == 0){ // precaution against too much growth in memory usage
+            workspace_reset_vi_htable(c3c->work); 
+        }
+        
         /* printf("ii = %zu\n",ii); */
         assert (start != NULL);
         size_t niter_evals = 0;
@@ -2332,6 +2346,8 @@ struct ValueF * c3control_pi_solve(struct C3Control * c3c,
     struct ValueF * start = valuef_copy(policy);
     struct PIparam * poli = pi_param_create(1e-10,policy);
     workspace_increment_pi_iter(c3c->work);
+    workspace_reset_pi_prob_htable(c3c->work);
+    workspace_reset_pi_htable(c3c->work);
     
     /* double dd = valuef_norm2diff(start,policy); */
     /* printf("diff = %G\n",dd); */

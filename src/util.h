@@ -83,6 +83,9 @@ size_t uniform_stride(size_t, size_t);
 struct Workspace;
 struct Workspace * workspace_alloc(size_t,size_t,size_t,size_t);
 void workspace_free(struct Workspace *);
+void workspace_reset_pi_prob_htable(struct Workspace *);
+void workspace_reset_pi_htable(struct Workspace *);
+void workspace_reset_vi_htable(struct Workspace *);
 
 void workspace_increment_vi_iter(struct Workspace * w);
 size_t workspace_get_vi_iter(const struct Workspace * w);

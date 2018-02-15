@@ -715,7 +715,7 @@ struct ValueF * valuef_interp(size_t d,
         }
     }
     else{
-        ftref = function_train_constant(1.0,mopts);
+        ftref = function_train_constant(1.0, mopts);
 
         // initialize cross indices
         cross_index_array_initialize(d,vf->isr,0,1,ranks_use,(void**)start,sizeof(double));
@@ -729,7 +729,7 @@ struct ValueF * valuef_interp(size_t d,
         vf->cost = ftapprox_cross(fw,fca,vf->isl,vf->isr,mopts,fibopt,ftref);
     }
 
-    if (vref == NULL){
+    if ((vref == NULL) || adapt == 0){
         function_train_free(ftref); ftref = NULL;
     }
 

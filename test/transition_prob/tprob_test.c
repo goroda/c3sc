@@ -68,7 +68,7 @@ struct Trajectory * run_sim_2d_1d(struct Integrator * ode_sys)
     // Integrate
     struct Trajectory * traj = NULL;
     trajectory_add(&traj,2,1,time,state,con);
-    double final_time = 1e1;
+    double final_time = 3e0;
     double dt = 1e-2;
     int res;
     printf("Integrating Trajectory\n");
@@ -1820,8 +1820,8 @@ void Test_bellman_vi(CuTest * tc)
 
     double lb[2] = {-2.0, -2.0};
     double ub[2] = {2.0, 2.0 };
-    /* double goal_center[2] = {0.0,0.0}; */
-    /* double goal_width[2] = {0.4,0.4}; */
+    double goal_center[2] = {0.0,0.0};
+    double goal_width[2] = {0.4,0.4};
     size_t ngrid[2] = {100, 100};
     double discount = 0.1;
 
@@ -1859,8 +1859,8 @@ void Test_bellman_vi(CuTest * tc)
     c3control_set_external_boundary(c3c,0,"reflect");
     c3control_set_external_boundary(c3c,1,"reflect");        
     
-    size_t maxiter_vi = 100;
-    /* size_t maxiter_vi = 10; */
+    size_t maxiter_vi = 10000;
+    /* size_t maxiter_vi = 2; */
     int verbose = 1;
     double convergence = 1e-5;
     struct ValueF * vf = c3control_init_value(c3c,quad2d,NULL,aargs,0);
@@ -1868,23 +1868,23 @@ void Test_bellman_vi(CuTest * tc)
     struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,vf,
                                               aargs,opt,verbose,NULL);
     
-    /* c3control_add_policy_sim(c3c,cost,opt,NULL); */
-    /* struct Integrator * ode_sys = NULL; */
-    /* ode_sys = integrator_create_controlled(2,1,f1b,NULL, */
-    /*                                        c3control_controller,c3c); */
-    /* struct Trajectory * traj = run_sim_2d_1d(ode_sys); */
+    c3control_add_policy_sim(c3c,cost,opt,NULL);
+    struct Integrator * ode_sys = NULL;
+    ode_sys = integrator_create_controlled(2,1,f1b,NULL,
+                                           c3control_controller,c3c);
+    struct Trajectory * traj = run_sim_2d_1d(ode_sys);
 
-    /* trajectory_print(traj,stdout,5); */
+    trajectory_print(traj,stdout,5);
 
-    /* double * s = trajectory_get_last_state(traj); */
-    /* CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2); */
-    /* CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2); */
-    /* CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2); */
-    /* CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2); */
+    double * s = trajectory_get_last_state(traj);
+    CuAssertIntEquals(tc,1,s[0] < goal_center[0] + goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[0] > goal_center[0] - goal_width[0]/2);
+    CuAssertIntEquals(tc,1,s[1] < goal_center[1] + goal_width[1]/2);
+    CuAssertIntEquals(tc,1,s[1] > goal_center[1] - goal_width[1]/2);
 
-    /* // cleanup integrator stuff */
-    /* integrator_destroy(ode_sys); ode_sys = NULL; */
-    /* trajectory_free(traj); traj = NULL; */
+    // cleanup integrator stuff
+    integrator_destroy(ode_sys); ode_sys = NULL;
+    trajectory_free(traj); traj = NULL;
 
     valuef_destroy(vf); vf = NULL;
     valuef_destroy(cost); cost = NULL;
@@ -1895,7 +1895,8 @@ void Test_bellman_vi(CuTest * tc)
 
 void Test_bellman_vi_const(CuTest * tc)
 {
-    printf("Testing Function: bellman_vi (1d control) const\n");
+    printf("Testing Function: bellman_vi (1d control)\n");
+    // ensure constant elemenets and linear elements both work 
     size_t dx = 2;
     size_t du = 1;
     size_t dw = 2;
@@ -1952,40 +1953,41 @@ void Test_bellman_vi_const(CuTest * tc)
 
     c3control_set_external_boundary(c3c,0,"reflect");
     c3control_set_external_boundary(c3c,1,"reflect");        
-    
-    size_t maxiter_vi = 400;
-    /* size_t maxiter_vi = 10; */
-    int verbose = 2;
-    double convergence = 1e-5;
-    struct ValueF * vf_lin = c3control_init_value(c3c,quad2d,NULL,aargs,1);
-    printf("STARTING CONSTANT\n");
-    struct ValueF * vf_const = c3control_init_value(c3c,quad2d,NULL,aargs2,1);
+
+
+    struct ValueF * vf_lin = c3control_init_value(c3c,quad2d,NULL,aargs,0);
+    struct ValueF * vf_const = c3control_init_value(c3c,quad2d,NULL,aargs2,0);
 
     double norm_lin = valuef_norm(vf_lin);
     double norm_const = valuef_norm(vf_const);
-    printf("Norm lin = %3.15G, norm_const = %3.15G\n",norm_lin,norm_const);
+    /* printf("Norm lin = %3.15G, norm_const = %3.15G\n",norm_lin,norm_const); */
+    CuAssertDblEquals(tc, norm_lin, norm_const, 1e-10);
     
     double pt[2] = {0.5, -0.3};
     double eval_lin = valuef_eval(vf_lin,pt);
     double eval_const = valuef_eval(vf_const,pt);
-    printf("Eval lin = %3.15G, eval_const = %3.15G\n",eval_lin,eval_const);
-    printf("\t Eval true = %3.15G\n",pt[0]*pt[0] + pt[1]*pt[1]);
+    /* printf("Eval lin = %3.15G, eval_const = %3.15G\n",eval_lin,eval_const); */
+    CuAssertDblEquals(tc, eval_lin, eval_const, 1e-10);
+    /* printf("\t Eval true = %3.15G\n",pt[0]*pt[0] + pt[1]*pt[1]); */
 
-    
-
+    /* int verbose = 1; */
+    /* size_t maxiter_vi = 400; */
+    /* /\* size_t maxiter_vi = 10; *\/ */
+    /* double convergence = 1e-5; */
     /* struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence, */
     /*                                           vf_const, */
     /*                                           aargs2,opt,verbose,NULL); */
-    struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence,
-                                              vf_lin,
-                                              aargs,opt,verbose,NULL);
-
-    exit(1);
-    /* valuef_destroy(vf); vf = NULL; */
+    /* struct ValueF * cost = c3control_vi_solve(c3c,maxiter_vi,convergence, */
+    /*                                           vf_lin, */
+    /*                                           aargs,opt,verbose,NULL); */
     /* valuef_destroy(cost); cost = NULL; */
-    /* c3control_destroy(c3c); c3c = NULL; */
-    /* c3opt_free(opt); opt = NULL; */
-    /* approx_args_free(aargs); aargs = NULL; */
+
+    valuef_destroy(vf_lin); vf_lin = NULL;
+    valuef_destroy(vf_const); vf_const = NULL;
+    c3control_destroy(c3c); c3c = NULL;
+    approx_args_free(aargs); aargs = NULL;
+    approx_args_free(aargs2); aargs2 = NULL;
+    c3opt_free(opt); opt = NULL;
 }
 
 void Test_bellman_pi_25_const(CuTest * tc)
@@ -1999,7 +2001,8 @@ void Test_bellman_pi_25_const(CuTest * tc)
     double ub[2] = {2.0, 2.0 };
     /* double goal_center[2] = {0.0,0.0}; */
     /* double goal_width[2] = {0.4,0.4}; */
-    size_t ngrid[2] = {100, 100};
+    /* size_t ngrid[2] = {100, 100}; */
+    size_t ngrid[2] = {25, 25};    
     double discount = 0.1;
 
     // optimization arguments
@@ -2038,11 +2041,12 @@ void Test_bellman_pi_25_const(CuTest * tc)
     c3control_set_external_boundary(c3c,0,"reflect");
     c3control_set_external_boundary(c3c,1,"reflect");        
 
+    /* size_t maxiter_vi = 10000; */
     size_t maxiter_vi = 10000;
     size_t maxiter_pi = 10;
     int verbose = 1;
     double convergence = 1e-5;
-    struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,1);
+    struct ValueF * cost = c3control_init_value(c3c,quad2d,NULL,aargs,0);
 
     for (size_t ii = 0; ii < maxiter_vi; ii++){
         printf("Control update: %zu\n",ii);
@@ -2050,48 +2054,61 @@ void Test_bellman_pi_25_const(CuTest * tc)
                                                   convergence,
                                                   cost,aargs,opt,
                                                   verbose,NULL);
-        valuef_destroy(cost); cost = NULL;
+
         struct ValueF * temp = c3control_vi_solve(c3c,1,convergence,
                                                   next,aargs,opt,verbose,NULL);
         double diff = valuef_norm2diff(next,temp);
+        valuef_destroy(next); next = NULL;
+        valuef_destroy(cost); cost = NULL;
         cost = valuef_copy(temp);
         valuef_destroy(temp); temp = NULL;
         if (diff < convergence){
             break;
         }
 
-        valuef_destroy(next); next = NULL;
+
     }
 
-
-    // from reference solution
-    double ** xgrid = c3control_get_xgrid(c3c);
-    struct ValueF * ref_sol = valuef_load("PI_adapt_100x100_ref_sol.c3",
-                                          ngrid,xgrid);
-    double diff;
-    /* double diff = valuef_norm2diff(cost,ref_sol); */
-    /* printf("L2norm of difference = %G\n",diff); */
-
-    double pt[2];
-    diff = 0.0;
-    for (size_t ii = 0; ii < ngrid[0]; ii++){
-        for (size_t jj = 0; jj < ngrid[1]; jj++){
-            pt[0] = xgrid[0][ii];
-            pt[1] = xgrid[1][ii];
-            double val_ref = valuef_eval(ref_sol,pt);
-            double val_here = valuef_eval(cost,pt);
-            double diff_pt = val_ref-val_here;
-            diff += diff_pt*diff_pt;
-        }
-    }
-    diff = sqrt(diff/(ngrid[0]*ngrid[1]));
-    printf("L2 norm num = %G\n",diff);
-    // FROM PAPER!! This is a regression test
-    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; 
+    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0;
     CuAssertDblEquals(tc,0.0,reldiff,0.1);
 
-    
-    valuef_destroy(ref_sol);
+
+    double ** xgrid = c3control_get_xgrid(c3c);
+    struct ValueF * ref_sol = valuef_load("PI_adapt_100x100_ref_sol.c3", ngrid, xgrid);
+                                              
+    if (ref_sol == NULL){
+        printf("Cannot check constant element policy iteration solution yet\n");
+        printf("because no reference solution exists -->retry running bellman_pi_100 test\n");
+    }
+    else{
+        // from reference solution
+
+        double diff;
+        /* double diff = valuef_norm2diff(cost,ref_sol); */
+        /* printf("L2norm of difference = %G\n",diff); */
+
+        double pt[2];
+        diff = 0.0;
+        double den = 0.0;
+        for (size_t ii = 0; ii < ngrid[0]; ii++){
+            for (size_t jj = 0; jj < ngrid[1]; jj++){
+                pt[0] = xgrid[0][ii];
+                pt[1] = xgrid[1][ii];
+                double val_ref = valuef_eval(ref_sol,pt);
+                double val_here = valuef_eval(cost,pt);
+                double diff_pt = val_ref-val_here;
+                den += val_ref*val_ref;
+                diff += diff_pt*diff_pt;
+            }
+        }
+        /* diff = sqrt(diff/(ngrid[0]*ngrid[1])); */
+        diff = sqrt(diff/den);
+        printf("L2 norm num = %G\n",diff);
+        // FROM PAPER!! This is a regression test
+        valuef_destroy(ref_sol);
+        CuAssertIntEquals(tc, 1, diff < 1e-1);
+    }
+
     valuef_destroy(cost); cost = NULL;
     c3control_destroy(c3c); c3c = NULL;
     c3opt_free(opt); opt = NULL;
@@ -2166,8 +2183,8 @@ void Test_bellman_pi_25(CuTest * tc)
         valuef_destroy(next); next = NULL;
     }
 
-    /* double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test */
-    /* CuAssertDblEquals(tc,0.0,reldiff,0.1); */
+    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test
+    CuAssertDblEquals(tc,0.0,reldiff,0.1);
 
 
     valuef_destroy(cost); cost = NULL;
@@ -2300,7 +2317,7 @@ void Test_bellman_pi_100(CuTest * tc)
     c3control_set_external_boundary(c3c,0,"reflect");
     c3control_set_external_boundary(c3c,1,"reflect");        
 
-    size_t maxiter_vi = 60000;
+    size_t maxiter_vi = 10000;
     size_t maxiter_pi = 10;
     int verbose = 1;
     double convergence = 1e-7;
@@ -2317,14 +2334,14 @@ void Test_bellman_pi_100(CuTest * tc)
         double diff = valuef_norm2diff(next,temp);
         cost = valuef_copy(temp);
         valuef_destroy(temp); temp = NULL;
+        valuef_destroy(next); next = NULL;
         if (diff < convergence){
             break;
         }
-            
-        valuef_destroy(next); next = NULL;
     }
 
-    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0; // FROM PAPER!! This is a regression test
+    double reldiff = fabs(100.0 - valuef_norm(cost)) / 100.0;
+    // FROM PAPER!! This is a regression test
     CuAssertDblEquals(tc,0.0,reldiff,0.1);
 
 
@@ -2491,10 +2508,10 @@ void Test_bellman_pi3d(CuTest * tc)
         double diff = valuef_norm2diff(next,temp);
         cost = valuef_copy(temp);
         valuef_destroy(temp); temp = NULL;
+        valuef_destroy(next); next = NULL;        
         if (diff < convergence){
             break;
         }
-        valuef_destroy(next); next = NULL;
     }
 
 
@@ -2529,12 +2546,12 @@ CuSuite * DPAlgsGetSuite()
     //printf("----------------------------\n");
 
     CuSuite * suite = CuSuiteNew();
-    SUITE_ADD_TEST(suite, Test_bellman_vi);
-    /* SUITE_ADD_TEST(suite, Test_bellman_vi_const); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi_25_const); */
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi); // passed valgrind 2/14 */
+    /* SUITE_ADD_TEST(suite, Test_bellman_vi_const); // passed valgrind 2/14  */
+    /* SUITE_ADD_TEST(suite, Test_bellman_pi_25_const); // passed valgrind 2/14 */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_25); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi_50); */
-    /* SUITE_ADD_TEST(suite, Test_bellman_pi_100); */
+    SUITE_ADD_TEST(suite, Test_bellman_pi_100); // passed valgrind 2/14
 
     /* SUITE_ADD_TEST(suite, Test_bellman_vi3d); */
     /* SUITE_ADD_TEST(suite, Test_bellman_pi3d); */

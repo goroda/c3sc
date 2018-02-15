@@ -1,8 +1,16 @@
 #include <stdio.h>
 #include <time.h>
+
+#ifndef _OPENMP
+int main (void)
+{
+    printf("Not compiled with OPEN_MP so not checking parallelization\n");
+    return 0;
+}
+#endif
+
+#ifdef _OPENMP
 #include <omp.h>
-
-
 int main (void)
 {
     clock_t start = clock();
@@ -39,4 +47,4 @@ int main (void)
     printf("Wall time elapsed: %G\n",tout);
     return 0;
 }
-
+#endif
