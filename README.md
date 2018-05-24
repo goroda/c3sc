@@ -12,7 +12,7 @@ This library is used for these papers
 
 ## Installation Instructions
 
-We will install the prerequisite packages (C3 and CDyn) into a generic directory denoted by `<c3sc-prereq>`. Replace this flag with what is appropriate for your system. Then we will tell C3SC where to find the directory. We will install C3SC into the directory denoted by `<c3sc-installed>.`
+We will install the prerequisite packages (C3 and CDYN) into a generic directory denoted by `<c3sc-prereq>`. Replace this flag with what is appropriate for your system. Then we will tell C3SC where to find the directory. We will install C3SC into the directory denoted by `<c3sc-installed>.`
 
 ### Install C3 
     ``` shell
@@ -25,10 +25,10 @@ We will install the prerequisite packages (C3 and CDyn) into a generic directory
     make install
     ```
 
-### Install Cdyn
+### Install CDYN
     ``` shell
-    git clone https://github.com/goroda/Compressed-Continuous-Computation.git c3
-    cd c3
+    git clone https://github.com/goroda/cdyn.git cdyn
+    cd cdyn
     mkdir build
     cd build
     cmake -DCMAKE_INSTALL_PREFIX=<c3sc-prereq> ..
