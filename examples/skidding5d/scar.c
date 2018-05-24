@@ -68,7 +68,7 @@ int f1(double t, const double * x, const double * u, double * out,
     double ct = 20000.0;
     double a = 1.2;
     double b = 1.5;
-    double I = 2170.0;
+    double In = 2170.0;
     double s = 27.0;
 
     double co = cos(orient);
@@ -84,7 +84,7 @@ int f1(double t, const double * x, const double * u, double * out,
     out[order[0]] = s * co - speed * so;
     out[order[1]] = s * so + speed * co;
     out[order[2]] = angvel;
-    out[order[3]] = (a * ff - b * ft)/ I;
+    out[order[3]] = (a * ff - b * ft)/ In;
     out[order[4]] = -s * angvel + (ff + ft)/m;
 
     if (jac != NULL){
@@ -92,7 +92,7 @@ int f1(double t, const double * x, const double * u, double * out,
         jac[order[0]] = 0.0;    
         jac[order[1]] = 0.0;    
         jac[order[2]] = 0.0;
-        jac[order[3]] = a * dff / I;
+        jac[order[3]] = a * dff / In;
         jac[order[4]] = dff / m;
 
         /* jac[order[0]] = 0.0; */
