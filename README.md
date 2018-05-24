@@ -52,6 +52,6 @@ We will install the prerequisite packages (C3 and CDyn) into a generic directory
 
 Author: [Alex A. Gorodetsky](https://www.alexgorodetsky.com)  
 Contact: [goroda@umich.edu](mailto:goroda@umich.edu)  
-Copyright (c) 2015-2016, Massachusetts Institute of Technology _
+Copyright (c) 2015-2016, Massachusetts Institute of Technology__
 Copyright (c) 2018, University of Michigan  
 License: BSD
