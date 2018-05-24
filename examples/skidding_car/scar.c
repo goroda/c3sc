@@ -72,16 +72,16 @@ int f1(double t, const double * x, const double * u, double * out,
     out[order[3]] = alpha * u[1];
 
     if (jac != NULL){
-        //df1/du
+   
         jac[order[0]] = 0.0;    
         jac[order[1]] = 0.0;    
         jac[order[2]] = pre * pow(cos(u[0]),-2);
         jac[order[3]] = 0;
 
-        jac[order[0]] = 0.0;
-        jac[order[1]] = 0.0;
-        jac[order[2]] = 0.0;   
-        jac[order[3]] = alpha;
+        jac[4 + order[0]] = 0.0;
+        jac[4 + order[1]] = 0.0;
+        jac[4 + order[2]] = 0.0;   
+        jac[4 + order[3]] = alpha;
     }
 
     /* printf("x = "); dprint(4,x); */
