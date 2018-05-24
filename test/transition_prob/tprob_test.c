@@ -49,8 +49,8 @@
 #include "bellman.h"
 #include "c3sc.h"
 
-#include "cdyn/src/simulate.h"
-#include "cdyn/src/integrate.h"
+#include "cdyn/simulate.h"
+#include "cdyn/integrate.h"
 
 struct Memory
 {

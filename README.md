@@ -10,6 +10,43 @@ This library is used for these papers
 1. Alex Gorodetsky, Sertac Karaman, Youssef Marzouk: [High-Dimensional Stochastic Optimal Control using Continuous Tensor Decompositions](https://alexgorodetsky.com/wp-content/uploads/2018/02/1611.04706.pdf). In: International Journal of Robotics Research, Accepted 2018.
 2. Ezra Tal, Alex Gorodetsky, Sertac Karaman: Continuous Tensor Train-Based Dynamic Programming for High-Dimensional Zero-Sum Differential Games. In: American Control Conference (ACC), Milwaukee, WI, Accepted 2018.
 
+## Installation Instructions
+
+We will install the prerequisite packages (C3 and CDyn) into a generic directory denoted by `<c3sc-prereq>`. Replace this flag with what is appropriate for your system. Then we will tell C3SC where to find the directory. We will install C3SC into the directory denoted by `<c3sc-installed.`
+
+### Install C3 
+    ``` shell
+    git clone https://github.com/goroda/Compressed-Continuous-Computation.git c3
+    cd c3
+    mkdir build
+    cd build
+    cmake -DCMAKE_INSTALL_PREFIX=<c3sc-prereq> ..
+    make
+    make install
+    ```
+
+### Install Cdyn
+    ``` shell
+    git clone https://github.com/goroda/Compressed-Continuous-Computation.git c3
+    cd c3
+    mkdir build
+    cd build
+    cmake -DCMAKE_INSTALL_PREFIX=<c3sc-prereq> ..
+    make
+    make install
+    ```
+### Install C3SC
+
+    ``` shell
+    git clone https://github.com/goroda/Compressed-Continuous-Computation.git c3
+    cd c3
+    mkdir build
+    cd build
+    cmake -DC3_INCLUDE_DIRMAKE_INSTALL_PREFIX=<c3sc-prereq> ..
+    make
+    make install
+    ```
+
 
 <!-- http://www.alexgorodetsky.com/c3/html/ -->
 

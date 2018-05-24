@@ -6,13 +6,13 @@
 #include <getopt.h>
 
 #include "c3/c3.h"
-#include "cdyn/src/simulate.h"
-#include "cdyn/src/integrate.h"
+#include "cdyn/simulate.h"
+#include "cdyn/integrate.h"
 
-#include "c3sc/src/nodeutil.h"
-#include "c3sc/src/valuefunc.h"
-#include "c3sc/src/bellman.h"
-#include "c3sc/src/c3sc.h"
+#include "nodeutil.h"
+#include "valuefunc.h"
+#include "bellman.h"
+#include "c3sc.h"
 
 static char * program_name;
 
