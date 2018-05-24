@@ -57,19 +57,34 @@ include_directories(src)
 include_directories(..)
 
 
-SET(C3_INCLUDE_DIR "" CACHE FILEPATH "Path to Compressed Continuous Computation (C3) includes")
+set(C3_INCLUDE_DIR "" CACHE FILEPATH "Path to Compressed Continuous Computation (C3) includes")
 
-if(NOT C3_INCLUDE_DIR/c3/lib_linalg.h)
+if(NOT EXISTS "${C3_INCLUDE_DIR}/c3/lib_linalg.h")
   message(SEND_ERROR "Can't find c3/lib_linalg.h in ${C3_INCLUDE_DIR}")
 endif()
 include_directories(${C3_INCLUDE_DIR})
 
-SET(CDYN_INCLUDE_DIR "" CACHE FILEPATH "Path to CDYN includes")
+set(CDYN_INCLUDE_DIR "" CACHE FILEPATH "Path to CDYN includes")
 
-if(NOT CDYN_INCLUDE_DIR/cdyn/simulate.h)
+if(NOT EXISTS "${CDYN_INCLUDE_DIR}/cdyn/simulate.h")
   message(SEND_ERROR "Can't find cdyn/simulate.h in ${CDYN_INCLUDE_DIR}")
 endif()
 include_directories(${CDYN_INCLUDE_DIR})
+
+
+# Set c3 library
+set(C3_LIB_PATH "" CACHE FILEPATH "Path to Compressed Continuous Computation (C3) library")
+find_library(c3lib c3 PATHS ${C3_LIB_PATH})
+if(NOT c3lib)
+  message(FATAL_ERROR "c3 library not found in ${C3_LIB_PATH}")
+endif()
+
+set(CDYN_LIB_PATH "" CACHE FILEPATH "Path to CDYN library")
+find_library(cdynlib cdyn PATHS ${CDYN_LIB_PATH})
+if(NOT cdynlib)
+  message(FATAL_ERROR "cdyn library not found in ${CDYN_LIB_PATH}")
+endif()
+
 
 set(CMAKE_C_FLAGS "${compiler_flags}")
 

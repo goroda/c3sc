@@ -21,8 +21,8 @@ add_library(c3sc SHARED ${header} ${src})
 target_link_libraries(c3sc
   ${blas_lapack}
   -lm
-  c3
-  cdyn
+  ${c3lib}
+  ${cdynlib}
   )
 target_include_directories(c3sc PUBLIC 
                      $<BUILD_INTERFACE:${C3SC_SOURCE_DIR}/include>

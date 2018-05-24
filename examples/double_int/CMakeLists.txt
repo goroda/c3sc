@@ -6,6 +6,5 @@ target_link_libraries(double_int
     -g 
     c3sc
     ${blas_lapack} 
-    -lm
-    c3 )
+    -lm)
 

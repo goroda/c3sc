@@ -12,7 +12,7 @@ This library is used for these papers
 
 ## Installation Instructions
 
-We will install the prerequisite packages (C3 and CDyn) into a generic directory denoted by `<c3sc-prereq>`. Replace this flag with what is appropriate for your system. Then we will tell C3SC where to find the directory. We will install C3SC into the directory denoted by `<c3sc-installed.`
+We will install the prerequisite packages (C3 and CDyn) into a generic directory denoted by `<c3sc-prereq>`. Replace this flag with what is appropriate for your system. Then we will tell C3SC where to find the directory. We will install C3SC into the directory denoted by `<c3sc-installed>.`
 
 ### Install C3 
     ``` shell
@@ -42,7 +42,7 @@ We will install the prerequisite packages (C3 and CDyn) into a generic directory
     cd c3
     mkdir build
     cd build
-    cmake -DC3_INCLUDE_DIRMAKE_INSTALL_PREFIX=<c3sc-prereq> ..
+    cmake -DC3_INCLUDE_DIR=<c3sc-prereq>/include -DCDYN_INCLUDE_DIR=<c3sc-prereq>/include -DC3_LIB_PATH=<c3sc-prereq>/lib -DCDYN_LIB_PATH=<c3sc-prereq>/lib -DCMAKE_INSTALL_PREFIX=<c3sc-installed> ..
     make
     make install
     ```
