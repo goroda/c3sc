@@ -44,7 +44,7 @@ int f1(double t, const double * x, const double * u, double * out,
     double rho = 1.292;
     double S_w = 0.1;
     double S_e = 0.025;
-    double I = 6e-3;
+    double In = 6e-3;
     double l = 0.35;
     double l_w = -0.03;
     double l_e = 0.04;
@@ -130,7 +130,7 @@ int f1(double t, const double * x, const double * u, double * out,
     out[3] = u[0];
     out[4] = (-f_w * s_t - f_e * s_tp) / m;
     out[5] = (f_w*c_t + f_e*c_tp - m * g)/ m;
-    out[6] = (-f_w * l_w - f_e*( l*c_p+ l_e))/ I;
+    out[6] = (-f_w * l_w - f_e*( l*c_p+ l_e))/ In;
 
     if (grad != NULL){
 
@@ -152,7 +152,7 @@ int f1(double t, const double * x, const double * u, double * out,
         grad[3] = 1.0;
         grad[4] = -s_tp / m * dfe_du;
         grad[5] = c_tp / m * dfe_du;
-        grad[6] = -(l*c_p + l_e) / I * dfe_du;
+        grad[6] = -(l*c_p + l_e) / In * dfe_du;
     }
 
     return 0;
