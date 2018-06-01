@@ -4,6 +4,7 @@
 #include <math.h>
 #include <assert.h>
 #include <getopt.h>
+#include <time.h>
 
 #include "c3/c3.h"
 #include "cdyn/simulate.h"
@@ -23,13 +24,12 @@ void print_code_usage (FILE * stream, int exit_code)
     fprintf(stream, "Usage: %s options \n", program_name);
     fprintf(stream,
             " -h --help      Display this usage information.\n"
-            " -x --xdim      Number of state dimensions\n"
             " -d --directory Output directory (defaults to .)\n"
             " -n --nodes     Number of nodes (defaults to 20)\n"
             " -a --lbu       Lower bound of control (default -1.0)\n"
             " -b --ubu       Upper bound of control (default 1.0)\n"
-            " -r --diff1     Size of diffusion for x (default 1.0)\n"
-            " -f --diff2     Size of diffusion for y (default 1.0)\n"
+            " -r --diff1     Size of diffusion for x (default 0.01)\n"
+            " -f --diff2     Size of diffusion for y (default 0.01)\n"
             " -s --steps     Number of iterations (default 100)\n"
             " -t --type      0 for absorb 1 for reflect (default 0)\n"
             " -e --epsilon   rounding tol (default is 1e-7)\n"
@@ -83,17 +83,20 @@ int f1(double t, const double * x, const double * u, double * out,
     (void)(t);
     (void)(args);
 
-    for (size_t ii = 0; ii < dim-1; ii++){
-        out[ii] = x[ii+1];
-    }
-    out[dim-1] = u[0];
+    /* double a = 0.423; */
+    /* double b = 2.0; */
+    /* double c = 4.0; */
+    double a = 0.1;
+    double b = 0.1;
+    double c = 14.0;
+    out[0] = -x[1] - x[2];
+    out[1] = x[0] + a*x[1] + u[0];
+    out[2] = b + x[2]*(x[0] - c);
 
     if (jac != NULL){
-
-        for (size_t ii = 0; ii < dim-1; ii++){
-            jac[ii] = 0.0;
-        }
-        jac[dim] = 1.0;
+        jac[0] = 0;
+        jac[1] = 1;
+        jac[2] = 0;
     }
 
     return 0;
@@ -131,10 +134,17 @@ int stagecost(double t,const double * x,const double * u, double * out,
     (void)(t);
     (void)(x);
     (void)(u);
+
+    double scale = 1e2;
     *out = 0.0;
-    *out = 1.0;
+    for (size_t ii = 0; ii < dim; ii++){
+        *out = *out + scale*x[ii]*x[ii];
+    }
+
+    double rho = 1e0;
+    *out += rho * u[0] * u[0];
     if (grad!= NULL){
-        grad[0] = 0.0;
+        grad[0] = 2.0 * rho * u[0];
     }
     return 0;
 }
@@ -164,14 +174,12 @@ int ocost(const double * x,double * out)
 int startcost(size_t N, const double * x, double * out, void * args)
 {
     (void)(args);
+    double scale = 10.0;
     for (size_t ii = 0; ii < N; ii++){
-        /* printf("ii = %zu, x = ",ii); dprint(2,x+ii); */
         out[ii] = 0.0;
         for (size_t jj = 0; jj < dim; jj++){
-            out[ii] += (x[dim*ii+jj]*x[dim*ii+jj]);
+            out[ii] += scale*(x[dim*ii+jj]*x[dim*ii+jj]);
         }
-        /* out[ii] = 3.0*x[2*ii+0]*x[2*ii+0] + 4.0*x[2*ii+1]*x[2*ii+1]; */
-        /* out[ii] = 0.2; */
     }
     /* printf("done\n"); */
     return 0;
@@ -179,12 +187,12 @@ int startcost(size_t N, const double * x, double * out, void * args)
 
 int main(int argc, char * argv[])
 {
+    srand(time(NULL));
     int next_option;
-    const char * const short_options = "hd:x:n:a:b:r:f:s:t:e:v:";
+    const char * const short_options = "hd:n:a:b:r:f:s:e:v:";
     const struct option long_options[] = {
         { "help"     , 0, NULL, 'h' },
         { "directory", 1, NULL, 'd' },
-        { "xdim"     , 1, NULL, 'x' },
         { "nodes"    , 1, NULL, 'n' },
         { "lbu"      , 1, NULL, 'a' },
         { "ubu"      , 1, NULL, 'b' },
@@ -192,7 +200,6 @@ int main(int argc, char * argv[])
         { "diff2"    , 1, NULL, 'f' },
         { "steps"    , 1, NULL, 's' },
         { "epsilon"  , 1, NULL, 'e' },
-        { "bctype"   , 1, NULL, 't' },
         { "verbose"  , 1, NULL, 'v' },
         { NULL       , 0, NULL, 0   }
     };
@@ -202,23 +209,20 @@ int main(int argc, char * argv[])
     int verbose = 0;
     size_t N = 20;
     size_t niter = 100;
-    double lbu[1] = {-1.0};
-    double ubu[1] = {1.0};
-    double ss[2] = {1.0,1.0};
-    double roundtol = 1e-7;
-    dim = 2;
-    int bctype = 0;
+    double lbu[1] = {-4.0};
+    double ubu[1] = {4.0};
+    double ss[3] = {1e0,1e0,1e0};
+    double roundtol = 1e-8;
+    dim = 3;
     do {
-        next_option = getopt_long (argc, argv, short_options, long_options, NULL);
+        next_option = getopt_long (argc, argv, short_options, long_options,
+                                   NULL);
         switch (next_option)
         {
             case 'h': 
                 print_code_usage(stdout, 0);
             case 'd':
                 dirout = optarg;
-                break;
-            case 'x':
-                dim = strtoul(optarg,NULL,10);
                 break;
             case 'n':
                 N = strtoul(optarg,NULL,10);
@@ -237,9 +241,6 @@ int main(int argc, char * argv[])
                 break;
             case 's':
                 niter = strtoul(optarg,NULL,10);
-                break;
-            case 't':
-                bctype = strtoul(optarg,NULL,10);
                 break;
             case 'e':
                 roundtol = strtod(optarg,NULL);
@@ -264,32 +265,32 @@ int main(int argc, char * argv[])
     double * ub = calloc_double(dx);
     size_t * Narr = calloc_size_t(dx);
     for (size_t ii = 0; ii < dx; ii++){
-        lb[ii] = -2.0;
-        ub[ii] = 2.0;
+        lb[ii] = -1.0;
+        ub[ii] = 1.0;
         Narr[ii] = N;
     }
     double beta = 0.1;
 
     // optimization arguments
-    struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du);
-    size_t dopts = 3;
-    double uopts[3] = {lbu[0],0.0,ubu[0]};
-    c3opt_set_brute_force_vals(opt,dopts,uopts);
-    /* struct c3Opt * opt = c3opt_alloc(BFGS,du); */
-    /* c3opt_add_lb(opt,lbu); */
-    /* c3opt_add_ub(opt,ubu); */
-    /* c3opt_set_absxtol(opt,1e-8); */
-    /* c3opt_set_relftol(opt,1e-8); */
-    /* c3opt_set_gtol(opt,1e-25); */
-    /* c3opt_set_verbose(opt,0); */
+    /* struct c3Opt * opt = c3opt_alloc(BRUTEFORCE,du); */
+    /* size_t dopts = 3; */
+    /* double uopts[3] = {lbu[0],0.0,ubu[0]}; */
+    /* c3opt_set_brute_force_vals(opt,dopts,uopts); */
+    struct c3Opt * opt = c3opt_alloc(BFGS,du);
+    c3opt_add_lb(opt,lbu);
+    c3opt_add_ub(opt,ubu);
+    c3opt_set_absxtol(opt,1e-8);
+    c3opt_set_relftol(opt,1e-8);
+    c3opt_set_gtol(opt,1e-25);
+    c3opt_set_verbose(opt,0);
     
     // cross approximation tolerances
     struct ApproxArgs * aargs = approx_args_init();
     approx_args_set_cross_tol(aargs,1e-10);
     approx_args_set_round_tol(aargs,roundtol);
-    approx_args_set_kickrank(aargs,5);
+    approx_args_set_kickrank(aargs,2);
     approx_args_set_adapt(aargs,1);
-    approx_args_set_startrank(aargs,5);
+    approx_args_set_startrank(aargs,2);
     approx_args_set_maxrank(aargs,N);
 
     // setup problem
@@ -300,18 +301,18 @@ int main(int argc, char * argv[])
     c3control_add_boundcost(c3c,boundcost);
     c3control_add_obscost(c3c,ocost);
     
-    if (bctype == 1){
-        for (size_t ii = 0; ii < dx; ii++){
-            c3control_set_external_boundary(c3c,ii,"reflect");
-        }
+
+    for (size_t ii = 0; ii < dx; ii++){
+        c3control_set_external_boundary(c3c,ii,"reflect");
     }
+
 
     double * center = calloc_double(dx);
     double * width = calloc_double(dx);
     for (size_t ii = 0; ii < dx; ii++){
         width[ii] = 0.4;
     }
-    c3control_add_obstacle(c3c,center,width);
+    /* c3control_add_obstacle(c3c,center,width); */
     
     char filename[256];
     sprintf(filename,"%s/%s_%d.c3",dirout,"costfunc",0);
@@ -319,6 +320,7 @@ int main(int argc, char * argv[])
     /* struct ValueF * cost = NULL; */
     struct ValueF * cost = valuef_load(filename,Narr,xgrid);
     if (cost == NULL){
+        printf("NOT HERE\n");
         cost = c3control_init_value(c3c,startcost,NULL,aargs,0);
     }
 
@@ -384,38 +386,28 @@ int main(int argc, char * argv[])
         iprint_sz(dx+1,ranks);
     }
 
-
-
     c3control_add_policy_sim(c3c,cost,opt,NULL);
     
     printf("created policy\n");
-    /* char odename[256] = "rk4"; */
-    char odename[256] = "forward-euler";
+    char odename[256] = "rk4";
+    /* char odename[256] = "forward-euler"; */
     struct Integrator * ode_sys = NULL;
     ode_sys = integrator_create_controlled(dx,1,f1,NULL,
                                            c3control_controller,c3c);
     integrator_set_type(ode_sys,odename);
-    integrator_set_dt(ode_sys,1e-2);
+    integrator_set_dt(ode_sys,1e-3);
     integrator_set_verbose(ode_sys,0);
 
     // Initialize trajectories for state
+    
     double time = 0.0;
     double * state = calloc_double(dx);
     for (size_t ii = 0; ii < dx; ii++){
-        if (ii % 2 == 0){
-            state[ii] = 0.1;
-        }
-        else{
-            state[ii] = -0.1;
-        }
+        /* state[ii] = 0.5; */
+        /* state[ii] = 0.8; */
+        state[ii] = randu()*2.0-1.0;
     }
-    if (dx >= 3){
-        state[dx-3] = 0.4;
-    }
-    if (dx >= 2){
-        state[dx-2] = -0.4;
-        state[dx-1] = 0.4;
-    }
+
     /* double state[2] = {-0.5, -0.5}; */
     double con[1] = {0.0};
     // Integrate
@@ -431,7 +423,7 @@ int main(int argc, char * argv[])
         time = time + dt;
     }
     printf("Saving Trajectory\n");
-    sprintf(filename,"%s/%s.dat",dirout,"traj");
+    sprintf(filename,"%s/%s.dat",dirout,"traj1");
     FILE * fp = fopen(filename,"w");
     assert (fp != NULL);
     trajectory_print(traj,fp,4);
