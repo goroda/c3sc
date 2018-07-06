@@ -41,8 +41,8 @@ make install
 ### Install C3SC
 
 ```shell
-git clone https://github.com/goroda/Compressed-Continuous-Computation.git c3
-cd c3
+git clone https://github.com/goroda/c3sc.git c3sc
+cd c3sc
 mkdir build
 cd build
 cmake -DC3_INCLUDE_DIR=<c3sc-prereq>/include -DCDYN_INCLUDE_DIR=<c3sc-prereq>/include -DC3_LIB_PATH=<c3sc-prereq>/lib -DCDYN_LIB_PATH=<c3sc-prereq>/lib -DCMAKE_INSTALL_PREFIX=<c3sc-installed> ..
