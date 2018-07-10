@@ -29,7 +29,10 @@ target_include_directories(c3sc PUBLIC
                      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                      $<INSTALL_INTERFACE:${include_dest}>
                      $<INSTALL_INTERFACE:${lib_dest}>)
+                   
+# install(TARGETS c3sc EXPORT c3sc DESTINATION "${lib_dest}")
+# install(FILES ${header} DESTINATION "${include_dest}")
 
-install(TARGETS c3sc EXPORT c3sc DESTINATION "${lib_dest}")
-install(FILES ${header} DESTINATION "${include_dest}")
+install(TARGETS c3sc DESTINATION lib)
+install(FILES ${header} DESTINATION include/c3sc)
 

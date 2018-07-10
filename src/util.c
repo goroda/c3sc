@@ -44,7 +44,7 @@
 #include <string.h>
 
 #include "util.h"
-#include "cdyn/src/simulate.h"
+#include "cdyn/simulate.h"
 
 /////////////////////////////////////////////
 /// Packing a double

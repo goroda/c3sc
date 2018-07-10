@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.0)
 project (C3SC)
 
 #create my libray
@@ -8,34 +8,41 @@ set(C3SC_VERSION "${C3SC_VERSION_MAJOR}.${C3SC_VERSION_MINOR}" CACHE STRING "ver
 
 option(C3SC_DEBUG_MODE "whether or not debug mode is activated" OFF)
 
-set(include_dest "include/c3sc")
-set(main_lib_dest "lib/c3sc")
-set(lib_dest "${main_lib_dest}/${CMAKE_BUILD_TYPE}")
+include(c3sc.cmake)
+c3_always_full_rpath()
+
+# set(include_dest "include/c3sc")
+# set(main_lib_dest "lib/c3sc")
+# set(lib_dest "${main_lib_dest}/${CMAKE_BUILD_TYPE}")
 
 if (APPLE)
-    option(USE_CLANG "build application with clang" ON)
+  set(CMAKE_MACOSX_RPATH 1)
+
+  option(USE_CLANG "build application with clang" ON)
+  # set(compiler_flags "-std=c99 -O2 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn -fopenmp=libomp -Wno-reserved-id-macro")
+    # set(CMAKE_C_COMPILER "/opt/local/bin/clang-mp-4.0")
+
+    set(compiler_flags "-std=c99 -O2 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn -Wno-reserved-id-macro")
+
     include_directories(/opt/local/include)
     find_library(macblas
-        NAMES ACCELERATE
-        PATHS ${CMAKE_OSX_SYSROOT}/System/Library
-        PATH_SUFFIXES Frameworks
-        NO_DEFAULT_PATH)
+      NAMES ACCELERATE
+      PATHS ${CMAKE_OSX_SYSROOT}/System/Library
+      PATH_SUFFIXES Frameworks
+      NO_DEFAULT_PATH)
 
     set(blas_lapack ${macblas}/Accelerate)
-    set(compiler_flags "-std=c99 -O2 -Wall -Weverything -Wno-shorten-64-to-32 -Wno-padded -Wno-missing-prototypes -Wno-format-nonliteral -Wno-disabled-macro-expansion -Wno-missing-noreturn -fopenmp=libomp -Wno-reserved-id-macro")
-    set(CMAKE_C_COMPILER "/opt/local/bin/clang-mp-4.0")
-    #set(CMAKE_C_COMPILER "clang")
 
-    set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} /opt/local/lib)
 else ()
     set(compiler_flags "-g -O2 -ftree-vectorize -Wall -Wextra -std=c99 -fno-omit-frame-pointer")
 
     set(CMAKE_C_COMPILER "gcc")
-
+    include_directories(/usr/include)
+    
     find_package(BLAS REQUIRED)
     find_package(LAPACK REQUIRED)
 
-    include_directories(/usr/include)
+    include_directories(${BLAS_INCLUDE_DIR}, ${LAPACK_INCLUDE_DIR})
     set(blas_lapack ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 
 endif()
@@ -52,10 +59,7 @@ if (USE_OPEN_MP)
 endif()
 
 
-include_directories(${BLAS_INCLUDE_DIR}, ${LAPACK_INCLUDE_DIR})
 include_directories(src)
-include_directories(..)
-
 
 set(C3_INCLUDE_DIR "" CACHE FILEPATH "Path to Compressed Continuous Computation (C3) includes")
 
@@ -88,13 +92,13 @@ endif()
 
 set(CMAKE_C_FLAGS "${compiler_flags}")
 
-SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+# SET(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 add_subdirectory(src)
 add_subdirectory(examples)
 add_subdirectory(miscellaneous)
 add_subdirectory(test)
 
-install(FILES cmake/c3sc-config.cmake DESTINATION ${main_lib_dest})
-install(EXPORT c3sc DESTINATION ${lib_dest})
+# install(FILES cmake/c3sc-config.cmake DESTINATION ${main_lib_dest})
+# install(EXPORT c3sc DESTINATION ${lib_dest})
 
